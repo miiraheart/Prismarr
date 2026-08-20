@@ -31,13 +31,16 @@ jobs:
       - name: Fetch upstream
         run: |
           git remote add upstream https://github.com/Shoshuo/Prismarr.git || true
-          git fetch upstream --tags --prune
+          git fetch upstream --prune
 
       - name: Fast-forward main
         run: |
           git checkout -B main origin/main
           if git merge --ff-only upstream/main; then
-            git push origin main --follow-tags
+            # NB: no --follow-tags. Upstream tags carry .github/workflows/*, and
+            # GITHUB_TOKEN is refused when a push would create or update a
+            # workflow file. Pushing tags would need a PAT with `workflow` scope.
+            git push origin main
           else
             echo "::error::main is not a fast-forward of upstream/main. It should never be edited directly."
             exit 1
