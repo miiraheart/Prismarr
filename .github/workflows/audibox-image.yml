@@ -69,6 +69,12 @@ jobs:
           file: docker/frankenphp/Dockerfile
           platforms: linux/amd64
           push: true
+          # Emit a plain image manifest, not an OCI image index. buildx wraps even a
+          # single-platform build in an index when attestations are on, and WUD then
+          # compares the platform manifest digest against the index digest and never
+          # sees a match -> digest watching silently never reports an update.
+          provenance: false
+          sbom: false
           build-args: |
             PRISMARR_VERSION=${{ steps.ver.outputs.version }}
           tags: |
