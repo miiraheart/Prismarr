@@ -1,0 +1,73 @@
+name: Sync with upstream
+
+# Keeps `main` a pristine fast-forward mirror of Shoshuo/Prismarr, then merges
+# it into `audibox` (this fork's working branch). If the merge is clean it is
+# pushed automatically; if it conflicts, a PR main -> audibox is opened so the
+# conflicts can be resolved by hand instead of silently piling up.
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/Shoshuo/Prismarr.git || true
+          git fetch upstream --tags --prune
+
+      - name: Fast-forward main
+        run: |
+          git checkout -B main origin/main
+          if git merge --ff-only upstream/main; then
+            git push origin main --follow-tags
+          else
+            echo "::error::main is not a fast-forward of upstream/main. It should never be edited directly."
+            exit 1
+          fi
+
+      - name: Merge main into audibox
+        id: merge
+        run: |
+          git checkout audibox
+          if git merge --no-edit main; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push audibox
+        if: steps.merge.outputs.clean == 'true'
+        run: git push origin audibox
+
+      - name: Open PR on conflict
+        if: steps.merge.outputs.clean == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh pr list --base audibox --head main --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "PR #$existing already open for this sync."
+          else
+            gh pr create --base audibox --head main \
+              --title "Upstream sync needs manual merge" \
+              --body "Automatic merge of \`main\` (upstream mirror) into \`audibox\` hit conflicts. Resolve them here."
+          fi

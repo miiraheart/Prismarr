@@ -1,0 +1,54 @@
+name: Build audibox image
+
+# Builds this fork's `audibox` branch and publishes it to GHCR so audibox can
+# pull it like any other image. amd64 only: the target server is amd64, and
+# skipping the arm64 emulation leg cuts build time roughly in half.
+
+on:
+  push:
+    branches: [audibox]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/prismarr
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase image name
+        id: img
+        run: echo "name=$(echo '${{ env.IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/frankenphp/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            PRISMARR_VERSION=audibox-${{ github.sha }}
+          tags: |
+            ${{ steps.img.outputs.name }}:audibox
+            ${{ steps.img.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
