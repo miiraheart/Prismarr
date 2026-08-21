@@ -1,0 +1,1276 @@
+{% import '_icons.html.twig' as ico %}
+
+{# ── Shared TMDb detail modal ──────────────────────────────────────────────
+   Extracted verbatim from decouverte/index.html.twig so the Trakt page can
+   open the SAME modal instead of a second, thinner one. Nothing here is
+   Decouverte-specific: every Twig expression in it is a translation or an
+   icon, so it renders identically wherever it is included.
+
+   Contract for a host page:
+     window.PrismarrDetail.load(type, id)   open the modal for a TMDb id
+     window.PrismarrDetail.extraActions     optional fn(d) -> array of button
+                                            HTML appended to the action column
+     window.__prismarrPushRecent            optional fn(item), "recently viewed"
+
+   The helpers this modal needs (escHtml, TMDB_I18N, seasonsEpisodes,
+   renderCardHTML, voteClass) are published on window because the Decouverte
+   page's own code calls them too and its call sites were left untouched.
+#}
+<style>
+  /* ── media-card (mimique de templates/media/films.html.twig) ── */
+  .media-card[data-tmdb-id] {
+    flex: 0 0 150px; width: 150px;
+    position: relative; border-radius: .5rem; overflow: hidden;
+    background: var(--tblr-bg-surface);
+    border: 1px solid var(--tblr-border-color);
+    cursor: pointer; transition: transform .15s, box-shadow .15s;
+  }
+  .media-card[data-tmdb-id]:hover {
+    transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.3);
+    z-index: 2;
+  }
+  .media-card[data-tmdb-id] img {
+    width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block;
+  }
+  .media-card[data-tmdb-id] .no-poster {
+    width: 100%; aspect-ratio: 2/3;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--tblr-bg-surface-secondary);
+    color: var(--tblr-muted); font-size: 1.5rem;
+  }
+  .media-card[data-tmdb-id] .card-overlay {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,.85));
+    padding: .5rem .4rem .4rem;
+  }
+  .media-card[data-tmdb-id] .card-title-text {
+    font-size: .72rem; font-weight: 600; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .media-card[data-tmdb-id] .card-year { font-size: .62rem; color: rgba(255,255,255,.6); }
+  .media-card[data-tmdb-id] .quality-badge {
+    position: absolute; top: .4rem; left: .4rem;
+    font-size: .6rem; font-weight: 700; padding: .1rem .35rem;
+    border-radius: .25rem; background: rgba(0,0,0,.65); color: #fff;
+    backdrop-filter: blur(4px);
+  }
+  .media-card[data-tmdb-id] .quality-badge.movie { background: rgba(255,194,48,.92); color: #1a1a1a; }
+  .media-card[data-tmdb-id] .quality-badge.tv    { background: rgba(0,204,255,.92);  color: #1a1a1a; }
+  .media-card[data-tmdb-id] .lib-badge {
+    position: absolute; top: .4rem; left: calc(.4rem + 2.2rem + .25rem);
+    font-size: .6rem; font-weight: 700; padding: .1rem .35rem;
+    border-radius: .25rem; color: #fff;
+    backdrop-filter: blur(4px);
+  }
+  .media-card[data-tmdb-id] .vote-badge {
+    position: absolute; bottom: 0; right: 0;
+    font-size: .62rem; font-weight: 700; padding: .1rem .35rem;
+    border-top-left-radius: .3rem;
+    color: #fff; z-index: 2;
+  }
+  .media-card[data-tmdb-id] .vote-badge.good { background: rgba(34,197,94,.9); }
+  .media-card[data-tmdb-id] .vote-badge.mid  { background: rgba(245,158,11,.9); }
+  .media-card[data-tmdb-id] .vote-badge.bad  { background: rgba(239,68,68,.9); }
+
+  /* Hover info (style Radarr/Sonarr) */
+  .media-card[data-tmdb-id] .hover-info {
+    position: absolute; inset: 0; background: rgba(0,0,0,.8);
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: .55rem; opacity: 0; transition: opacity .2s;
+    pointer-events: none; z-index: 5;
+  }
+  .media-card[data-tmdb-id]:hover .hover-info { opacity: 1; pointer-events: auto; }
+  .media-card[data-tmdb-id]:hover .card-overlay,
+  .media-card[data-tmdb-id]:hover .quality-badge,
+  .media-card[data-tmdb-id]:hover .lib-badge,
+  .media-card[data-tmdb-id]:hover .vote-badge { opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .media-card[data-tmdb-id]:hover .wl-star { z-index: 8; }
+
+  /* Countdown badge J-X */
+  .media-card[data-tmdb-id] .countdown-badge {
+    position: absolute; top: .4rem; right: .4rem;
+    font-size: .55rem; font-weight: 700; padding: .1rem .35rem;
+    border-radius: .25rem; background: rgba(245,158,11,.9); color: #fff;
+    backdrop-filter: blur(4px); z-index: 3;
+  }
+  .media-card[data-tmdb-id]:hover .countdown-badge { opacity: 0; pointer-events: none; transition: opacity .2s; }
+
+  /* Vu récemment — cards compactes */
+  #tmdb-recent-row .media-card[data-tmdb-id] { flex: 0 0 100px; width: 100px; }
+  #tmdb-recent-row .media-card[data-tmdb-id] .quality-badge,
+  #tmdb-recent-row .media-card[data-tmdb-id] .lib-badge,
+  #tmdb-recent-row .media-card[data-tmdb-id] .countdown-badge,
+  #tmdb-recent-row .media-card[data-tmdb-id] .vote-badge { display: none; }
+  #tmdb-recent-row .media-card[data-tmdb-id] .card-title-text { font-size: .6rem; }
+  #tmdb-recent-row .media-card[data-tmdb-id] .card-year { font-size: .5rem; }
+  .media-card[data-tmdb-id] .hover-info .h-title {
+    font-size: .75rem; font-weight: 700; color: #fff; line-height: 1.2;
+    margin-bottom: .15rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .media-card[data-tmdb-id] .hover-info .h-year { font-size: .65rem; color: rgba(255,255,255,.65); margin-bottom: .35rem; }
+  .media-card[data-tmdb-id] .hover-info .h-actions { display: flex; gap: .25rem; flex-direction: column; }
+  .media-card[data-tmdb-id] .hover-info .h-actions .btn { font-size: .65rem; padding: .2rem .4rem; }
+
+  /* Watchlist star button */
+  .media-card[data-tmdb-id] .wl-star {
+    position: absolute; top: .3rem; right: .3rem;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(0,0,0,.5); border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity .15s;
+    z-index: 6; padding: 0;
+  }
+  .media-card[data-tmdb-id]:hover .wl-star { opacity: 1; }
+  .media-card[data-tmdb-id] .wl-star svg { width: 14px; height: 14px; }
+  .media-card[data-tmdb-id] .wl-star.in-wl { opacity: 1; background: rgba(245,158,11,.85); }
+  .media-card[data-tmdb-id] .wl-star.in-wl:hover { background: rgba(245,158,11,1); }
+  .media-card[data-tmdb-id] .wl-star:not(.in-wl):hover { background: rgba(245,158,11,.6); }
+
+  /* Overrides contextuels */
+  .tmdb-results-grid .media-card[data-tmdb-id] { flex: none; width: auto; }
+  .td-similar-row .media-card[data-tmdb-id] { flex: 0 0 110px; width: 110px; }
+
+  /* TMDb detail modal — calqué sur le modal Films */
+  #tmdb-detail-modal .modal-content { background: var(--tblr-bg-surface); }
+
+  .td-backdrop {
+    position: relative; min-height: 200px;
+    background-size: cover; background-position: center top;
+    background-repeat: no-repeat;
+  }
+  .td-backdrop::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(24,24,27,1) 0%, rgba(24,24,27,.85) 40%, rgba(24,24,27,.4) 100%);
+  }
+  .td-backdrop-content {
+    position: relative; z-index: 1;
+    padding: 2.5rem 1.5rem 1rem;
+  }
+  .td-rating-badge {
+    display: inline-flex; align-items: center; gap: .3rem;
+    font-size: .78rem; font-weight: 600;
+    padding: .2rem .5rem; border-radius: .3rem;
+    background: rgba(255,255,255,.12); color: #fff;
+  }
+  .td-genre-badge {
+    font-size: .68rem; padding: .15rem .45rem;
+    border-radius: 1rem; background: rgba(255,255,255,.1);
+    color: rgba(255,255,255,.75); border: 1px solid rgba(255,255,255,.15);
+  }
+  .td-poster-col img {
+    width: 100%; border-radius: .5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  }
+
+  .td-cast-scroll {
+    display: flex; gap: .75rem; overflow-x: auto;
+    padding-bottom: .5rem; scrollbar-width: thin;
+  }
+  .td-cast-card { flex-shrink: 0; width: 90px; text-align: center; }
+  .td-cast-card img {
+    width: 64px; height: 64px; border-radius: 50%;
+    object-fit: cover; background: var(--tblr-bg-surface-secondary);
+  }
+  .td-cast-card .cast-name { font-size: .7rem; font-weight: 600; line-height: 1.2; margin-top: .3rem; }
+  .td-cast-card .cast-role { font-size: .62rem; color: var(--tblr-muted); line-height: 1.2; display: block; }
+
+  .td-trailer {
+    position: relative; aspect-ratio: 16/9;
+    border-radius: .5rem; overflow: hidden; background: #000;
+  }
+  .td-trailer iframe { width: 100%; height: 100%; border: 0; }
+
+  .td-similar-row {
+    display: flex; gap: .5rem; overflow-x: auto;
+    padding-bottom: .4rem; scrollbar-width: thin;
+  }
+
+  /* Saisons : carousel horizontal de cards avec poster + méta */
+  .td-seasons-scroll {
+    display: flex; gap: .6rem; overflow-x: auto;
+    padding: .2rem .2rem .6rem; scrollbar-width: thin;
+  }
+  .td-seasons-scroll::-webkit-scrollbar { height: 6px; }
+  .td-seasons-scroll::-webkit-scrollbar-thumb { background: var(--tblr-border-color); border-radius: 3px; }
+  .td-season-card {
+    flex: 0 0 120px; width: 120px;
+    background: var(--tblr-bg-surface-secondary);
+    border: 1px solid var(--tblr-border-color);
+    border-radius: .4rem; overflow: hidden;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .td-season-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+  .td-season-card img {
+    width: 100%; aspect-ratio: 2/3; object-fit: cover;
+    background: var(--tblr-bg-surface); display: block;
+  }
+  .td-season-card .no-poster {
+    width: 100%; aspect-ratio: 2/3; background: var(--tblr-bg-surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--tblr-muted);
+  }
+  .td-season-card .season-body { padding: .4rem; }
+  .td-season-card .season-name {
+    font-weight: 600; font-size: .75rem; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: .15rem;
+  }
+  .td-season-card .season-meta {
+    font-size: .65rem; color: var(--tblr-muted); line-height: 1.3;
+  }
+  .td-season-card .season-vote { color: #f5c518; font-weight: 700; }
+
+  /* Infos rapides clé-valeur dans la colonne gauche */
+  .td-quickinfo {
+    display: flex; flex-direction: column; gap: .25rem;
+    font-size: .75rem;
+  }
+  .td-quickinfo .qi-row {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .3rem .4rem; border-radius: .3rem;
+    background: var(--tblr-bg-surface-secondary);
+  }
+  .td-quickinfo .qi-icon {
+    width: 20px; text-align: center; color: var(--tblr-muted); flex-shrink: 0;
+  }
+  .td-quickinfo .qi-label {
+    color: var(--tblr-muted); flex-shrink: 0; min-width: 65px; font-size: .7rem;
+  }
+  .td-quickinfo .qi-value {
+    color: var(--tblr-body-color); font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1; text-align: right;
+  }
+
+  /* Providers compacts (logos plus petits) */
+  #td-providers .provider-group {
+    margin-bottom: .3rem; font-size: .72rem;
+  }
+  #td-providers .provider-group-label {
+    color: var(--tblr-muted); margin-bottom: .2rem; font-size: .7rem;
+  }
+  #td-providers .provider-logos { display: flex; flex-wrap: wrap; gap: .2rem; }
+  #td-providers .provider-logos img {
+    width: 28px; height: 28px; border-radius: 5px; object-fit: cover;
+  }
+
+  /* Galerie backdrops (horizontal scroll, 16:9 thumbs) */
+  .td-backdrops-scroll {
+    display: flex; gap: .5rem; overflow-x: auto;
+    padding: .2rem .2rem .6rem; scrollbar-width: thin;
+  }
+  .td-backdrops-scroll::-webkit-scrollbar { height: 6px; }
+  .td-backdrops-scroll::-webkit-scrollbar-thumb { background: var(--tblr-border-color); border-radius: 3px; }
+  .td-backdrop-thumb {
+    flex: 0 0 240px; width: 240px; aspect-ratio: 16/9;
+    border-radius: .4rem; overflow: hidden; cursor: pointer;
+    border: 1px solid var(--tblr-border-color);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .td-backdrop-thumb:hover { transform: scale(1.03); box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+  .td-backdrop-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* Lightbox plein écran pour backdrops */
+  .td-lightbox {
+    position: fixed; inset: 0; z-index: 1080;
+    background: rgba(0,0,0,.95);
+    display: none; align-items: center; justify-content: center;
+    cursor: zoom-out;
+  }
+  .td-lightbox.show { display: flex; }
+  .td-lightbox img { max-width: 96vw; max-height: 96vh; object-fit: contain; }
+  .td-lightbox .close-x {
+    position: absolute; top: 20px; right: 20px;
+    background: rgba(255,255,255,.2); color: #fff;
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; cursor: pointer;
+  }
+
+  .td-video-btn {
+    border: 1px solid var(--tblr-border-color);
+    background: var(--tblr-bg-surface-secondary);
+    padding: .2rem .5rem; font-size: .72rem;
+    border-radius: .25rem; cursor: pointer;
+    transition: all .15s;
+  }
+  .td-video-btn:hover { background: var(--tblr-primary); color: white; border-color: var(--tblr-primary); }
+  .td-video-btn.active { background: var(--tblr-primary); color: white; border-color: var(--tblr-primary); }
+</style>
+
+{# ── Full-screen lightbox for backdrop gallery ─────────────────────────── #}
+<div class="td-lightbox" id="td-lightbox">
+  <div class="close-x" data-td-lb-close>×</div>
+  <img id="td-lightbox-img" src="" alt="">
+</div>
+
+{# ── TMDb detail modal ─────────────────────────────────────────────────────── #}
+<div class="modal modal-blur fade" id="tmdb-detail-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-fullscreen-lg-down modal-xl" role="document" style="margin-top:1rem;">
+    <div class="modal-content" style="background:var(--tblr-bg-surface)">
+      <div id="tmdb-detail-loading" style="padding:4rem; text-align:center;">
+        <div class="spinner-border text-primary" role="status"></div>
+      </div>
+      <div id="tmdb-detail-content" style="display:none;">
+
+        {# ── Header backdrop ── #}
+        <div class="td-backdrop" id="td-backdrop">
+          <div class="td-backdrop-content">
+            <div class="d-flex justify-content-between align-items-start">
+              <div style="max-width:85%">
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                  <span id="td-type-badge" class="badge"></span>
+                  <h2 class="text-white mb-0" id="td-title" style="text-shadow:0 2px 8px rgba(0,0,0,.6)"></h2>
+                </div>
+                <div id="td-original" class="text-white-50 small mb-1" style="display:none"></div>
+                <div id="td-tagline" class="text-white-50 fst-italic small mb-2" style="display:none"></div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                  <span id="td-year" class="text-white-50 fw-medium"></span>
+                  <span id="td-runtime" class="text-white-50 small" style="display:none"></span>
+                  <span id="td-meta-seasons" class="text-white-50 small" style="display:none"></span>
+                  <span id="td-status-info" class="text-white-50 small" style="display:none"></span>
+                  <span id="td-rating-tmdb" class="td-rating-badge" style="display:none">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#01d277" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/></svg>
+                    <span id="td-rating-tmdb-val"></span>
+                  </span>
+                </div>
+                <div id="td-genres" class="d-flex flex-wrap gap-1 mt-2"></div>
+              </div>
+              <button type="button" class="btn-close btn-close-white ms-2 mt-1" data-bs-dismiss="modal" aria-label="{{ 'decouverte.action.close'|trans }}" style="filter:drop-shadow(0 0 2px rgba(0,0,0,.8))"></button>
+            </div>
+          </div>
+        </div>
+
+        {# ── Body 2 colonnes ── #}
+        <div class="modal-body pt-3">
+          <div class="row g-4">
+
+            {# Left column: poster + status + actions + providers #}
+            <div class="col-md-5 col-lg-4">
+              <div class="td-poster-col mb-3">
+                <img id="td-poster" src="" alt="" loading="lazy" style="display:none">
+              </div>
+
+              <div class="d-flex flex-wrap gap-2 mb-3" id="td-status-badges"></div>
+
+              <div class="d-grid gap-2 mb-3" id="td-actions"></div>
+
+              <div class="d-flex gap-2 mb-3 flex-wrap" id="td-external-links"></div>
+
+              {# Quick info (compact key-value) #}
+              <div id="td-quickinfo-block" style="display:none" class="mb-3">
+                <h5 class="mb-2" style="font-size:.85rem; font-weight:600;">{{ 'decouverte.modal.quick_info'|trans }}</h5>
+                <div id="td-quickinfo" class="td-quickinfo"></div>
+              </div>
+
+              {# Collection (movies) — moved left #}
+              <div id="td-collection-block" style="display:none" class="mb-3">
+                <div class="card">
+                  <div class="card-body py-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <img id="td-collection-poster" src="" alt="" style="width:40px; border-radius:.25rem;">
+                      <div class="min-w-0">
+                        <div class="text-muted" style="font-size:.7rem;">{{ 'decouverte.modal.part_of'|trans }}</div>
+                        <div class="fw-medium" style="font-size:.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="td-collection-name"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {# Next/Last episode (series) — moved left #}
+              <div id="td-next-ep-block" style="display:none" class="mb-2">
+                <div class="card border-primary">
+                  <div class="card-body py-2">
+                    <div class="text-muted" style="font-size:.7rem;">{{ 'decouverte.modal.next_episode'|trans }}</div>
+                    <div class="fw-medium" style="font-size:.8rem;" id="td-next-ep-label"></div>
+                    <div class="text-muted" style="font-size:.7rem;" id="td-next-ep-date"></div>
+                  </div>
+                </div>
+              </div>
+              <div id="td-last-ep-block" style="display:none" class="mb-3">
+                <div class="card">
+                  <div class="card-body py-2">
+                    <div class="text-muted" style="font-size:.7rem;">{{ 'decouverte.modal.last_episode'|trans }}</div>
+                    <div class="fw-medium" style="font-size:.8rem;" id="td-last-ep-label"></div>
+                    <div class="text-muted" style="font-size:.7rem;" id="td-last-ep-date"></div>
+                  </div>
+                </div>
+              </div>
+
+              {# Providers streaming (compact) #}
+              <div id="td-providers-block" style="display:none" class="mb-3">
+                <h5 class="mb-2" style="font-size:.85rem; font-weight:600;">
+                  {{ 'decouverte.modal.available_on'|trans }} <span id="td-providers-country" class="text-muted" style="font-size:.7rem;"></span>
+                </h5>
+                <div id="td-providers"></div>
+              </div>
+            </div>
+
+            {# Right column #}
+            <div class="col-md-7 col-lg-8">
+
+              {# Synopsis pleine largeur #}
+              <div class="mb-3" id="td-overview-block" style="display:none">
+                <h4 class="mb-2">{{ 'decouverte.modal.synopsis'|trans }}</h4>
+                <p id="td-overview" class="text-muted mb-0" style="line-height:1.65; font-size:.9rem;"></p>
+              </div>
+
+              {# Trailer : card autonome #}
+              <div class="card mb-3" id="td-trailer-block" style="display:none;">
+                <div class="card-header py-1 px-2 d-flex align-items-center justify-content-between" style="min-height:34px;">
+                  <h3 class="card-title mb-0" style="font-size:.78rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#ff0000" stroke="none" style="vertical-align:-2px;"><path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z"/></svg>
+                    {{ 'decouverte.modal.trailer'|trans }} <span id="td-trailer-name" class="text-muted ms-1" style="font-size:.7rem;"></span>
+                  </h3>
+                  <a id="td-trailer-yt-link" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-ghost-secondary p-1" title="{{ 'decouverte.modal.trailer_youtube_link'|trans }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7h-5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-5"/><path d="M10 14l10-10"/><path d="M15 4l5 0l0 5"/></svg>
+                  </a>
+                </div>
+                <div class="card-body p-2">
+                  <div class="td-trailer" id="td-trailer"></div>
+                  <div id="td-video-gallery" class="d-flex flex-wrap gap-1 mt-2" style="display:none"></div>
+                </div>
+              </div>
+
+              {# Casting #}
+              <div class="card mb-3" id="td-cast-block" style="display:none">
+                <div class="card-header py-2">
+                  <h3 class="card-title mb-0">{{ 'decouverte.modal.cast'|trans }}</h3>
+                </div>
+                <div class="card-body py-2">
+                  <div class="td-cast-scroll" id="td-cast"></div>
+                </div>
+              </div>
+
+              {# Production + crew info #}
+              <div class="card mb-3" id="td-info-block" style="display:none">
+                <div class="card-header py-2">
+                  <h3 class="card-title mb-0">{{ 'decouverte.modal.info'|trans }}</h3>
+                </div>
+                <div class="card-body py-2">
+                  <div class="table-responsive">
+                    <table class="table table-sm table-vcenter mb-0" style="font-size:.82rem">
+                      <tbody id="td-info-rows"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {# Seasons (series) — horizontal carousel with properly-sized posters #}
+              <div class="card mb-3" id="td-seasons-block" style="display:none">
+                <div class="card-header py-2 d-flex align-items-center justify-content-between">
+                  <h3 class="card-title mb-0">{{ 'decouverte.modal.seasons'|trans }}</h3>
+                  <div class="tmdb-section-actions">
+                    <button type="button" class="tmdb-scroll-btn" data-seasons-scroll="left" aria-label="{{ 'decouverte.scroll.prev'|trans }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6l6 6"/></svg>
+                    </button>
+                    <button type="button" class="tmdb-scroll-btn" data-seasons-scroll="right" aria-label="{{ 'decouverte.scroll.next'|trans }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body py-2">
+                  <div class="td-seasons-scroll" id="td-seasons"></div>
+                </div>
+              </div>
+
+              {# Alternative titles + Reviews side-by-side to fill width #}
+              <div class="row g-3 mb-3">
+                <div class="col-lg-5" id="td-alt-titles-block" style="display:none">
+                  <div class="card h-100">
+                    <div class="card-header py-2">
+                      <h3 class="card-title mb-0">{{ 'decouverte.modal.alt_titles'|trans }}</h3>
+                    </div>
+                    <div class="card-body py-2">
+                      <div id="td-alt-titles" class="d-flex flex-wrap gap-1"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-lg-7" id="td-reviews-block" style="display:none">
+                  <div class="card h-100">
+                    <div class="card-header py-2">
+                      <h3 class="card-title mb-0">{{ 'decouverte.modal.reviews'|trans }}</h3>
+                    </div>
+                    <div class="card-body py-2" id="td-reviews"></div>
+                  </div>
+                </div>
+              </div>
+
+              {# Galerie images (backdrops TMDb) #}
+              <div class="card mb-3" id="td-backdrops-block" style="display:none">
+                <div class="card-header py-2 d-flex align-items-center justify-content-between">
+                  <h3 class="card-title mb-0">{{ 'decouverte.modal.gallery'|trans }}</h3>
+                  <div class="tmdb-section-actions">
+                    <button type="button" class="tmdb-scroll-btn" data-backdrops-scroll="left" aria-label="{{ 'decouverte.scroll.prev'|trans }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6l6 6"/></svg>
+                    </button>
+                    <button type="button" class="tmdb-scroll-btn" data-backdrops-scroll="right" aria-label="{{ 'decouverte.scroll.next'|trans }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body py-2">
+                  <div class="td-backdrops-scroll" id="td-backdrops"></div>
+                </div>
+              </div>
+
+              {# Similar (with scroll arrows) #}
+              <div class="card mb-2" id="td-similar-block" style="display:none">
+                <div class="card-header py-2 d-flex align-items-center justify-content-between">
+                  <h3 class="card-title mb-0">{{ 'decouverte.modal.similar'|trans }}</h3>
+                  <div class="tmdb-section-actions">
+                    <button type="button" class="tmdb-scroll-btn" data-td-scroll="left" aria-label="{{ 'decouverte.scroll.prev'|trans }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6"/></svg>
+                    </button>
+                    <button type="button" class="tmdb-scroll-btn" data-td-scroll="right" aria-label="{{ 'decouverte.scroll.next'|trans }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body py-2">
+                  <div class="td-similar-row" id="td-similar"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  // Localized strings used by the detail modal + toasts. Built server-side
+  // so every label stays in sync with the current request locale.
+  var TMDB_I18N = {
+    type_film:    {{ 'decouverte.modal.type_film'|trans|json_encode|raw }},
+    type_series:  {{ 'decouverte.modal.type_series'|trans|json_encode|raw }},
+    watchlist:    {{ 'decouverte.modal.watchlist'|trans|json_encode|raw }},
+    in_watchlist: {{ 'decouverte.modal.in_watchlist'|trans|json_encode|raw }},
+    in_library:   {{ 'decouverte.modal.in_library'|trans|json_encode|raw }},
+    not_monitored:{{ 'decouverte.modal.not_monitored'|trans|json_encode|raw }},
+    coming_soon:  {{ 'decouverte.modal.coming_soon'|trans|json_encode|raw }},
+    in_production:{{ 'decouverte.modal.in_production'|trans|json_encode|raw }},
+    ended:        {{ 'decouverte.modal.ended_series'|trans|json_encode|raw }},
+    canceled:     {{ 'decouverte.modal.canceled_series'|trans|json_encode|raw }},
+    network_error:{{ 'decouverte.modal.network_error'|trans|json_encode|raw }},
+    wl_added:     {{ 'decouverte.watchlist.added_toast'|trans|json_encode|raw }},
+    wl_removed:   {{ 'decouverte.watchlist.removed_toast'|trans|json_encode|raw }},
+    season_tpl:   {{ 'decouverte.modal.season_label'|trans({n: '__N__'})|json_encode|raw }},
+    episode_short:{{ 'decouverte.modal.episode_short'|trans|json_encode|raw }},
+    impossible:   {{ 'decouverte.modal.impossible'|trans({reason: '__REASON__'})|json_encode|raw }},
+    generic_err:  {{ 'decouverte.modal.generic_error'|trans|json_encode|raw }},
+    add_to_radarr:{{ 'decouverte.modal.add_to'|trans({service: 'Radarr'})|json_encode|raw }},
+    add_to_sonarr:{{ 'decouverte.modal.add_to'|trans({service: 'Sonarr'})|json_encode|raw }},
+    view_movies:  {{ 'decouverte.modal.view_in'|trans({section: 'decouverte.modal.view_movies'|trans})|json_encode|raw }},
+    view_series:  {{ 'decouverte.modal.view_in'|trans({section: 'decouverte.modal.view_series'|trans})|json_encode|raw }},
+    lib_status: {
+      downloaded:  {{ 'decouverte.modal.status.downloaded'|trans|json_encode|raw }},
+      missing:     {{ 'decouverte.modal.status.missing'|trans|json_encode|raw }},
+      announced:   {{ 'decouverte.modal.status.announced'|trans|json_encode|raw }},
+      inCinemas:   {{ 'decouverte.modal.status.inCinemas'|trans|json_encode|raw }},
+      partial:     {{ 'decouverte.modal.status.partial'|trans|json_encode|raw }},
+      unmonitored: {{ 'decouverte.modal.status.unmonitored'|trans|json_encode|raw }},
+    },
+    tmdb_status: {
+      'Released':         {{ 'decouverte.modal.tmdb_status.released'|trans|json_encode|raw }},
+      'Post Production':  {{ 'decouverte.modal.tmdb_status.post_production'|trans|json_encode|raw }},
+      'In Production':    {{ 'decouverte.modal.tmdb_status.in_production'|trans|json_encode|raw }},
+      'Planned':          {{ 'decouverte.modal.tmdb_status.planned'|trans|json_encode|raw }},
+      'Rumored':          {{ 'decouverte.modal.tmdb_status.rumored'|trans|json_encode|raw }},
+      'Canceled':         {{ 'decouverte.modal.tmdb_status.canceled'|trans|json_encode|raw }},
+      'Ended':            {{ 'decouverte.modal.tmdb_status.ended'|trans|json_encode|raw }},
+      'Returning Series': {{ 'decouverte.modal.tmdb_status.returning_series'|trans|json_encode|raw }},
+      'Pilot':            {{ 'decouverte.modal.tmdb_status.pilot'|trans|json_encode|raw }},
+    },
+    qi: {
+      release:         {{ 'decouverte.modal.qi.release'|trans|json_encode|raw }},
+      runtime:         {{ 'decouverte.modal.qi.runtime'|trans|json_encode|raw }},
+      episode_runtime: {{ 'decouverte.modal.qi.episode_runtime'|trans|json_encode|raw }},
+      status:          {{ 'decouverte.modal.qi.status'|trans|json_encode|raw }},
+      certification:   {{ 'decouverte.modal.qi.certification'|trans|json_encode|raw }},
+      orig_language:   {{ 'decouverte.modal.qi.orig_language'|trans|json_encode|raw }},
+      country:         {{ 'decouverte.modal.qi.country'|trans|json_encode|raw }},
+      budget:          {{ 'decouverte.modal.qi.budget'|trans|json_encode|raw }},
+      box_office:      {{ 'decouverte.modal.qi.box_office'|trans|json_encode|raw }},
+      votes:           {{ 'decouverte.modal.qi.votes'|trans|json_encode|raw }},
+      popularity:      {{ 'decouverte.modal.qi.popularity'|trans|json_encode|raw }},
+    },
+    provider: {
+      flatrate: {{ 'decouverte.modal.provider.flatrate'|trans|json_encode|raw }},
+      rent:     {{ 'decouverte.modal.provider.rent'|trans|json_encode|raw }},
+      buy:      {{ 'decouverte.modal.provider.buy'|trans|json_encode|raw }},
+    },
+    info_row: {
+      director:       {{ 'decouverte.modal.info_row.director'|trans|json_encode|raw }},
+      writers:        {{ 'decouverte.modal.info_row.writers'|trans|json_encode|raw }},
+      composers:      {{ 'decouverte.modal.info_row.composers'|trans|json_encode|raw }},
+      cinematography: {{ 'decouverte.modal.info_row.cinematography'|trans|json_encode|raw }},
+      creators:       {{ 'decouverte.modal.info_row.creators'|trans|json_encode|raw }},
+      production:     {{ 'decouverte.modal.info_row.production'|trans|json_encode|raw }},
+      network:        {{ 'decouverte.modal.info_row.network'|trans|json_encode|raw }},
+      country:        {{ 'decouverte.modal.info_row.country'|trans|json_encode|raw }},
+      orig_language:  {{ 'decouverte.modal.info_row.orig_language'|trans|json_encode|raw }},
+      languages:      {{ 'decouverte.modal.info_row.languages'|trans|json_encode|raw }},
+      classification: {{ 'decouverte.modal.info_row.classification'|trans|json_encode|raw }},
+      budget:         {{ 'decouverte.modal.info_row.budget'|trans|json_encode|raw }},
+      revenue:        {{ 'decouverte.modal.info_row.revenue'|trans|json_encode|raw }},
+      episode_runtime:{{ 'decouverte.modal.info_row.episode_runtime'|trans|json_encode|raw }},
+      tags:           {{ 'decouverte.modal.info_row.tags'|trans|json_encode|raw }},
+      popularity:     {{ 'decouverte.modal.info_row.popularity_tmdb'|trans|json_encode|raw }},
+    },
+    // ICU template for "N seasons · M episodes"
+    seasons_tpl: {
+      one_one:     {{ 'decouverte.modal.seasons_episodes'|trans({seasons: 1, episodes: 1})|json_encode|raw }},
+      one_many:    {{ 'decouverte.modal.seasons_episodes'|trans({seasons: 1, episodes: 9})|json_encode|raw }},
+      many_one:    {{ 'decouverte.modal.seasons_episodes'|trans({seasons: 9, episodes: 1})|json_encode|raw }},
+      many_many:   {{ 'decouverte.modal.seasons_episodes'|trans({seasons: 9, episodes: 9})|json_encode|raw }},
+    },
+  };
+  function seasonsEpisodes(s, e) {
+    var key = (s === 1 ? 'one' : 'many') + '_' + (e === 1 ? 'one' : 'many');
+    var tpl = TMDB_I18N.seasons_tpl[key] || '';
+    var idx = 0;
+    return tpl.replace(/\b\d+\b/g, function() {
+      return String(idx++ === 0 ? s : e);
+    });
+  }
+
+  // ── Scroll horizontal par boutons
+  document.querySelectorAll('[data-section]').forEach(function(section) {
+    var row = section.querySelector('.tmdb-row');
+    if (!row) return;
+    section.querySelectorAll('.tmdb-scroll-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var dir = btn.dataset.scroll === 'right' ? 1 : -1;
+        row.scrollBy({ left: dir * (row.clientWidth * 0.75), behavior: 'smooth' });
+      });
+    });
+  });
+
+  // ── Recently viewed (localStorage) ────────────────────────
+  var detailModal    = document.getElementById('tmdb-detail-modal');
+  var detailLoading  = document.getElementById('tmdb-detail-loading');
+  var detailContent  = document.getElementById('tmdb-detail-content');
+
+  function openDetailModal() {
+    detailLoading.style.display = '';
+    detailContent.style.display = 'none';
+    detailModal.classList.add('show');
+    detailModal.style.display = 'block';
+    detailModal.setAttribute('aria-modal', 'true');
+    detailModal.removeAttribute('aria-hidden');
+    document.body.classList.add('modal-open');
+    if (!document.querySelector('.modal-backdrop.tmdb-detail-backdrop')) {
+      var bd = document.createElement('div');
+      bd.className = 'modal-backdrop fade show tmdb-detail-backdrop';
+      document.body.appendChild(bd);
+    }
+  }
+
+  function closeDetailModal() {
+    detailModal.classList.remove('show');
+    detailModal.style.display = 'none';
+    detailModal.setAttribute('aria-hidden', 'true');
+    detailModal.removeAttribute('aria-modal');
+    var bd = document.querySelector('.modal-backdrop.tmdb-detail-backdrop');
+    if (bd) bd.remove();
+    if (!document.querySelector('.modal.show')) {
+      document.body.classList.remove('modal-open');
+    }
+    var trWrap = document.getElementById('td-trailer');
+    if (trWrap) trWrap.innerHTML = '';
+  }
+
+  // Close on X, backdrop, ESC
+  detailModal.addEventListener('click', function(e) {
+    if (e.target.closest('[data-bs-dismiss="modal"]')) {
+      e.preventDefault();
+      closeDetailModal();
+      return;
+    }
+    if (e.target === detailModal) {
+      closeDetailModal();
+    }
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && detailModal.classList.contains('show')) {
+      closeDetailModal();
+    }
+  });
+
+  function voteClass(v) {
+    if (v >= 7) return 'good';
+    if (v >= 5) return 'mid';
+    return 'bad';
+  }
+
+  function renderDetail(d) {
+    detailLoading.style.display = 'none';
+    detailContent.style.display = '';
+
+    // Save to "Recently viewed"
+    if (typeof window.__prismarrPushRecent === "function") window.__prismarrPushRecent({
+      id: d.id, type: d.type, title: d.title, year: d.year,
+      poster: d.poster, vote: d.vote, vote_count: d.vote_count,
+      in_library: d.in_library, lib_status: d.lib_status, lib_id: d.lib_id
+    });
+
+    var safeTitle = escHtml(d.title || '—');
+
+    // Backdrop
+    var bg = document.getElementById('td-backdrop');
+    if (d.backdrop) {
+      bg.style.backgroundImage = 'url("' + d.backdrop + '")';
+    } else {
+      bg.style.backgroundImage = 'none';
+      bg.style.background = '#1a1a1f';
+    }
+
+    // Header : badge type + titre + original + tagline
+    var typeBadge = document.getElementById('td-type-badge');
+    typeBadge.textContent = d.type === 'movie' ? TMDB_I18N.type_film : TMDB_I18N.type_series;
+    typeBadge.className = 'badge ' + (d.type === 'movie' ? 'bg-warning text-dark' : 'bg-info text-dark');
+    document.getElementById('td-title').textContent = d.title || '—';
+    var orig = document.getElementById('td-original');
+    if (d.original && d.original !== d.title) { orig.textContent = d.original; orig.style.display = ''; }
+    else { orig.style.display = 'none'; }
+    var tg = document.getElementById('td-tagline');
+    if (d.tagline) { tg.textContent = '« ' + d.tagline + ' »'; tg.style.display = ''; }
+    else { tg.style.display = 'none'; }
+
+    // Meta header: year, runtime, seasons, status, TMDb rating
+    document.getElementById('td-year').textContent = d.year || '';
+    var rt = document.getElementById('td-runtime');
+    if (d.runtime) { rt.textContent = d.runtime + ' min'; rt.style.display = ''; } else { rt.style.display = 'none'; }
+    var se = document.getElementById('td-meta-seasons');
+    if (d.seasons) { se.textContent = seasonsEpisodes(d.seasons, d.episodes || 0); se.style.display = ''; } else { se.style.display = 'none'; }
+    var st = document.getElementById('td-status-info');
+    if (d.status) { st.textContent = d.status; st.style.display = ''; } else { st.style.display = 'none'; }
+    if (d.vote) {
+      document.getElementById('td-rating-tmdb').style.display = '';
+      document.getElementById('td-rating-tmdb-val').textContent = d.vote + ' / 10';
+    } else {
+      document.getElementById('td-rating-tmdb').style.display = 'none';
+    }
+
+    // Genres
+    var genresEl = document.getElementById('td-genres');
+    genresEl.innerHTML = (d.genres || []).map(function(g) {
+      return '<span class="td-genre-badge">' + escHtml(g) + '</span>';
+    }).join('');
+
+    // Poster
+    var poster = document.getElementById('td-poster');
+    if (d.poster) { poster.src = d.poster; poster.alt = d.title || ''; poster.style.display = ''; }
+    else { poster.style.display = 'none'; }
+
+    // Status badges (left column) — white text forced on colored background
+    var badges = [];
+    function mkBadge(bg, text, icon) {
+      var i = icon ? '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; vertical-align:-1px;">' + icon + '</svg>' : '';
+      return '<span class="badge" style="background:' + bg + '; color:#fff; font-weight:600;">' + i + text + '</span>';
+    }
+    if (d.in_library && d.lib_status) {
+      var statusMap = {
+        'downloaded':  { bg: '#22c55e', label: TMDB_I18N.lib_status.downloaded,  icon: '<path d="M5 12l5 5l10-10"/>' },
+        'missing':     { bg: '#f59e0b', label: TMDB_I18N.lib_status.missing,     icon: null },
+        'announced':   { bg: '#6366f1', label: TMDB_I18N.lib_status.announced,   icon: null },
+        'inCinemas':   { bg: '#6366f1', label: TMDB_I18N.lib_status.inCinemas,   icon: null },
+        'partial':     { bg: '#3b82f6', label: TMDB_I18N.lib_status.partial,     icon: null },
+        'unmonitored': { bg: '#6b7280', label: TMDB_I18N.lib_status.unmonitored, icon: null }
+      };
+      var libSt = statusMap[d.lib_status] || { bg: '#22c55e', label: TMDB_I18N.in_library, icon: '<path d="M5 12l5 5l10-10"/>' };
+      badges.push(mkBadge(libSt.bg, libSt.label, libSt.icon));
+    } else if (d.in_library) {
+      badges.push(mkBadge('#22c55e', TMDB_I18N.in_library, '<path d="M5 12l5 5l10-10"/>'));
+    } else {
+      badges.push(mkBadge('#64748b', TMDB_I18N.not_monitored, null));
+    }
+    if (!d.in_library && d.release) {
+      var now = new Date();
+      var rel = new Date(d.release);
+      if (rel > now) badges.push(mkBadge('#6366f1', TMDB_I18N.coming_soon, null));
+    }
+    if (d.status === 'In Production' || d.status === 'Returning Series') {
+      badges.push(mkBadge('#3b82f6', TMDB_I18N.in_production, null));
+    } else if (d.status === 'Ended') {
+      badges.push(mkBadge('#f59e0b', TMDB_I18N.ended, null));
+    } else if (d.status === 'Canceled') {
+      badges.push(mkBadge('#ef4444', TMDB_I18N.canceled, null));
+    }
+    document.getElementById('td-status-badges').innerHTML = badges.join(' ');
+
+    // Actions (colonne gauche, verticales comme films modal)
+    var actions = [];
+    if (!d.in_library) {
+      actions.push('<button class="btn btn-primary tmdb-add-btn" data-tmdb-id="' + d.id + '" data-tmdb-type="' + d.type + '" data-tmdb-title="' + safeTitle + '">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M12 5v14"/><path d="M5 12h14"/></svg>' + (d.type === 'movie' ? TMDB_I18N.add_to_radarr : TMDB_I18N.add_to_sonarr) + '</button>');
+    } else {
+      var libUrl = d.type === 'movie' ? '/medias/' + DEFAULT_RADARR_SLUG + '/films' : '/medias/' + DEFAULT_SONARR_SLUG + '/series';
+      if (d.lib_id) libUrl += '?open=' + d.lib_id;
+      var btnClass = d.lib_status === 'downloaded' ? 'btn-success' : (d.lib_status === 'missing' || d.lib_status === 'partial' ? 'btn-warning' : 'btn-outline-primary');
+      actions.push('<a href="' + libUrl + '" class="btn ' + btnClass + '">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M5 12l5 5l10-10"/></svg>' + (d.type === 'movie' ? TMDB_I18N.view_movies : TMDB_I18N.view_series) + '</a>');
+    }
+    // Bouton watchlist dans la modal
+    var wlKey = d.type + '_' + d.id;
+    var isInWl = window._prismarrWatchlist && window._prismarrWatchlist[wlKey];
+    actions.push('<button class="btn ' + (isInWl ? 'btn-warning' : 'btn-outline-warning') + ' tmdb-wl-modal-btn" data-tmdb-id="' + d.id + '" data-tmdb-type="' + d.type + '" data-tmdb-title="' + safeTitle + '" data-poster-path="' + (d.poster_path || '') + '" data-vote="' + (d.vote || '') + '" data-year="' + (d.year || '') + '">'
+      + '<svg width="15" height="15" viewBox="0 0 24 24" fill="' + (isInWl ? '#fff' : 'none') + '" stroke="currentColor" stroke-width="2" class="me-1"><path d="M12 2l2.4 7.4h7.6l-6.2 4.5 2.4 7.4-6.2-4.6-6.2 4.6 2.4-7.4-6.2-4.5h7.6z"/></svg>'
+      + (isInWl ? TMDB_I18N.in_watchlist : TMDB_I18N.watchlist) + '</button>');
+
+    // A host page may add its own actions (the Trakt page adds "remove from
+    // Trakt watchlist"). Kept as a hook so this partial stays generic.
+    if (window.PrismarrDetail && typeof window.PrismarrDetail.extraActions === 'function') {
+      try { actions = actions.concat(window.PrismarrDetail.extraActions(d) || []); } catch (err) {}
+    }
+    document.getElementById('td-actions').innerHTML = actions.join('');
+
+    // External links
+    var ext = [];
+    ext.push('<a href="https://www.themoviedb.org/' + d.type + '/' + d.id + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">TMDb ↗</a>');
+    if (d.imdb_id) ext.push('<a href="https://www.imdb.com/title/' + d.imdb_id + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">IMDb ↗</a>');
+    if (d.homepage && /^https?:\/\//.test(d.homepage)) ext.push('<a href="' + d.homepage + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Site ↗</a>');
+    document.getElementById('td-external-links').innerHTML = ext.join('');
+
+    // Synopsis
+    var ovBlock = document.getElementById('td-overview-block');
+    if (d.overview) {
+      document.getElementById('td-overview').textContent = d.overview;
+      ovBlock.style.display = '';
+    } else {
+      ovBlock.style.display = 'none';
+    }
+
+    // Trailer + galerie alternatives
+    var trBlock   = document.getElementById('td-trailer-block');
+    var trWrap    = document.getElementById('td-trailer');
+    var trName    = document.getElementById('td-trailer-name');
+    var trYtLink  = document.getElementById('td-trailer-yt-link');
+    var galWrap   = document.getElementById('td-video-gallery');
+
+    function playVideo(key, name) {
+      trWrap.innerHTML = '<iframe src="https://www.youtube.com/embed/' + key + '?rel=0&cc_lang_pref=fr&hl=fr" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>';
+      trName.textContent = name ? '— ' + name : '';
+      trYtLink.href = 'https://www.youtube.com/watch?v=' + key;
+      // Marquer le bouton actif
+      galWrap.querySelectorAll('.td-video-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.ytKey === key);
+      });
+    }
+
+    if (d.trailer && d.trailer.key) {
+      playVideo(d.trailer.key, d.trailer.name);
+      // Galerie : trailer principal + alternatives
+      var videos = [d.trailer].concat(d.video_gallery || []);
+      if (videos.length > 1) {
+        galWrap.innerHTML = videos.map(function(v, i) {
+          return '<button type="button" class="td-video-btn" data-yt-key="' + v.key + '" data-yt-name="' + (v.name||'').replace(/"/g,'&quot;') + '">' + (v.type || 'Trailer') + (i === 0 ? ' ' + {{ ico.icon('star-filled', '', 12)|json_encode|raw }} : '') + '</button>';
+        }).join('');
+        galWrap.style.display = '';
+        // Re-activate the current button
+        var firstBtn = galWrap.querySelector('[data-yt-key="' + d.trailer.key + '"]');
+        if (firstBtn) firstBtn.classList.add('active');
+      } else {
+        galWrap.style.display = 'none';
+        galWrap.innerHTML = '';
+      }
+      trBlock.style.display = '';
+    } else {
+      trWrap.innerHTML = '';
+      galWrap.innerHTML = '';
+      galWrap.style.display = 'none';
+      trBlock.style.display = 'none';
+    }
+
+    // Cast (style cast-scroll avec avatars 64px ronds comme modal Films)
+    var castBlock = document.getElementById('td-cast-block');
+    if (d.cast && d.cast.length) {
+      document.getElementById('td-cast').innerHTML = d.cast.map(function(c) {
+        var photo = c.profile
+          ? '<img src="' + c.profile + '" alt="" loading="lazy">'
+          : '<img src="data:image/svg+xml;utf8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'64\' height=\'64\' viewBox=\'0 0 24 24\' fill=\'%23888\'%3E%3Cpath d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/%3E%3C/svg%3E">';
+        return '<div class="td-cast-card">' + photo
+          + '<div class="cast-name">' + escHtml(c.name || '—') + '</div>'
+          + '<span class="cast-role">' + escHtml(c.character || '') + '</span></div>';
+      }).join('');
+      castBlock.style.display = '';
+    } else {
+      castBlock.style.display = 'none';
+    }
+
+    // Quick info (left column) — date, runtime, status, language, classification, vote count
+    var qiBlock = document.getElementById('td-quickinfo-block');
+    var qiRows = [];
+    function qi(icon, label, value) {
+      if (!value) return;
+      var safe = escHtml(String(value));
+      qiRows.push('<div class="qi-row"><span class="qi-icon">' + icon + '</span><span class="qi-label">' + escHtml(label) + '</span><span class="qi-value" title="' + safe + '">' + safe + '</span></div>');
+    }
+    qi({{ ico.icon('calendar', '', 16)|json_encode|raw }}, TMDB_I18N.qi.release, d.release || null);
+    if (d.type === 'movie' && d.runtime) {
+      var h = Math.floor(d.runtime / 60);
+      var m = d.runtime % 60;
+      qi({{ ico.icon('clock', '', 16)|json_encode|raw }}, TMDB_I18N.qi.runtime, (h > 0 ? h + 'h' + (m > 0 ? String(m).padStart(2, '0') : '') : m + ' min'));
+    } else if (d.type === 'tv' && d.episode_runtime) {
+      qi({{ ico.icon('clock', '', 16)|json_encode|raw }}, TMDB_I18N.qi.episode_runtime, d.episode_runtime + ' min');
+    }
+    qi({{ ico.icon('movie', '', 16)|json_encode|raw }}, TMDB_I18N.qi.status, d.status ? (TMDB_I18N.tmdb_status[d.status] || d.status) : null);
+    qi({{ ico.icon('masks-theater', '', 16)|json_encode|raw }}, TMDB_I18N.qi.certification, d.certification);
+    qi({{ ico.icon('language', '', 16)|json_encode|raw }}, TMDB_I18N.qi.orig_language, d.original_language ? d.original_language.toUpperCase() : null);
+    qi({{ ico.icon('world', '', 16)|json_encode|raw }}, TMDB_I18N.qi.country, (d.countries && d.countries.length) ? d.countries[0] : null);
+    if (d.type === 'movie' && d.budget && d.budget > 0) {
+      qi({{ ico.icon('coin', '', 16)|json_encode|raw }}, TMDB_I18N.qi.budget, '$' + (d.budget / 1e6).toFixed(1) + 'M');
+    }
+    if (d.type === 'movie' && d.revenue && d.revenue > 0) {
+      qi({{ ico.icon('cash', '', 16)|json_encode|raw }}, TMDB_I18N.qi.box_office, '$' + (d.revenue / 1e6).toFixed(1) + 'M');
+    }
+    if (d.vote_count) qi({{ ico.icon('star-filled', '', 16)|json_encode|raw }}, TMDB_I18N.qi.votes, d.vote_count.toLocaleString());
+    if (d.popularity) qi({{ ico.icon('flame', '', 16)|json_encode|raw }}, TMDB_I18N.qi.popularity, d.popularity);
+    if (qiRows.length) {
+      document.getElementById('td-quickinfo').innerHTML = qiRows.join('');
+      qiBlock.style.display = '';
+    } else {
+      qiBlock.style.display = 'none';
+    }
+
+    // Providers streaming (version compacte colonne gauche)
+    var provBlock = document.getElementById('td-providers-block');
+    var totalProv = 0;
+    if (d.providers) {
+      totalProv = (d.providers.flatrate || []).length + (d.providers.rent || []).length + (d.providers.buy || []).length;
+    }
+    if (totalProv > 0) {
+      document.getElementById('td-providers-country').textContent = '(' + d.providers.country + ')';
+      var provHtml = '';
+      function renderProviderGroup(label, list) {
+        if (!list || !list.length) return '';
+        var items = list.map(function(p) {
+          return p.logo
+            ? '<img src="' + p.logo + '" alt="' + (p.name||'') + '" title="' + (p.name||'').replace(/"/g,'&quot;') + '">'
+            : '<span class="badge bg-secondary-lt">' + (p.name||'') + '</span>';
+        }).join('');
+        return '<div class="provider-group"><div class="provider-group-label">' + label + '</div><div class="provider-logos">' + items + '</div></div>';
+      }
+      provHtml += renderProviderGroup(TMDB_I18N.provider.flatrate, d.providers.flatrate);
+      provHtml += renderProviderGroup(TMDB_I18N.provider.rent, d.providers.rent);
+      provHtml += renderProviderGroup(TMDB_I18N.provider.buy, d.providers.buy);
+      if (d.providers.link) provHtml += '<a href="' + d.providers.link + '" target="_blank" rel="noopener" class="small d-block mt-1">JustWatch ↗</a>';
+      document.getElementById('td-providers').innerHTML = provHtml;
+      provBlock.style.display = '';
+    } else {
+      provBlock.style.display = 'none';
+    }
+
+    // Collection (films uniquement)
+    var colBlock = document.getElementById('td-collection-block');
+    if (d.collection && d.collection.name) {
+      var cp = document.getElementById('td-collection-poster');
+      if (d.collection.poster) { cp.src = d.collection.poster; cp.style.display = ''; }
+      else { cp.style.display = 'none'; }
+      document.getElementById('td-collection-name').textContent = d.collection.name;
+      colBlock.style.display = '';
+    } else {
+      colBlock.style.display = 'none';
+    }
+
+    // Next/Last episode (TV series)
+    function fmtEp(ep) {
+      var code = 'S' + String(ep.season).padStart(2, '0') + 'E' + String(ep.episode).padStart(2, '0');
+      return code + (ep.name ? ' — ' + ep.name : '');
+    }
+    var nextBlock = document.getElementById('td-next-ep-block');
+    if (d.next_episode) {
+      document.getElementById('td-next-ep-label').textContent = fmtEp(d.next_episode);
+      document.getElementById('td-next-ep-date').textContent = d.next_episode.air_date || '';
+      nextBlock.style.display = '';
+    } else {
+      nextBlock.style.display = 'none';
+    }
+    var lastBlock = document.getElementById('td-last-ep-block');
+    if (d.last_episode) {
+      document.getElementById('td-last-ep-label').textContent = fmtEp(d.last_episode);
+      document.getElementById('td-last-ep-date').textContent = d.last_episode.air_date || '';
+      lastBlock.style.display = '';
+    } else {
+      lastBlock.style.display = 'none';
+    }
+
+    // Info table: director, writers, composer, studio, country, language, budget, revenue, certification, keywords
+    var infoRows = [];
+    function addRow(label, value) {
+      if (value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)) return;
+      var displayed = Array.isArray(value) ? value.join(', ') : value;
+      infoRows.push('<tr><td class="text-muted" style="width:30%">' + label + '</td><td>' + displayed + '</td></tr>');
+    }
+    if (d.crew) {
+      addRow(TMDB_I18N.info_row.director, d.crew.directors);
+      addRow(TMDB_I18N.info_row.writers, d.crew.writers);
+      addRow(TMDB_I18N.info_row.composers, d.crew.composers);
+      if (d.crew.cinematographers) addRow(TMDB_I18N.info_row.cinematography, d.crew.cinematographers);
+    }
+    if (d.creators && d.creators.length) addRow(TMDB_I18N.info_row.creators, d.creators);
+    if (d.companies && d.companies.length) {
+      var compHtml = d.companies.map(function(c) {
+        return c.logo
+          ? '<img src="' + c.logo + '" alt="" title="' + (c.name||'').replace(/"/g,'&quot;') + '" style="height:20px; object-fit:contain; background:white; padding:2px 4px; border-radius:3px; margin-right:4px;">'
+          : '<span class="badge bg-secondary-lt me-1">' + c.name + '</span>';
+      }).join('');
+      infoRows.push('<tr><td class="text-muted">' + TMDB_I18N.info_row.production + '</td><td>' + compHtml + '</td></tr>');
+    }
+    if (d.networks && d.networks.length) {
+      var netHtml = d.networks.map(function(n) {
+        return n.logo
+          ? '<img src="' + n.logo + '" alt="" title="' + (n.name||'').replace(/"/g,'&quot;') + '" style="height:20px; object-fit:contain; background:white; padding:2px 4px; border-radius:3px; margin-right:4px;">'
+          : '<span class="badge bg-secondary-lt me-1">' + n.name + '</span>';
+      }).join('');
+      infoRows.push('<tr><td class="text-muted">' + TMDB_I18N.info_row.network + '</td><td>' + netHtml + '</td></tr>');
+    }
+    addRow(TMDB_I18N.info_row.country, d.countries);
+    addRow(TMDB_I18N.info_row.orig_language, d.original_language ? d.original_language.toUpperCase() : null);
+    addRow(TMDB_I18N.info_row.languages, d.spoken_languages);
+    addRow(TMDB_I18N.info_row.classification, d.certification);
+    if (d.budget && d.budget > 0) addRow(TMDB_I18N.info_row.budget, '$' + d.budget.toLocaleString());
+    if (d.revenue && d.revenue > 0) addRow(TMDB_I18N.info_row.revenue, '$' + d.revenue.toLocaleString());
+    if (d.episode_runtime) addRow(TMDB_I18N.info_row.episode_runtime, d.episode_runtime + ' min');
+    if (d.keywords && d.keywords.length) {
+      addRow(TMDB_I18N.info_row.tags, d.keywords.map(function(k) { return '<span class="td-genre-badge me-1" style="color:var(--tblr-secondary); background:var(--tblr-bg-surface-secondary); border-color:var(--tblr-border-color);">' + escHtml(k) + '</span>'; }).join(''));
+    }
+    if (d.popularity) addRow(TMDB_I18N.info_row.popularity, d.popularity);
+    var infoBlock = document.getElementById('td-info-block');
+    if (infoRows.length) {
+      document.getElementById('td-info-rows').innerHTML = infoRows.join('');
+      infoBlock.style.display = '';
+    } else {
+      infoBlock.style.display = 'none';
+    }
+
+    // Seasons (TV series)
+    var seasonsBlock = document.getElementById('td-seasons-block');
+    if (d.seasons_list && d.seasons_list.length) {
+      // Sort: season 0 (specials) last
+      var sorted = d.seasons_list.slice().sort(function(a, b) {
+        if (a.number === 0) return 1;
+        if (b.number === 0) return -1;
+        return a.number - b.number;
+      });
+      document.getElementById('td-seasons').innerHTML = sorted.map(function(s) {
+        var poster = s.poster
+          ? '<img src="' + s.poster + '" alt="" loading="lazy">'
+          : '<div class="no-poster"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 4v16l13 -8z"/></svg></div>';
+        var year = s.air_date ? s.air_date.substring(0, 4) : '—';
+        var vote = s.vote ? '<span class="season-vote">' + {{ ico.icon('star-filled', '', 12)|json_encode|raw }} + ' ' + s.vote + '</span>' : '';
+        return '<div class="td-season-card" title="' + (s.overview||'').replace(/"/g,'&quot;') + '">' + poster
+          + '<div class="season-body">'
+          + '<div class="season-name">' + (s.name || TMDB_I18N.season_tpl.replace('__N__', s.number)) + '</div>'
+          + '<div class="season-meta">' + s.episode_count + ' ' + TMDB_I18N.episode_short + ' · ' + year + ' ' + vote + '</div>'
+          + '</div></div>';
+      }).join('');
+      seasonsBlock.style.display = '';
+    } else {
+      seasonsBlock.style.display = 'none';
+    }
+
+    // Titres alternatifs
+    var altBlock = document.getElementById('td-alt-titles-block');
+    if (d.alt_titles && d.alt_titles.length) {
+      document.getElementById('td-alt-titles').innerHTML = d.alt_titles.map(function(t) {
+        return '<span class="badge bg-secondary-lt"><span class="text-muted me-1">' + t.country + '</span>' + t.title + '</span>';
+      }).join('');
+      altBlock.style.display = '';
+    } else {
+      altBlock.style.display = 'none';
+    }
+
+    // Reviews
+    var revBlock = document.getElementById('td-reviews-block');
+    if (d.reviews && d.reviews.length) {
+      document.getElementById('td-reviews').innerHTML = d.reviews.map(function(r) {
+        var excerpt = (r.content || '').substring(0, 300);
+        if (r.content && r.content.length > 300) excerpt += '…';
+        var rating = r.rating ? ' <span class="badge bg-warning ms-2">' + {{ ico.icon('star-filled', '', 12)|json_encode|raw }} + ' ' + r.rating + '/10</span>' : '';
+        var link = r.url ? ' <a href="' + r.url + '" target="_blank" rel="noopener" class="small">Lire ↗</a>' : '';
+        return '<div class="mb-2 pb-2 border-bottom">'
+          + '<div class="d-flex align-items-center gap-2 mb-1"><strong class="small">' + escHtml(r.author) + '</strong>' + rating + link + '</div>'
+          + '<div class="small text-muted" style="white-space:pre-wrap;">' + excerpt + '</div></div>';
+      }).join('');
+      revBlock.style.display = '';
+    } else {
+      revBlock.style.display = 'none';
+    }
+
+    // Galerie backdrops (carousel horizontal + lightbox)
+    var backdropsBlock = document.getElementById('td-backdrops-block');
+    if (d.backdrops && d.backdrops.length) {
+      document.getElementById('td-backdrops').innerHTML = d.backdrops.map(function(b) {
+        return '<div class="td-backdrop-thumb" data-td-lb-open="' + b.full + '"><img src="' + b.thumb + '" alt="" loading="lazy"></div>';
+      }).join('');
+      backdropsBlock.style.display = '';
+    } else {
+      backdropsBlock.style.display = 'none';
+    }
+
+    // Similar (cards plus petites)
+    var simBlock = document.getElementById('td-similar-block');
+    if (d.similar && d.similar.length) {
+      document.getElementById('td-similar').innerHTML = d.similar.map(renderCardHTML).join('');
+      simBlock.style.display = '';
+    } else {
+      simBlock.style.display = 'none';
+    }
+  }
+
+  // Switch video in the gallery
+  document.addEventListener('click', function(e) {
+    var vbtn = e.target.closest('.td-video-btn');
+    if (!vbtn) return;
+    var key = vbtn.dataset.ytKey;
+    var name = vbtn.dataset.ytName;
+    var trWrap = document.getElementById('td-trailer');
+    var trName = document.getElementById('td-trailer-name');
+    var trYtLink = document.getElementById('td-trailer-yt-link');
+    trWrap.innerHTML = '<iframe src="https://www.youtube.com/embed/' + key + '?rel=0&cc_lang_pref=fr&hl=fr" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>';
+    trName.textContent = name ? '— ' + name : '';
+    trYtLink.href = 'https://www.youtube.com/watch?v=' + key;
+    vbtn.parentNode.querySelectorAll('.td-video-btn').forEach(function(b) {
+      b.classList.toggle('active', b === vbtn);
+    });
+  });
+
+  // Scroll arrows for similar + seasons + backdrops (in the modal)
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-td-scroll], [data-seasons-scroll], [data-backdrops-scroll]');
+    if (!btn) return;
+    var rowId, dirAttr;
+    if (btn.hasAttribute('data-seasons-scroll'))   { rowId = 'td-seasons';   dirAttr = btn.dataset.seasonsScroll; }
+    else if (btn.hasAttribute('data-backdrops-scroll')) { rowId = 'td-backdrops'; dirAttr = btn.dataset.backdropsScroll; }
+    else                                           { rowId = 'td-similar';  dirAttr = btn.dataset.tdScroll; }
+    var row = document.getElementById(rowId);
+    if (!row) return;
+    var dir = dirAttr === 'right' ? 1 : -1;
+    row.scrollBy({ left: dir * (row.clientWidth * 0.75), behavior: 'smooth' });
+  });
+
+  // Lightbox backdrops
+  var lb = document.getElementById('td-lightbox');
+  var lbImg = document.getElementById('td-lightbox-img');
+  document.addEventListener('click', function(e) {
+    var open = e.target.closest('[data-td-lb-open]');
+    if (open) {
+      lbImg.src = open.dataset.tdLbOpen;
+      lb.classList.add('show');
+      return;
+    }
+    if (e.target.closest('[data-td-lb-close]') || e.target === lb) {
+      lb.classList.remove('show');
+      lbImg.src = '';
+    }
+  });
+  document.addEventListener('keydown', function(e) {
+    if (!document.getElementById('td-lightbox')) return;
+    if (e.key === 'Escape' && lb.classList.contains('show')) {
+      lb.classList.remove('show');
+      lbImg.src = '';
+    }
+  });
+
+  function renderCardHTML(item) {
+    var vc = item.vote >= 7 ? 'good' : (item.vote >= 5 ? 'mid' : 'bad');
+    var safeTitle = escHtml(item.title || '');
+    var poster = item.poster
+      ? '<img src="' + item.poster + '" alt="" loading="lazy">'
+      : '<div class="no-poster">' + {{ ico.icon('movie', '', 32)|json_encode|raw }} + '</div>';
+    var statusColors = { downloaded: '#22c55e', missing: '#f59e0b', announced: '#6366f1', inCinemas: '#6366f1', partial: '#3b82f6', unmonitored: '#6b7280' };
+    // Short labels (for card badges) — reuse the card.status_short keys
+    // from _i18n, with a sensible fallback if a lib_status is unknown.
+    var cardShort = {
+      downloaded:  {{ 'decouverte.card.status_short.downloaded'|trans|json_encode|raw }},
+      missing:     {{ 'decouverte.card.status_short.missing'|trans|json_encode|raw }},
+      announced:   {{ 'decouverte.card.status_short.announced'|trans|json_encode|raw }},
+      inCinemas:   {{ 'decouverte.card.status_short.inCinemas'|trans|json_encode|raw }},
+      partial:     {{ 'decouverte.card.status_short.partial'|trans|json_encode|raw }},
+      unmonitored: {{ 'decouverte.card.status_short.unmonitored'|trans|json_encode|raw }},
+      _default:    {{ 'decouverte.card.status_short.default'|trans|json_encode|raw }},
+    };
+    var inLibraryShort = {{ 'decouverte.card.in_library_short'|trans|json_encode|raw }};
+    var libBadge = item.in_library ? '<span class="lib-badge" style="background:' + (statusColors[item.lib_status] || '#22c55e') + ';">' + (cardShort[item.lib_status] || cardShort._default) + '</span>' : '';
+    var voteBadge = item.vote ? '<span class="vote-badge ' + vc + '">' + {{ ico.icon('star-filled', '', 12)|json_encode|raw }} + ' ' + item.vote + '</span>' : '';
+    var hoverBtn  = item.in_library
+      ? '<a href="' + (item.type === 'movie' ? '/medias/' + DEFAULT_RADARR_SLUG + '/films' : '/medias/' + DEFAULT_SONARR_SLUG + '/series') + '?open=' + (item.lib_id||'') + '" class="btn btn-sm" style="background:' + ({downloaded:'#22c55e',missing:'#f59e0b',announced:'#6366f1',inCinemas:'#6366f1',partial:'#3b82f6',unmonitored:'#6b7280'}[item.lib_status]||'#22c55e') + ';color:#fff;">' + (cardShort[item.lib_status] || inLibraryShort) + '</a>'
+      : '<button type="button" class="btn btn-primary btn-sm tmdb-add-btn" data-tmdb-id="' + item.id + '" data-tmdb-type="' + item.type + '" data-tmdb-title="' + safeTitle + '">' + {{ 'decouverte.action.add'|trans|json_encode|raw }} + '</button>';
+
+    var wlClass = (window._prismarrWatchlist && window._prismarrWatchlist[item.type + '_' + item.id]) ? ' in-wl' : '';
+    var wlStar = '<button type="button" class="wl-star' + wlClass + '" data-tmdb-id="' + item.id + '" data-tmdb-type="' + item.type + '" title="Watchlist"><svg viewBox="0 0 24 24" fill="' + (wlClass ? '#f59e0b' : 'none') + '" stroke="#f59e0b" stroke-width="2"><path d="M12 2l2.4 7.4h7.6l-6.2 4.5 2.4 7.4-6.2-4.6-6.2 4.6 2.4-7.4-6.2-4.5h7.6z"/></svg></button>';
+
+    // Countdown J-X
+    var countdown = '';
+    if (item.release) {
+      var diff = Math.ceil((new Date(item.release) - new Date()) / 86400000);
+      if (diff > 0 && diff <= 365) countdown = '<span class="countdown-badge">J-' + diff + '</span>';
+    }
+
+    // safeTitle is already escHtml'd above; also escape the textual fields
+    // (title fallback "—" already safe, but item.title was untrusted and
+    // splat raw into innerHTML before this pass). item.year is server-side
+    // numeric but defense-in-depth costs nothing.
+    var titleOrDash = item.title ? safeTitle : '—';
+    var safeYear    = escHtml(item.year || '');
+    return '<div class="media-card" data-tmdb-id="' + item.id + '" data-tmdb-type="' + item.type + '" data-tmdb-title="' + safeTitle + '" data-tmdb-vote="' + (item.vote||'') + '" data-tmdb-year="' + safeYear + '" data-release="' + escHtml(item.release||'') + '">'
+      + poster
+      + '<span class="quality-badge ' + item.type + '">' + (item.type === 'movie' ? TMDB_I18N.type_film : TMDB_I18N.type_series) + '</span>'
+      + libBadge + countdown + wlStar + voteBadge
+      + '<div class="card-overlay"><div class="card-title-text" title="' + safeTitle + '">' + titleOrDash + '</div>'
+      + '<div class="card-year">' + safeYear + '</div></div>'
+      + '<div class="hover-info"><div class="h-title">' + titleOrDash + '</div>'
+      + '<div class="h-year">' + safeYear + (item.vote ? ' · ' + {{ ico.icon('star-filled', '', 12)|json_encode|raw }} + ' ' + item.vote : '') + '</div>'
+      + '<div class="h-actions">' + hoverBtn + '</div></div></div>';
+  }
+
+  function loadDetail(type, id) {
+    openDetailModal();
+    fetch('/decouverte/detail/' + type + '/' + id, { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          detailLoading.innerHTML = '<div class="alert alert-danger m-4">' + {{ 'decouverte.search.error_prefix'|trans({message: '__MSG__'})|json_encode|raw }}.replace('__MSG__', d.error) + '</div>';
+          return;
+        }
+        renderDetail(d);
+      })
+      .catch(function() {
+        detailLoading.innerHTML = '<div class="alert alert-danger m-4">' + TMDB_I18N.network_error + '</div>';
+      });
+  }
+
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
+    var card = e.target.closest('.media-card[data-tmdb-id]');
+    if (!card) return;
+    e.preventDefault();
+    loadDetail(card.dataset.tmdbType, card.dataset.tmdbId);
+  });
+
+
+  // Recherche TMDb avec debounce
+
+  window.escHtml         = escHtml;
+  window.TMDB_I18N       = TMDB_I18N;
+  window.seasonsEpisodes = seasonsEpisodes;
+  window.renderCardHTML  = renderCardHTML;
+  window.voteClass       = voteClass;
+
+  window.PrismarrDetail = window.PrismarrDetail || {};
+  window.PrismarrDetail.load  = loadDetail;
+  window.PrismarrDetail.open  = openDetailModal;
+  window.PrismarrDetail.close = closeDetailModal;
+})();
+</script>

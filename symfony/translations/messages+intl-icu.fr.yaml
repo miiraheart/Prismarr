@@ -5633,6 +5633,7 @@ trakt:
     importing: 'Import en cours…'
     imported: '{count} importés'
     remove_title: Retirer de votre watchlist Trakt
+    remove_modal: Retirer de la watchlist Trakt
     remove_confirm: 'Retirer {title} de votre watchlist Trakt ? Cela modifie Trakt lui-même.'
   empty:
     title: Votre watchlist Trakt est vide

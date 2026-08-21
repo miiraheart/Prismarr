@@ -101,6 +101,8 @@
     <span class="tk-count" id="tk-count"></span>
   </div>
 
+{% include 'decouverte/_detail_modal.html.twig' %}
+
   <div class="tk-grid" id="tk-grid">
     {% for item in items %}
     <div class="tk-card"
@@ -108,13 +110,13 @@
          data-type="{{ item.type }}"
          data-title="{{ item.title|e('html_attr') }}"
          data-year="{{ item.year ?: '' }}">
-      {# Opens the real Decouverte detail modal (cast, providers, trailer,
-         library status) rather than the leaner app-wide quick-look. That modal
-         and its JS live inside decouverte/index.html.twig and depend on that
-         page's own globals, so it cannot be included from here; the page
-         already supports the ?detail=type/id deep link, which is the intended
-         way in. Nothing is duplicated. #}
-      <a class="tk-thumb" href="{{ path('tmdb_index') }}?detail={{ item.type }}/{{ item.tmdb_id }}">
+      {# Opens the real Decouverte detail modal in place (cast, providers,
+         trailer, library status). The modal now lives in a shared partial
+         included above, so this is the same markup and the same JS the
+         Decouverte page runs, not a copy. The href is kept so middle-click
+         and no-JS still land somewhere sensible. #}
+      <a class="tk-thumb" href="{{ path('tmdb_index') }}?detail={{ item.type }}/{{ item.tmdb_id }}"
+         data-tk-detail>
         <div class="no-poster" data-tk-poster>{{ ico.icon('movie', '', 32) }}</div>
         <span class="type-badge {{ item.type }}">{{ item.type == 'movie' ? 'trakt.type.movie'|trans : 'trakt.type.tv'|trans }}</span>
         <span class="mark mark-rating" data-tk-rating></span>
@@ -274,6 +276,49 @@
       });
     }
   });
+
+  // ── Detail modal ──────────────────────────────────────────────────────
+  // Same modal as Decouverte, included from the shared partial.
+  grid.addEventListener('click', function (e) {
+    var link = e.target.closest('[data-tk-detail]');
+    if (!link) return;
+    var card = link.closest('.tk-card');
+    if (!card || !window.PrismarrDetail || !window.PrismarrDetail.load) return; // let the href navigate
+    e.preventDefault();
+    window.PrismarrDetail.load(card.dataset.type, card.dataset.tmdbId);
+  });
+
+{% if can_write %}
+  // Contribute a "remove from Trakt" button to the modal's action column.
+  window.PrismarrDetail = window.PrismarrDetail || {};
+  window.PrismarrDetail.extraActions = function (d) {
+    return ['<button type="button" class="btn btn-outline-danger" data-tk-modal-remove'
+      + ' data-tmdb-id="' + d.id + '" data-type="' + d.type + '">'
+      + {{ 'trakt.action.remove_modal'|trans|json_encode|raw }} + '</button>'];
+  };
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-tk-modal-remove]');
+    if (!btn) return;
+    var id = btn.dataset.tmdbId;
+    var type = btn.dataset.type;
+    var card = grid.querySelector('.tk-card[data-tmdb-id="' + id + '"][data-type="' + type + '"]');
+    var name = card ? card.dataset.title : '';
+    if (!window.confirm({{ 'trakt.action.remove_confirm'|trans({title: '__T__'})|json_encode|raw }}.replace('__T__', name))) return;
+
+    btn.disabled = true;
+    post({{ path('trakt_remove')|json_encode|raw }}, { tmdb_id: parseInt(id, 10), type: type })
+      .then(function (res) {
+        if (!res.ok) { btn.disabled = false; btn.title = (res.data && res.data.error) || ''; return; }
+        if (card) {
+          card.remove();
+          cards = cards.filter(function (c) { return c !== card; });
+          updateCount();
+        }
+        if (window.PrismarrDetail.close) window.PrismarrDetail.close();
+      });
+  });
+{% endif %}
 
   // ── Remove from Trakt ─────────────────────────────────────────────────
   // A real write against the Trakt account, so it asks first.
