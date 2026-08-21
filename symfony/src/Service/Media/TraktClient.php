@@ -193,6 +193,10 @@ class TraktClient implements ResetInterface
                     'title'     => (string) ($media['title'] ?? ''),
                     'year'      => isset($media['year']) ? (int) $media['year'] : null,
                     'trakt_id'  => $media['ids']['trakt'] ?? null,
+                    // Community score, already in the extended=full payload.
+                    // Distinct from $entry['rating'] below, which is Mira's own.
+                    'community_rating' => isset($media['rating']) ? round((float) $media['rating'], 1) : null,
+                    'community_votes'  => isset($media['votes']) ? (int) $media['votes'] : null,
                     'listed_at' => $entry['listed_at'] ?? null,
                     'rating'    => isset($entry['rating']) ? (int) $entry['rating'] : null,
                     'rated_at'  => $entry['rated_at'] ?? null,
@@ -216,7 +220,9 @@ class TraktClient implements ResetInterface
     private function cachedGet(string $key, callable $producer): array
     {
         $this->ensureConfig();
-        $full = 'prismarr_trakt_' . sha1($this->username . '_' . $key);
+        // v2: bumped when the cached row shape changes, so an old entry is
+        // never served against newer rendering code.
+        $full = 'prismarr_trakt_v2_' . sha1($this->username . '_' . $key);
 
         return $this->cache->get($full, function (ItemInterface $item) use ($producer) {
             $item->expiresAfter(self::TTL_LIST);
@@ -478,7 +484,7 @@ class TraktClient implements ResetInterface
     private function forgetCached(string $key): void
     {
         if ($this->cache instanceof CacheItemPoolInterface && $this->username !== '') {
-            $this->cache->deleteItem('prismarr_trakt_' . sha1($this->username . '_' . $key));
+            $this->cache->deleteItem('prismarr_trakt_v2_' . sha1($this->username . '_' . $key));
         }
     }
 
