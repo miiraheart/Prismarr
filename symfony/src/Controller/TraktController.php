@@ -67,10 +67,12 @@ class TraktController extends AbstractController
         usort($rows, static fn (array $a, array $b): int => ($b['listed_at'] ?? '') <=> ($a['listed_at'] ?? ''));
 
         return $this->render('trakt/index.html.twig', [
-            'items'   => $rows,
-            'error'   => $error,
-            'movies'  => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'movie')),
-            'shows'   => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'tv')),
+            'items'        => $rows,
+            'error'        => $error,
+            'can_write'    => $this->trakt->hasWriteAccess(),
+            'can_connect'  => $this->trakt->canStartDeviceAuth(),
+            'movies'       => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'movie')),
+            'shows'        => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'tv')),
         ]);
     }
 
@@ -184,6 +186,72 @@ class TraktController extends AbstractController
         $this->em->flush();
 
         return $this->json(['ok' => true, 'added' => $added, 'total' => count($items)]);
+    }
+
+    // ── Trakt write access (OAuth device flow) ───────────────────────────────
+
+    /**
+     * Start the device flow. Returns the short code the user types at
+     * trakt.tv/activate. The device code itself stays server-side.
+     */
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    #[Route('/connect', name: 'connect', methods: ['POST'])]
+    public function connect(): JsonResponse
+    {
+        if (!$this->trakt->canStartDeviceAuth()) {
+            return $this->json(['error' => $this->translator->trans('trakt.connect.need_secret')], 400);
+        }
+
+        $started = $this->trakt->startDeviceAuth();
+        if ($started === null) {
+            return $this->json(['error' => $this->translator->trans('trakt.connect.failed')], 502);
+        }
+
+        return $this->json($started);
+    }
+
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    #[Route('/connect/poll', name: 'connect_poll', methods: ['POST'])]
+    public function connectPoll(): JsonResponse
+    {
+        return $this->json(['status' => $this->trakt->pollDeviceAuth()]);
+    }
+
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    #[Route('/disconnect', name: 'disconnect', methods: ['POST'])]
+    public function disconnect(): JsonResponse
+    {
+        $this->trakt->disconnect();
+
+        return $this->json(['ok' => true]);
+    }
+
+    /**
+     * Remove a title from the Trakt watchlist itself, not just from this page.
+     * Needs the device flow to have been completed.
+     */
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    #[Route('/remove', name: 'remove', methods: ['POST'])]
+    public function remove(Request $request): JsonResponse
+    {
+        [$tmdbId, $type] = $this->readTarget($request);
+        if ($tmdbId === 0) {
+            return $this->json(['error' => $this->translator->trans('trakt.error.invalid_params')], 400);
+        }
+        if (!$this->trakt->hasWriteAccess()) {
+            return $this->json(['error' => $this->translator->trans('trakt.connect.needed')], 403);
+        }
+
+        try {
+            $done = $this->trakt->removeFromWatchlist($tmdbId, $type);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt remove failed', ['tmdb_id' => $tmdbId, 'message' => $e->getMessage()]);
+            $done = false;
+        }
+
+        return $done
+            ? $this->json(['ok' => true])
+            : $this->json(['error' => $this->translator->trans('trakt.error.remove_failed')], 502);
     }
 
     /**

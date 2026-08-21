@@ -901,6 +901,7 @@ admin:
     trakt:
       client_id: Client ID
       username: Utilisateur Trakt
+      client_secret: 'Client secret (uniquement pour retirer des titres)'
   internal:
     calendar:
       label: Calendrier
@@ -5631,10 +5632,24 @@ trakt:
     import_all: Tout importer dans la watchlist
     importing: 'Import en cours…'
     imported: '{count} importés'
+    remove_title: Retirer de votre watchlist Trakt
+    remove_confirm: 'Retirer {title} de votre watchlist Trakt ? Cela modifie Trakt lui-même.'
   empty:
     title: Votre watchlist Trakt est vide
     subtitle: 'Tout ce que vous ajoutez sur Trakt apparaît ici sous 15 minutes.'
+  connect:
+    title: Connecter Trakt pour retirer des titres
+    ready: 'Lire votre watchlist ne demande aucune connexion. Retirer une entrée est une écriture, donc Trakt vous demande d''autoriser Prismarr une fois.'
+    need_secret: 'Ajoutez d''abord votre client secret Trakt dans les réglages. Il ne sert qu''à cette autorisation.'
+    action: Connecter
+    waiting: 'En attente…'
+    instructions: 'Ouvrez cette page et saisissez le code :'
+    expired: 'Code expiré ou refusé. Réessayez.'
+    disconnect: Déconnecter
+    needed: Connectez Trakt d'abord.
+    failed: 'Trakt n''a pas renvoyé de code. Vérifiez le client id et le secret.'
   error:
     unavailable: 'Lecture de la watchlist Trakt impossible. Vérifiez la carte Trakt dans les réglages.'
     invalid_params: Paramètres invalides.
     request_failed: Seerr a refusé la demande.
+    remove_failed: 'Trakt ne l''a pas retiré.'

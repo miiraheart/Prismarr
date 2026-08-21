@@ -98,8 +98,11 @@ class AdminSettingsController extends AbstractController
             ['key' => 'tautulli_api_key', 'type' => 'password', 'label' => 'admin.field.api_key'],
         ],
         'trakt' => [
-            ['key' => 'trakt_client_id', 'type' => 'password', 'label' => 'admin.field.trakt.client_id'],
-            ['key' => 'trakt_username',  'type' => 'text',     'label' => 'admin.field.trakt.username', 'placeholder' => 'your-trakt-slug'],
+            ['key' => 'trakt_client_id',     'type' => 'password', 'label' => 'admin.field.trakt.client_id'],
+            ['key' => 'trakt_username',      'type' => 'text',     'label' => 'admin.field.trakt.username', 'placeholder' => 'your-trakt-slug'],
+            // Only needed to remove entries from the Trakt watchlist: that is a
+            // write, and writes are OAuth. Reading a public profile never uses it.
+            ['key' => 'trakt_client_secret', 'type' => 'password', 'label' => 'admin.field.trakt.client_secret', 'clearable' => true],
         ],
     ];
 

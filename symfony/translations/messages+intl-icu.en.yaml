@@ -902,6 +902,7 @@ admin:
     trakt:
       client_id: Client ID
       username: Trakt username
+      client_secret: 'Client secret (only to remove titles)'
   internal:
     calendar:
       label: Calendar
@@ -5633,10 +5634,24 @@ trakt:
     import_all: Import all to watchlist
     importing: Importing…
     imported: '{count} imported'
+    remove_title: Remove from your Trakt watchlist
+    remove_confirm: 'Remove {title} from your Trakt watchlist? This changes Trakt itself.'
   empty:
     title: Your Trakt watchlist is empty
     subtitle: Anything you add on Trakt shows up here within 15 minutes.
+  connect:
+    title: Connect Trakt to remove titles
+    ready: Reading your watchlist needs no login. Removing an entry is a write, so Trakt asks you to authorise Prismarr once.
+    need_secret: Add your Trakt client secret in Settings first. It is only used to complete this authorisation.
+    action: Connect
+    waiting: Waiting for you…
+    instructions: 'Open this page and enter the code:'
+    expired: That code expired or was declined. Try again.
+    disconnect: Disconnect
+    needed: Connect Trakt first.
+    failed: Trakt did not hand out a code. Check the client id and secret.
   error:
     unavailable: Could not read your Trakt watchlist. Check the Trakt card in settings.
     invalid_params: Invalid parameters.
     request_failed: Seerr refused the request.
+    remove_failed: Trakt did not remove it.

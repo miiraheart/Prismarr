@@ -15,7 +15,7 @@
     background: var(--tblr-bg-surface); border: 1px solid var(--tblr-border-color);
     transition: transform .15s, box-shadow .15s;
   }
-  .tk-thumb { position: relative; }
+  .tk-thumb { position: relative; display: block; cursor: pointer; }
   .tk-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
   .tk-thumb img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
   .tk-thumb .no-poster {
@@ -54,6 +54,12 @@
     border-top: 1px solid var(--tblr-border-color);
   }
   .tk-actions .btn { flex: 1; font-size: .68rem; padding: .18rem .3rem; }
+  .tk-actions .tk-remove { flex: 0 0 auto; width: 1.9rem; }
+  .tk-connect code {
+    font-size: 1.4rem; font-weight: 700; letter-spacing: .18em;
+    padding: .2rem .6rem; border-radius: .3rem;
+    background: var(--tblr-bg-surface-secondary); color: var(--tblr-body-color);
+  }
   .tk-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 1rem; }
   .tk-count { font-size: .78rem; color: var(--tblr-secondary); }
 </style>
@@ -63,6 +69,25 @@
     <div class="alert alert-danger">{{ 'trakt.error.unavailable'|trans }}</div>
   {% endif %}
 
+  {% if not can_write %}
+    {# Reading a public profile needs only the client id. Removing an entry is a
+       write, and Trakt answers 401 to those without OAuth. The device flow needs
+       no callback URL, which is why it is used here. #}
+    <div class="alert alert-info tk-connect" id="tk-connect-box">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="flex-fill">
+          <strong>{{ 'trakt.connect.title'|trans }}</strong>
+          <div class="text-secondary" id="tk-connect-hint">
+            {{ can_connect ? 'trakt.connect.ready'|trans : 'trakt.connect.need_secret'|trans }}
+          </div>
+        </div>
+        {% if can_connect %}
+          <button type="button" class="btn btn-sm btn-primary" id="tk-connect">{{ 'trakt.connect.action'|trans }}</button>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
   <div class="tk-toolbar">
     <div class="btn-group btn-group-sm" role="group">
       <button type="button" class="btn btn-outline-secondary active" data-tk-filter="all">{{ 'trakt.filter.all'|trans }}</button>
@@ -70,6 +95,9 @@
       <button type="button" class="btn btn-outline-secondary" data-tk-filter="tv">{{ 'trakt.filter.shows'|trans({count: shows}) }}</button>
     </div>
     <button type="button" class="btn btn-sm btn-outline-primary" id="tk-import">{{ 'trakt.action.import_all'|trans }}</button>
+    {% if can_write %}
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="tk-disconnect">{{ 'trakt.connect.disconnect'|trans }}</button>
+    {% endif %}
     <span class="tk-count" id="tk-count"></span>
   </div>
 
@@ -80,7 +108,15 @@
          data-type="{{ item.type }}"
          data-title="{{ item.title|e('html_attr') }}"
          data-year="{{ item.year ?: '' }}">
-      <div class="tk-thumb">
+      {# Same contract the dashboard tiles use: the app-wide quick-look in
+         _quicklook.html.twig is already included by base.html.twig and picks
+         this up by delegation. The href is the fallback when the fragment
+         fetch fails. #}
+      <a class="tk-thumb" href="{{ path('tmdb_detail', {type: item.type, id: item.tmdb_id}) }}"
+         data-ql-trigger
+         data-ql-source="tmdb"
+         data-ql-type="{{ item.type }}"
+         data-ql-id="{{ item.tmdb_id }}">
         <div class="no-poster" data-tk-poster>{{ ico.icon('movie', '', 32) }}</div>
         <span class="type-badge {{ item.type }}">{{ item.type == 'movie' ? 'trakt.type.movie'|trans : 'trakt.type.tv'|trans }}</span>
         <span class="mark mark-rating" data-tk-rating></span>
@@ -92,10 +128,14 @@
           <div class="card-title" title="{{ item.title }}">{{ item.title }}</div>
           <div class="card-sub">{{ item.year ?: '' }}</div>
         </div>
-      </div>
+      </a>
       <div class="tk-actions">
         <button type="button" class="btn btn-outline-primary" data-tk-request>{{ 'trakt.action.request'|trans }}</button>
         <button type="button" class="btn btn-outline-secondary" data-tk-watchlist>{{ 'trakt.action.watchlist'|trans }}</button>
+        {% if can_write %}
+          <button type="button" class="btn btn-outline-danger tk-remove" data-tk-remove
+                  title="{{ 'trakt.action.remove_title'|trans }}">&times;</button>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -236,6 +276,96 @@
       });
     }
   });
+
+  // ── Remove from Trakt ─────────────────────────────────────────────────
+  // A real write against the Trakt account, so it asks first.
+  grid.addEventListener('click', function (e) {
+    var rmBtn = e.target.closest('[data-tk-remove]');
+    if (!rmBtn) return;
+    var card = rmBtn.closest('.tk-card');
+    if (!card) return;
+    if (!window.confirm({{ 'trakt.action.remove_confirm'|trans({title: '__T__'})|json_encode|raw }}
+        .replace('__T__', card.dataset.title))) return;
+
+    rmBtn.disabled = true;
+    post({{ path('trakt_remove')|json_encode|raw }}, {
+      tmdb_id: parseInt(card.dataset.tmdbId, 10),
+      type: card.dataset.type,
+    }).then(function (res) {
+      if (res.ok) {
+        card.remove();
+        cards = cards.filter(function (c) { return c !== card; });
+        updateCount();
+      } else {
+        rmBtn.disabled = false;
+        rmBtn.title = (res.data && res.data.error) || '';
+      }
+    });
+  });
+
+  // ── Connect to Trakt (OAuth device flow) ──────────────────────────────
+  var connectBtn = document.getElementById('tk-connect');
+  if (connectBtn) {
+    connectBtn.onclick = function () {
+      connectBtn.disabled = true;
+      var hint = document.getElementById('tk-connect-hint');
+      post({{ path('trakt_connect')|json_encode|raw }}, {}).then(function (res) {
+        if (!res.ok || !res.data || !res.data.user_code) {
+          connectBtn.disabled = false;
+          if (hint) hint.textContent = (res.data && res.data.error) || '';
+          return;
+        }
+        var d = res.data;
+        if (hint) {
+          hint.innerHTML = '';
+          var line = document.createElement('div');
+          line.textContent = {{ 'trakt.connect.instructions'|trans|json_encode|raw }} + ' ';
+          var link = document.createElement('a');
+          link.href = d.verification_url;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.textContent = d.verification_url;
+          var code = document.createElement('code');
+          code.textContent = d.user_code;
+          line.appendChild(link);
+          hint.appendChild(line);
+          hint.appendChild(code);
+        }
+        connectBtn.textContent = {{ 'trakt.connect.waiting'|trans|json_encode|raw }};
+
+        var everyMs = Math.max(2, d.interval || 5) * 1000;
+        var deadline = Date.now() + ((d.expires_in || 600) * 1000);
+        (function tick() {
+          if (Date.now() > deadline) {
+            connectBtn.disabled = false;
+            connectBtn.textContent = {{ 'trakt.connect.action'|trans|json_encode|raw }};
+            if (hint) hint.textContent = {{ 'trakt.connect.expired'|trans|json_encode|raw }};
+            return;
+          }
+          post({{ path('trakt_connect_poll')|json_encode|raw }}, {}).then(function (r) {
+            var st = r.data && r.data.status;
+            if (st === 'ok') { window.location.reload(); return; }
+            if (st === 'slow_down') { everyMs += 1000; }
+            if (st === 'expired' || st === 'denied' || st === 'none' || st === 'error') {
+              connectBtn.disabled = false;
+              connectBtn.textContent = {{ 'trakt.connect.action'|trans|json_encode|raw }};
+              if (hint) hint.textContent = {{ 'trakt.connect.expired'|trans|json_encode|raw }};
+              return;
+            }
+            setTimeout(tick, everyMs);
+          });
+        })();
+      });
+    };
+  }
+
+  var disconnectBtn = document.getElementById('tk-disconnect');
+  if (disconnectBtn) {
+    disconnectBtn.onclick = function () {
+      disconnectBtn.disabled = true;
+      post({{ path('trakt_disconnect')|json_encode|raw }}, {}).then(function () { window.location.reload(); });
+    };
+  }
 
   // ── Import all ────────────────────────────────────────────────────────
   var importBtn = document.getElementById('tk-import');

@@ -4,6 +4,7 @@ namespace App\Service\Media;
 
 use App\Exception\ServiceNotConfiguredException;
 use App\Service\ConfigService;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -29,6 +30,14 @@ class TraktClient implements ResetInterface
     // a 403 HTML block page instead of passing it to Trakt. PHP's curl sends no
     // User-Agent by default, so one has to be set explicitly.
     private const USER_AGENT  = 'Prismarr/1.0';
+    // Reads need only the client id. Writes (removing a watchlist entry) are
+    // OAuth: verified against the live API, POST /sync/watchlist/remove with
+    // the client id alone answers 401. The device flow is used rather than the
+    // authorization-code flow because it needs no reachable callback URL, which
+    // matches the app registration's urn:ietf:wg:oauth:2.0:oob redirect.
+    private const OAUTH_REDIRECT = 'urn:ietf:wg:oauth:2.0:oob';
+    // Refresh this many seconds before the token actually lapses.
+    private const TOKEN_MARGIN = 600;
 
     private string $clientId = '';
     private string $username = '';
@@ -278,5 +287,238 @@ class TraktClient implements ResetInterface
         }
 
         return 1;
+    }
+
+    // ── Write side (OAuth device flow) ───────────────────────────────────────
+
+    /** True once the device flow has been completed and a token is stored. */
+    public function hasWriteAccess(): bool
+    {
+        return (string) $this->config->get('trakt_access_token') !== '';
+    }
+
+    /** True when the client secret needed for the token exchange is present. */
+    public function canStartDeviceAuth(): bool
+    {
+        return (string) $this->config->get('trakt_client_id') !== ''
+            && (string) $this->config->get('trakt_client_secret') !== '';
+    }
+
+    /**
+     * Begin the device flow. The user code is shown by the caller and typed by
+     * the user at the returned verification URL. The device code is kept
+     * server-side so the poll endpoint never has to trust client input.
+     *
+     * @return array{user_code:string, verification_url:string, interval:int, expires_in:int}|null
+     */
+    public function startDeviceAuth(): ?array
+    {
+        $clientId = (string) $this->config->get('trakt_client_id');
+        if ($clientId === '') {
+            return null;
+        }
+
+        $res = $this->postJson('/oauth/device/code', ['client_id' => $clientId], null);
+        $data = $res['data'];
+        if ($res['code'] !== 200 || !is_array($data) || !isset($data['device_code'], $data['user_code'])) {
+            $this->logger->warning('Trakt device code request failed', ['http' => $res['code']]);
+
+            return null;
+        }
+
+        $this->config->set('trakt_device_code', (string) $data['device_code']);
+
+        return [
+            'user_code'        => (string) $data['user_code'],
+            'verification_url' => (string) ($data['verification_url'] ?? 'https://trakt.tv/activate'),
+            'interval'         => (int) ($data['interval'] ?? 5),
+            'expires_in'       => (int) ($data['expires_in'] ?? 600),
+        ];
+    }
+
+    /**
+     * Poll the pending device authorisation once.
+     *
+     * @return string one of: ok, pending, slow_down, expired, denied, none, error
+     */
+    public function pollDeviceAuth(): string
+    {
+        $deviceCode = (string) $this->config->get('trakt_device_code');
+        if ($deviceCode === '') {
+            return 'none';
+        }
+
+        $res = $this->postJson('/oauth/device/token', [
+            'code'          => $deviceCode,
+            'client_id'     => (string) $this->config->get('trakt_client_id'),
+            'client_secret' => (string) $this->config->get('trakt_client_secret'),
+        ], null);
+
+        // Trakt's documented device-flow codes: 400 keep waiting, 404 unknown
+        // code, 409 already used, 410 expired, 418 denied, 429 poll slower.
+        return match ($res['code']) {
+            200 => $this->storeToken($res['data']) ? 'ok' : 'error',
+            400 => 'pending',
+            429 => 'slow_down',
+            404, 409, 410 => $this->forgetDeviceCode('expired'),
+            418 => $this->forgetDeviceCode('denied'),
+            default => 'error',
+        };
+    }
+
+    /** Drop the stored tokens. The read side keeps working without them. */
+    public function disconnect(): void
+    {
+        foreach (['trakt_access_token', 'trakt_refresh_token', 'trakt_token_expires', 'trakt_device_code'] as $key) {
+            $this->config->set($key, null);
+        }
+    }
+
+    /**
+     * Remove one title from the Trakt watchlist itself.
+     *
+     * @param string $type movie|tv in Prismarr's vocabulary
+     */
+    public function removeFromWatchlist(int $tmdbId, string $type): bool
+    {
+        // Populates $this->username, which forgetCached() needs for the key.
+        $this->ensureConfig();
+
+        $token = $this->accessToken();
+        if ($token === null) {
+            return false;
+        }
+
+        // Back to Trakt's own vocabulary on the way out.
+        $bucket = $type === 'movie' ? 'movies' : 'shows';
+        $res = $this->postJson('/sync/watchlist/remove', [
+            $bucket => [['ids' => ['tmdb' => $tmdbId]]],
+        ], $token);
+
+        $deleted = (int) ($res['data']['deleted'][$bucket] ?? 0);
+        if ($res['code'] !== 200 || $deleted < 1) {
+            $this->logger->warning('Trakt watchlist remove did not delete anything', [
+                'http' => $res['code'], 'tmdb_id' => $tmdbId, 'bucket' => $bucket,
+            ]);
+
+            return false;
+        }
+
+        $this->forgetCached('watchlist');
+
+        return true;
+    }
+
+    /**
+     * A valid bearer token, refreshing it when it is close to lapsing.
+     * Null when the device flow has never been completed.
+     */
+    private function accessToken(): ?string
+    {
+        $token = (string) $this->config->get('trakt_access_token');
+        if ($token === '') {
+            return null;
+        }
+
+        $expires = (int) $this->config->get('trakt_token_expires');
+        if ($expires > 0 && $expires - self::TOKEN_MARGIN > time()) {
+            return $token;
+        }
+
+        $refresh = (string) $this->config->get('trakt_refresh_token');
+        if ($refresh === '') {
+            return $token; // no refresh token: try the one we have and let the API judge
+        }
+
+        $res = $this->postJson('/oauth/token', [
+            'refresh_token' => $refresh,
+            'client_id'     => (string) $this->config->get('trakt_client_id'),
+            'client_secret' => (string) $this->config->get('trakt_client_secret'),
+            'redirect_uri'  => self::OAUTH_REDIRECT,
+            'grant_type'    => 'refresh_token',
+        ], null);
+
+        if ($res['code'] === 200 && $this->storeToken($res['data'])) {
+            return (string) $this->config->get('trakt_access_token');
+        }
+
+        $this->logger->warning('Trakt token refresh failed', ['http' => $res['code']]);
+
+        return null;
+    }
+
+    /** @param array<string, mixed>|null $data */
+    private function storeToken(?array $data): bool
+    {
+        if (!is_array($data) || !isset($data['access_token'])) {
+            return false;
+        }
+
+        $createdAt = (int) ($data['created_at'] ?? time());
+        $this->config->set('trakt_access_token', (string) $data['access_token']);
+        $this->config->set('trakt_refresh_token', (string) ($data['refresh_token'] ?? ''));
+        $this->config->set('trakt_token_expires', (string) ($createdAt + (int) ($data['expires_in'] ?? 0)));
+        $this->config->set('trakt_device_code', null);
+
+        return true;
+    }
+
+    private function forgetDeviceCode(string $verdict): string
+    {
+        $this->config->set('trakt_device_code', null);
+
+        return $verdict;
+    }
+
+    /**
+     * Best-effort cache drop so a removal shows up before the 15 minute TTL.
+     * CacheInterface has no delete(); the app pool also implements the PSR-6
+     * pool, so downcast when it does and simply wait out the TTL when it does not.
+     */
+    private function forgetCached(string $key): void
+    {
+        if ($this->cache instanceof CacheItemPoolInterface && $this->username !== '') {
+            $this->cache->deleteItem('prismarr_trakt_' . sha1($this->username . '_' . $key));
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return array{code:int, data:?array}
+     */
+    private function postJson(string $path, array $body, ?string $bearer): array
+    {
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'trakt-api-version: ' . self::API_VERSION,
+            'trakt-api-key: ' . (string) $this->config->get('trakt_client_id'),
+        ];
+        if ($bearer !== null) {
+            $headers[] = 'Authorization: Bearer ' . $bearer;
+        }
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => self::BASE_URL . $path,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($body),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_NOSIGNAL       => 1,
+            CURLOPT_USERAGENT      => self::USER_AGENT,
+            CURLOPT_PROTOCOLS       => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_HTTPHEADER     => $headers,
+        ]);
+
+        $raw  = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $decoded = is_string($raw) ? json_decode($raw, true) : null;
+
+        return ['code' => $code, 'data' => is_array($decoded) ? $decoded : null];
     }
 }
