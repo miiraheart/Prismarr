@@ -580,6 +580,9 @@ class HealthService
                         'Accept: application/json',
                         'trakt-api-version: 2',
                         'trakt-api-key: ' . $key,
+                        // Cloudflare fronts api.trakt.tv and 403s a request with no
+                        // User-Agent. See the same header in TraktClient::request().
+                        'User-Agent: Prismarr/1.0',
                     ],
                 ];
             }

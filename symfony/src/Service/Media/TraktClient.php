@@ -25,6 +25,10 @@ class TraktClient implements ResetInterface
     private const PAGE_LIMIT  = 100;
     private const MAX_PAGES   = 50;
     private const TTL_LIST    = 900;
+    // api.trakt.tv sits behind Cloudflare, which answers a UA-less request with
+    // a 403 HTML block page instead of passing it to Trakt. PHP's curl sends no
+    // User-Agent by default, so one has to be set explicitly.
+    private const USER_AGENT  = 'Prismarr/1.0';
 
     private string $clientId = '';
     private string $username = '';
@@ -228,6 +232,7 @@ class TraktClient implements ResetInterface
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_CONNECTTIMEOUT => 8,
             CURLOPT_NOSIGNAL       => 1,
+            CURLOPT_USERAGENT      => self::USER_AGENT,
             // Same SSRF guard as the other clients in this namespace.
             CURLOPT_PROTOCOLS       => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
