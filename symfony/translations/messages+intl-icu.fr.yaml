@@ -5639,7 +5639,7 @@ trakt:
     subtitle: 'Tout ce que vous ajoutez sur Trakt apparaît ici sous 15 minutes.'
   connect:
     title: Connecter votre compte Trakt
-    ready: 'Lire votre watchlist ne demande aucune connexion. Modifier quoi que ce soit sur Trakt oui, donc autorisez Prismarr une fois.'
+    ready: 'Le retrait de titres est désactivé tant que vous n''êtes pas connectée. Lire la watchlist ne demande aucune connexion, mais modifier Trakt oui, donc autorisez Prismarr une fois.'
     need_secret: 'Ajoutez d''abord votre client secret Trakt dans les réglages. Il sert à cette autorisation.'
     action: Connecter
     waiting: 'En attente…'

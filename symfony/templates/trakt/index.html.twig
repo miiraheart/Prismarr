@@ -73,7 +73,7 @@
     {# Reading a public profile needs only the client id. Removing an entry is a
        write, and Trakt answers 401 to those without OAuth. The device flow needs
        no callback URL, which is why it is used here. #}
-    <div class="alert alert-info tk-connect" id="tk-connect-box">
+    <div class="alert alert-warning tk-connect" id="tk-connect-box">
       <div class="d-flex flex-wrap align-items-center gap-2">
         <div class="flex-fill">
           <strong>{{ 'trakt.connect.title'|trans }}</strong>
@@ -108,15 +108,13 @@
          data-type="{{ item.type }}"
          data-title="{{ item.title|e('html_attr') }}"
          data-year="{{ item.year ?: '' }}">
-      {# Same contract the dashboard tiles use: the app-wide quick-look in
-         _quicklook.html.twig is already included by base.html.twig and picks
-         this up by delegation. The href is the fallback when the fragment
-         fetch fails. #}
-      <a class="tk-thumb" href="{{ path('tmdb_detail', {type: item.type, id: item.tmdb_id}) }}"
-         data-ql-trigger
-         data-ql-source="tmdb"
-         data-ql-type="{{ item.type }}"
-         data-ql-id="{{ item.tmdb_id }}">
+      {# Opens the real Decouverte detail modal (cast, providers, trailer,
+         library status) rather than the leaner app-wide quick-look. That modal
+         and its JS live inside decouverte/index.html.twig and depend on that
+         page's own globals, so it cannot be included from here; the page
+         already supports the ?detail=type/id deep link, which is the intended
+         way in. Nothing is duplicated. #}
+      <a class="tk-thumb" href="{{ path('tmdb_index') }}?detail={{ item.type }}/{{ item.tmdb_id }}">
         <div class="no-poster" data-tk-poster>{{ ico.icon('movie', '', 32) }}</div>
         <span class="type-badge {{ item.type }}">{{ item.type == 'movie' ? 'trakt.type.movie'|trans : 'trakt.type.tv'|trans }}</span>
         <span class="mark mark-rating" data-tk-rating></span>

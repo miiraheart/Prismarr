@@ -5641,7 +5641,7 @@ trakt:
     subtitle: Anything you add on Trakt shows up here within 15 minutes.
   connect:
     title: Connect your Trakt account
-    ready: Reading your watchlist needs no login. Changing anything on Trakt does, so authorise Prismarr once.
+    ready: 'Removing titles is off until you connect. Reading your watchlist needs no login, but changing anything on Trakt does, so authorise Prismarr once.'
     need_secret: Add your Trakt client secret in Settings first. It is used to complete this authorisation.
     action: Connect
     waiting: Waiting for you…
