@@ -902,7 +902,7 @@ admin:
     trakt:
       client_id: Client ID
       username: Trakt username
-      client_secret: 'Client secret (only to remove titles)'
+      client_secret: Client secret
   internal:
     calendar:
       label: Calendar
@@ -5640,9 +5640,9 @@ trakt:
     title: Your Trakt watchlist is empty
     subtitle: Anything you add on Trakt shows up here within 15 minutes.
   connect:
-    title: Connect Trakt to remove titles
-    ready: Reading your watchlist needs no login. Removing an entry is a write, so Trakt asks you to authorise Prismarr once.
-    need_secret: Add your Trakt client secret in Settings first. It is only used to complete this authorisation.
+    title: Connect your Trakt account
+    ready: Reading your watchlist needs no login. Changing anything on Trakt does, so authorise Prismarr once.
+    need_secret: Add your Trakt client secret in Settings first. It is used to complete this authorisation.
     action: Connect
     waiting: Waiting for you…
     instructions: 'Open this page and enter the code:'

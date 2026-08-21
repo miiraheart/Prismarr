@@ -100,8 +100,8 @@ class AdminSettingsController extends AbstractController
         'trakt' => [
             ['key' => 'trakt_client_id',     'type' => 'password', 'label' => 'admin.field.trakt.client_id'],
             ['key' => 'trakt_username',      'type' => 'text',     'label' => 'admin.field.trakt.username', 'placeholder' => 'your-trakt-slug'],
-            // Only needed to remove entries from the Trakt watchlist: that is a
-            // write, and writes are OAuth. Reading a public profile never uses it.
+            // Needed for the OAuth device flow, which is what any write to the
+            // Trakt account goes through. Reading a public profile never uses it.
             ['key' => 'trakt_client_secret', 'type' => 'password', 'label' => 'admin.field.trakt.client_secret', 'clearable' => true],
         ],
     ];

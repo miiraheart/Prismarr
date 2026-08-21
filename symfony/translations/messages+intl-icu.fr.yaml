@@ -901,7 +901,7 @@ admin:
     trakt:
       client_id: Client ID
       username: Utilisateur Trakt
-      client_secret: 'Client secret (uniquement pour retirer des titres)'
+      client_secret: Client secret
   internal:
     calendar:
       label: Calendrier
@@ -5638,9 +5638,9 @@ trakt:
     title: Votre watchlist Trakt est vide
     subtitle: 'Tout ce que vous ajoutez sur Trakt apparaît ici sous 15 minutes.'
   connect:
-    title: Connecter Trakt pour retirer des titres
-    ready: 'Lire votre watchlist ne demande aucune connexion. Retirer une entrée est une écriture, donc Trakt vous demande d''autoriser Prismarr une fois.'
-    need_secret: 'Ajoutez d''abord votre client secret Trakt dans les réglages. Il ne sert qu''à cette autorisation.'
+    title: Connecter votre compte Trakt
+    ready: 'Lire votre watchlist ne demande aucune connexion. Modifier quoi que ce soit sur Trakt oui, donc autorisez Prismarr une fois.'
+    need_secret: 'Ajoutez d''abord votre client secret Trakt dans les réglages. Il sert à cette autorisation.'
     action: Connecter
     waiting: 'En attente…'
     instructions: 'Ouvrez cette page et saisissez le code :'
