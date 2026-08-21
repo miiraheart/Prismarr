@@ -97,6 +97,10 @@ class AdminSettingsController extends AbstractController
             ['key' => 'tautulli_url',     'type' => 'text',     'label' => 'admin.field.url',     'placeholder' => 'http://host.docker.internal:8181'],
             ['key' => 'tautulli_api_key', 'type' => 'password', 'label' => 'admin.field.api_key'],
         ],
+        'trakt' => [
+            ['key' => 'trakt_client_id', 'type' => 'password', 'label' => 'admin.field.trakt.client_id'],
+            ['key' => 'trakt_username',  'type' => 'text',     'label' => 'admin.field.trakt.username', 'placeholder' => 'your-trakt-slug'],
+        ],
     ];
 
     /**
@@ -145,6 +149,7 @@ class AdminSettingsController extends AbstractController
         'nzbget'      => 'NZBGet',
         'gluetun'     => 'Gluetun',
         'tautulli'    => 'Tautulli',
+        'trakt'       => 'Trakt',
     ];
 
     /**
@@ -549,6 +554,7 @@ class AdminSettingsController extends AbstractController
             'sabnzbd'                                    => ['sabnzbd_url', 'sabnzbd_api_key'],
             'nzbget'                                     => ['nzbget_url', 'nzbget_user', 'nzbget_password'],
             'tautulli'                                   => ['tautulli_url', 'tautulli_api_key'],
+            'trakt'                                      => ['trakt_client_id', 'trakt_username'],
             default                                      => [],
         };
         $overrides = [];
@@ -597,7 +603,7 @@ class AdminSettingsController extends AbstractController
     public function healthInvalidate(string $service): JsonResponse
     {
         $service = strtolower($service);
-        $allowed = ['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli'];
+        $allowed = ['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt'];
         if (!in_array($service, $allowed, true)) {
             return new JsonResponse(['ok' => false], 400);
         }
@@ -1155,7 +1161,7 @@ class AdminSettingsController extends AbstractController
      * password) are filtered out so the exported JSON is safe to share
      * or commit to a private dotfiles repo.
      */
-    private const EXPORT_SENSITIVE_PATTERNS = ['api_key', 'password', 'secret'];
+    private const EXPORT_SENSITIVE_PATTERNS = ['api_key', 'password', 'secret', 'client_id'];
 
     /**
      * @return array{safe: int, skipped: int}

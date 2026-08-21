@@ -691,6 +691,7 @@ admin:
       nzbget: Usenet downloader
       gluetun: 'VPN / port forwarding'
       tautulli: 'Plex activity (via Tautulli)'
+      trakt: 'Watchlist, ratings & watched state'
     sidebar_toggle: Menu
     sidebar_toggle_title: Show in sidebar
     status:
@@ -897,6 +898,9 @@ admin:
     clear: Clear
     tmdb:
       api_key: v3 API key
+    trakt:
+      client_id: Client ID
+      username: Trakt username
   internal:
     calendar:
       label: Calendar

@@ -12,6 +12,7 @@ use App\Service\Media\ServiceHealthCache;
 use App\Service\Media\SonarrClient;
 use App\Service\Media\TautulliClient;
 use App\Service\Media\TmdbClient;
+use App\Service\Media\TraktClient;
 use App\Service\Media\TransmissionClient;
 use App\Service\Media\Usenet\NzbgetClient;
 use App\Service\Media\Usenet\SabnzbdClient;
@@ -77,6 +78,9 @@ class HealthService
         // Transmission — nullable + last for the same legacy-test-constructor
         // reason as the clients above.
         private readonly ?TransmissionClient $transmission = null,
+        // Trakt: nullable + last for the same legacy-test-constructor
+        // reason as the clients above.
+        private readonly ?TraktClient      $trakt = null,
     ) {}
 
     /**
@@ -248,6 +252,7 @@ class HealthService
             'nzbget'      => $this->nzbget?->ping() ?? false,
             'tautulli'    => $this->tautulli?->ping() ?? false,
             'transmission' => $this->transmission?->ping() ?? false,
+            'trakt'       => $this->trakt?->ping() ?? false,
             default       => true,
         };
     }
@@ -264,7 +269,7 @@ class HealthService
      * (issue #15). Radarr/Sonarr are absent on purpose — they enable/disable
      * per instance via the `enabled` flag on `service_instance`.
      */
-    public const TOGGLEABLE_SERVICES = ['prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli'];
+    public const TOGGLEABLE_SERVICES = ['prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt'];
 
     public function isConfigured(string $service): bool
     {
@@ -318,6 +323,11 @@ class HealthService
             // including get_activity, is apikey-authenticated).
             'tautulli' =>
                 $this->config->has('tautulli_url') && $this->config->has('tautulli_api_key'),
+            // Trakt reads a *public* profile: the client id (API key) plus the
+            // username slug are all it needs. No OAuth, no secret, no URL,
+            // the endpoint is always api.trakt.tv.
+            'trakt' =>
+                $this->config->has('trakt_client_id') && $this->config->has('trakt_username'),
             default => true,
         };
     }
@@ -344,7 +354,7 @@ class HealthService
         if ($service === null) {
             $this->statusCache = [];
             if ($this->serviceHealthCache !== null) {
-                foreach (['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli'] as $svc) {
+                foreach (['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt'] as $svc) {
                     $this->serviceHealthCache->clear($svc);
                 }
             }
@@ -555,6 +565,22 @@ class HealthService
                 return [
                     'url'     => 'https://api.themoviedb.org/3/configuration?api_key=' . urlencode($key),
                     'headers' => ['Accept: application/json'],
+                ];
+            }
+            case 'trakt': {
+                $key  = $get('trakt_client_id');
+                $user = $get('trakt_username');
+                if ($key === '' || $user === '') return null;
+                // Same call TraktClient::ping() makes: it proves the client id
+                // is valid AND that the profile is publicly readable. A private
+                // profile answers 401/403, which diagnoses as auth/forbidden.
+                return [
+                    'url'     => 'https://api.trakt.tv/users/' . rawurlencode($user) . '/watchlist/movies?limit=1',
+                    'headers' => [
+                        'Accept: application/json',
+                        'trakt-api-version: 2',
+                        'trakt-api-key: ' . $key,
+                    ],
                 ];
             }
             case 'qbittorrent': {
