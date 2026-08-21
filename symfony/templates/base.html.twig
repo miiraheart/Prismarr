@@ -794,6 +794,20 @@
             </li>
             {% endif %}
 
+            {% if service_visible_in_sidebar('trakt') %}
+            <li class="nav-item">
+              <a class="nav-link {{ app.request.attributes.get('_route') starts with 'trakt_' ? 'active' }}"
+                 href="{{ path('trakt_index') }}">
+                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ed1c24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                    <circle cx="12" cy="12" r="9"/><path d="M8.5 15.5l5-5"/><path d="M15.5 15.5l-3.5 -3.5"/>
+                  </svg>
+                </span>
+                <span class="nav-link-title">{{ 'sidebar.nav.trakt'|trans }}</span>
+              </a>
+            </li>
+            {% endif %}
+
             {% if (service_configured('radarr') or service_configured('sonarr')) and feature_visible_in_sidebar('calendar') %}
             <li class="nav-item">
               <a class="nav-link {{ app.request.attributes.get('_route') == 'app_calendrier' ? 'active' }}"

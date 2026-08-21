@@ -73,6 +73,7 @@ sidebar:
     sonarr: Sonarr
     prowlarr: Prowlarr
     jellyseerr: Seerr
+    trakt: Trakt
     films: Movies
     series: TV Shows
   footer:
@@ -5610,3 +5611,32 @@ flash:
     mismatch: The two new passwords don't match.
   csrf:
     invalid: Invalid CSRF token.
+
+trakt:
+  page:
+    title: Trakt watchlist
+  type:
+    movie: Movie
+    tv: TV
+  filter:
+    all: All
+    movies: 'Movies ({count})'
+    shows: 'TV ({count})'
+  count: '{count} shown'
+  badge:
+    in_watchlist: Already in your Prismarr watchlist
+  action:
+    request: Request
+    requested: Requested
+    watchlist: Watchlist
+    added: Added
+    import_all: Import all to watchlist
+    importing: Importing…
+    imported: '{count} imported'
+  empty:
+    title: Your Trakt watchlist is empty
+    subtitle: Anything you add on Trakt shows up here within 15 minutes.
+  error:
+    unavailable: Could not read your Trakt watchlist. Check the Trakt card in settings.
+    invalid_params: Invalid parameters.
+    request_failed: Seerr refused the request.

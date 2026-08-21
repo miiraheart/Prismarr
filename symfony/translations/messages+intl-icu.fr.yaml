@@ -72,6 +72,7 @@ sidebar:
     sonarr: Sonarr
     prowlarr: Prowlarr
     jellyseerr: Seerr
+    trakt: Trakt
     films: Films
     series: Séries
   footer:
@@ -5608,3 +5609,32 @@ flash:
     mismatch: Les deux nouveaux mots de passe ne correspondent pas.
   csrf:
     invalid: Jeton CSRF invalide.
+
+trakt:
+  page:
+    title: Watchlist Trakt
+  type:
+    movie: Film
+    tv: Série
+  filter:
+    all: Tout
+    movies: 'Films ({count})'
+    shows: 'Séries ({count})'
+  count: '{count} affichés'
+  badge:
+    in_watchlist: Déjà dans votre watchlist Prismarr
+  action:
+    request: Demander
+    requested: Demandé
+    watchlist: Watchlist
+    added: Ajouté
+    import_all: Tout importer dans la watchlist
+    importing: 'Import en cours…'
+    imported: '{count} importés'
+  empty:
+    title: Votre watchlist Trakt est vide
+    subtitle: 'Tout ce que vous ajoutez sur Trakt apparaît ici sous 15 minutes.'
+  error:
+    unavailable: 'Lecture de la watchlist Trakt impossible. Vérifiez la carte Trakt dans les réglages.'
+    invalid_params: Paramètres invalides.
+    request_failed: Seerr a refusé la demande.

@@ -168,6 +168,21 @@ class JellyseerrClient implements ResetInterface
         return $this->request('PUT', "/api/v1/request/{$id}", [], $data);
     }
 
+    /**
+     * Create a request. `$mediaType` is Prismarr's own vocabulary (movie|tv),
+     * which is also what the API expects. A tv request without `seasons` is
+     * accepted but requests nothing, so ask for all of them by default.
+     */
+    public function createRequest(int $tmdbId, string $mediaType, bool $allSeasons = true): ?array
+    {
+        $body = ['mediaType' => $mediaType, 'mediaId' => $tmdbId];
+        if ($mediaType === 'tv' && $allSeasons) {
+            $body['seasons'] = 'all';
+        }
+
+        return $this->request('POST', '/api/v1/request', [], $body);
+    }
+
     // ── Services (quality profiles, root folders) ────────────────────────────
 
     public function getServiceRadarr(int $serverId = 0): ?array
