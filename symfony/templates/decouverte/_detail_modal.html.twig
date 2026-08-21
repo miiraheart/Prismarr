@@ -661,7 +661,22 @@
   var detailLoading  = document.getElementById('tmdb-detail-loading');
   var detailContent  = document.getElementById('tmdb-detail-content');
 
+  // Pristine copies of the modal's own markup. renderDetail() only fills the
+  // blocks the current title has data for, so without a reset the previous
+  // title's cast, trailer, providers or backdrops stay on screen behind the
+  // new one. Restoring the template on every open makes each render start from
+  // the same empty state. Safe to do: nothing binds listeners to these nodes
+  // at init, every handler is either delegated or re-attached by renderDetail.
+  var detailPristine = detailContent ? detailContent.innerHTML : '';
+  var loadingPristine = detailLoading ? detailLoading.innerHTML : '';
+
+  // Guards against an out-of-order response: open A, close, open B, and A's
+  // slower reply would otherwise paint over B.
+  var detailSeq = 0;
+
   function openDetailModal() {
+    detailLoading.innerHTML = loadingPristine;
+    detailContent.innerHTML = detailPristine;
     detailLoading.style.display = '';
     detailContent.style.display = 'none';
     detailModal.classList.add('show');
@@ -1237,9 +1252,11 @@
 
   function loadDetail(type, id) {
     openDetailModal();
+    var seq = ++detailSeq;
     fetch('/decouverte/detail/' + type + '/' + id, { credentials: 'same-origin' })
       .then(function(r) { return r.json(); })
       .then(function(d) {
+        if (seq !== detailSeq) return; // a newer title was opened meanwhile
         if (d.error) {
           detailLoading.innerHTML = '<div class="alert alert-danger m-4">' + {{ 'decouverte.search.error_prefix'|trans({message: '__MSG__'})|json_encode|raw }}.replace('__MSG__', d.error) + '</div>';
           return;
@@ -1247,6 +1264,7 @@
         renderDetail(d);
       })
       .catch(function() {
+        if (seq !== detailSeq) return;
         detailLoading.innerHTML = '<div class="alert alert-danger m-4">' + TMDB_I18N.network_error + '</div>';
       });
   }
