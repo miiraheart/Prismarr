@@ -691,7 +691,7 @@ admin:
       nzbget: Usenet downloader
       gluetun: 'VPN / port forwarding'
       tautulli: 'Plex activity (via Tautulli)'
-      trakt: 'Watchlist, ratings & watched state'
+      trakt: Watchlist & ratings
     sidebar_toggle: Menu
     sidebar_toggle_title: Show in sidebar
     status:

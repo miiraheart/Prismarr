@@ -690,7 +690,7 @@ admin:
       nzbget: Téléchargeur Usenet
       gluetun: 'VPN / port forwarding'
       tautulli: 'Activité Plex (via Tautulli)'
-      trakt: 'Watchlist, notes & état vu'
+      trakt: Watchlist & notes
     sidebar_toggle: Menu
     sidebar_toggle_title: Afficher dans le menu latéral
     status:
