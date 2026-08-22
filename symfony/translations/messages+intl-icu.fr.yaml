@@ -5636,6 +5636,7 @@ trakt:
     import_all: Tout importer dans la watchlist
     importing: 'Import en cours…'
     imported: '{count} importés'
+    remove: Retirer
     remove_title: Retirer de votre watchlist Trakt
     remove_modal: Retirer de la watchlist Trakt
     remove_confirm: 'Retirer {title} de votre watchlist Trakt ? Cela modifie Trakt lui-même.'
