@@ -93,27 +93,6 @@
   }
 
   .tmdb-search-bar { margin-bottom: 1rem; }
-  .tmdb-results-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 0.75rem;
-  }
-  .tmdb-results-grid .media-card {
-    position: relative; border-radius: .5rem; overflow: hidden;
-    background: var(--tblr-bg-surface); border: 1px solid var(--tblr-border-color);
-    cursor: pointer; transition: transform .15s, box-shadow .15s;
-  }
-  .tmdb-results-grid .media-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
-  .tmdb-results-grid .media-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
-  .tmdb-results-grid .media-card .no-poster {
-    width: 100%; aspect-ratio: 2/3; display: flex; align-items: center; justify-content: center;
-    background: var(--tblr-bg-surface-secondary); color: var(--tblr-muted); font-size: 1.5rem;
-  }
-  .tmdb-results-grid .media-card .card-overlay {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    background: linear-gradient(transparent, rgba(0,0,0,.85)); padding: .5rem .4rem .4rem;
-  }
-  .tmdb-results-grid .media-card .card-title-text { font-size: .72rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-  .tmdb-results-grid .media-card .card-year { font-size: .62rem; color: rgba(255,255,255,.6); }
 
   /* ── Hero trending (header immersif, format 2-col) ── */
   .tmdb-hero-row .tmdb-hero { margin-bottom: 0; height: 100%; }

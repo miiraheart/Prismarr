@@ -6,67 +6,17 @@
 
 {% block body %}
 <style>
-  .tk-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 1rem;
-  }
-  .tk-card {
-    border-radius: .5rem; overflow: hidden;
-    background: var(--tblr-bg-surface); border: 1px solid var(--tblr-border-color);
-    transition: transform .15s, box-shadow .15s;
-  }
-  .tk-thumb { position: relative; display: block; cursor: pointer; }
-  .tk-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
-  .tk-thumb img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
-  .tk-thumb .no-poster {
-    width: 100%; aspect-ratio: 2/3; display: flex; align-items: center; justify-content: center;
-    background: var(--tblr-bg-surface-secondary); color: var(--tblr-muted); font-size: 2rem;
-  }
-  .tk-thumb .card-overlay {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    background: linear-gradient(transparent, rgba(0,0,0,.88));
-    padding: .5rem .5rem .4rem;
-  }
-  .tk-thumb .card-title { font-size: .78rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tk-thumb .card-sub { font-size: .65rem; color: rgba(255,255,255,.6); }
-  .tk-thumb .type-badge {
-    position: absolute; top: .4rem; left: .4rem;
-    font-size: .6rem; font-weight: 700; padding: .1rem .35rem;
-    border-radius: .25rem; color: #1a1a1a;
-  }
-  .tk-thumb .type-badge.movie { background: rgba(255,194,48,.92); }
-  .tk-thumb .type-badge.tv { background: rgba(0,204,255,.92); }
-  .tk-thumb .mark {
-    position: absolute; right: .4rem;
-    font-size: .6rem; font-weight: 700; padding: .1rem .35rem;
-    border-radius: .25rem; color: #fff; display: none;
-  }
-  .tk-thumb .mark-rating { top: .4rem; background: rgba(237,28,36,.92); }
-  .tk-thumb .mark-watched { top: 1.75rem; background: rgba(34,197,94,.92); }
-  .tk-thumb .lib-dot {
-    position: absolute; bottom: 2.6rem; right: .4rem;
-    width: 12px; height: 12px; border-radius: 50%;
-    border: 2px solid rgba(0,0,0,.4);
-    background: #6366f1; box-shadow: 0 0 6px #6366f1;
-  }
-  .tk-actions {
-    display: flex; gap: .3rem; padding: .4rem;
-    border-top: 1px solid var(--tblr-border-color);
-  }
-  .tk-actions .btn { flex: 1; font-size: .68rem; padding: .18rem .3rem; }
-  .tk-actions .tk-remove { flex: 0 0 auto; width: 1.9rem; }
+  /* Cards, grid and badges all come from decouverte/_detail_modal.html.twig
+     (.tmdb-results-grid / .media-card / .vote-badge / .lib-badge / .hover-info),
+     so this page looks exactly like Decouverte. Only page furniture lives here. */
+  .tk-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+  .tk-count { font-size: .78rem; color: var(--tblr-secondary); }
   .tk-connect code {
     font-size: 1.4rem; font-weight: 700; letter-spacing: .18em;
     padding: .2rem .6rem; border-radius: .3rem;
     background: var(--tblr-bg-surface-secondary); color: var(--tblr-body-color);
   }
-  .tk-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 1rem; }
-  .tk-count { font-size: .78rem; color: var(--tblr-secondary); }
-  .tk-rates { display: flex; gap: .45rem; margin-top: .15rem; font-size: .62rem; color: rgba(255,255,255,.75); }
-  .tk-rates span { display: none; white-space: nowrap; }
-  .tk-rates .on { display: inline; }
-  .tk-rates b { font-weight: 700; color: #fff; }
-  .tk-rates i { font-style: normal; opacity: .65; }
+  .tmdb-results-grid .media-card .h-actions .btn { font-size: .68rem; padding: .15rem .45rem; }
 </style>
 
 <div class="container-xl">
@@ -108,48 +58,43 @@
 
 {% include 'decouverte/_detail_modal.html.twig' %}
 
-  <div class="tk-grid" id="tk-grid">
+  <div class="tmdb-results-grid" id="tk-grid">
     {% for item in items %}
-    <div class="tk-card"
+    {# Same structure as the card macro in decouverte/index.html.twig, so the
+       theme is shared rather than imitated. Trakt-only facts (your rating,
+       watched state, Trakt community score) ride in the hover line. #}
+    <div class="media-card"
          data-tmdb-id="{{ item.tmdb_id }}"
-         data-type="{{ item.type }}"
-         data-title="{{ item.title|e('html_attr') }}"
-         data-year="{{ item.year ?: '' }}">
-      {# Opens the real Decouverte detail modal in place (cast, providers,
-         trailer, library status). The modal now lives in a shared partial
-         included above, so this is the same markup and the same JS the
-         Decouverte page runs, not a copy. The href is kept so middle-click
-         and no-JS still land somewhere sensible. #}
-      <a class="tk-thumb" href="{{ path('tmdb_index') }}?detail={{ item.type }}/{{ item.tmdb_id }}"
-         data-tk-detail>
-        <div class="no-poster" data-tk-poster>{{ ico.icon('movie', '', 32) }}</div>
-        <span class="type-badge {{ item.type }}">{{ item.type == 'movie' ? 'trakt.type.movie'|trans : 'trakt.type.tv'|trans }}</span>
-        <span class="mark mark-rating" data-tk-rating></span>
-        <span class="mark mark-watched" data-tk-watched></span>
-        {% if item.in_local %}
-          <span class="lib-dot" title="{{ 'trakt.badge.in_watchlist'|trans }}"></span>
-        {% endif %}
-        <div class="card-overlay">
-          <div class="card-title" title="{{ item.title }}">{{ item.title }}</div>
-          <div class="card-sub">{{ item.year ?: '' }}</div>
-          {# Community scores. Trakt's comes free with the watchlist payload;
-             TMDb's is filled in by the poster hydration below. #}
-          <div class="tk-rates">
-            <span class="{{ item.community_rating ? 'on' : '' }}" data-tk-trakt-rate
-                  {% if item.community_votes %}title="{{ item.community_votes }} votes"{% endif %}>
-              <i>Trakt</i> <b>{{ item.community_rating ?: '' }}</b>
-            </span>
-            <span data-tk-tmdb-rate><i>TMDb</i> <b></b></span>
-          </div>
+         data-tmdb-type="{{ item.type }}"
+         data-tmdb-title="{{ item.title|e('html_attr') }}"
+         data-tmdb-year="{{ item.year ?: '' }}">
+      <div class="no-poster" data-tk-poster>
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 4v16l13 -8z"/></svg>
+      </div>
+      <span class="quality-badge {{ item.type }}">{{ item.type == 'movie' ? 'decouverte.modal.type_film'|trans : 'decouverte.modal.type_series'|trans }}</span>
+      {% if item.in_local %}
+        <span class="lib-badge" style="background:#6366f1;">{{ 'trakt.badge.in_watchlist_short'|trans }}</span>
+      {% endif %}
+      <span class="vote-badge" data-tk-vote style="display:none;"></span>
+      <div class="card-overlay">
+        <div class="card-title-text" title="{{ item.title }}">{{ item.title }}</div>
+        <div class="card-year">{{ item.year ?: '' }}</div>
+      </div>
+      <div class="hover-info">
+        <div class="h-title">{{ item.title }}</div>
+        <div class="h-year">
+          {{ item.year ?: '' }}
+          {% if item.community_rating %} · {{ ico.icon('star-filled', '', 14) }} {{ item.community_rating }} Trakt{% endif %}
+          <span data-tk-marks></span>
         </div>
-      </a>
-      <div class="tk-actions">
-        <button type="button" class="btn btn-outline-primary" data-tk-request>{{ 'trakt.action.request'|trans }}</button>
-        <button type="button" class="btn btn-outline-secondary" data-tk-watchlist>{{ 'trakt.action.watchlist'|trans }}</button>
-        {% if can_write %}
-          <button type="button" class="btn btn-outline-danger tk-remove" data-tk-remove
-                  title="{{ 'trakt.action.remove_title'|trans }}">&times;</button>
-        {% endif %}
+        <div class="h-actions">
+          <button type="button" class="btn btn-primary btn-sm" data-tk-request>{{ 'trakt.action.request'|trans }}</button>
+          <button type="button" class="btn btn-sm btn-outline-warning" data-tk-watchlist>{{ 'trakt.action.watchlist'|trans }}</button>
+          {% if can_write %}
+            <button type="button" class="btn btn-sm btn-outline-danger" data-tk-remove
+                    title="{{ 'trakt.action.remove_title'|trans }}">&times;</button>
+          {% endif %}
+        </div>
       </div>
     </div>
     {% endfor %}
@@ -166,9 +111,12 @@
 <script>
 (function () {
   var BASE = {{ path('trakt_index')|json_encode|raw }};
+  var STAR_ICON = {{ ico.icon('star-filled', '', 14)|json_encode|raw }};
+  var MINE_LABEL = {{ 'trakt.mark.mine'|trans|json_encode|raw }};
+  var SEEN_LABEL = {{ 'trakt.mark.seen'|trans|json_encode|raw }};
   var grid = document.getElementById('tk-grid');
   if (!grid) return;
-  var cards = Array.from(grid.querySelectorAll('.tk-card'));
+  var cards = Array.from(grid.querySelectorAll('.media-card'));
   var countEl = document.getElementById('tk-count');
 
   function updateCount() {
@@ -183,7 +131,7 @@
       document.querySelectorAll('[data-tk-filter]').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
       cards.forEach(function (c) {
-        c.style.display = (want === 'all' || c.dataset.type === want) ? '' : 'none';
+        c.style.display = (want === 'all' || c.dataset.tmdbType === want) ? '' : 'none';
       });
       updateCount();
     };
@@ -196,21 +144,25 @@
   function pump() {
     var card = queue.shift();
     if (!card) return;
-    fetch(BASE + '/meta/' + card.dataset.type + '/' + card.dataset.tmdbId)
+    fetch(BASE + '/meta/' + card.dataset.tmdbType + '/' + card.dataset.tmdbId)
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (!d) return;
         if (d.poster) {
           var img = document.createElement('img');
           img.src = d.poster;
-          img.alt = card.dataset.title;
+          img.alt = card.dataset.tmdbTitle;
           img.loading = 'lazy';
           var ph = card.querySelector('[data-tk-poster]');
           if (ph) ph.replaceWith(img);
         }
         if (d.vote) {
-          var slot = card.querySelector('[data-tk-tmdb-rate]');
-          if (slot) { slot.querySelector('b').textContent = d.vote; slot.classList.add('on'); }
+          var slot = card.querySelector('[data-tk-vote]');
+          if (slot) {
+            slot.className = 'vote-badge ' + (d.vote >= 7 ? 'good' : (d.vote >= 5 ? 'mid' : 'bad'));
+            slot.innerHTML = STAR_ICON + ' ' + d.vote;
+            slot.style.display = '';
+          }
         }
       })
       .catch(function () {})
@@ -224,19 +176,15 @@
     .then(function (d) {
       if (!d) return;
       cards.forEach(function (card) {
-        var key = card.dataset.type + ':' + card.dataset.tmdbId;
+        var key = card.dataset.tmdbType + ':' + card.dataset.tmdbId;
         var rating = d.ratings && d.ratings[key];
         var watched = d.watched && d.watched[key];
-        if (rating && rating.rating) {
-          var re = card.querySelector('[data-tk-rating]');
-          re.textContent = '★ ' + rating.rating;
-          re.style.display = 'block';
-        }
-        if (watched && watched.plays) {
-          var we = card.querySelector('[data-tk-watched]');
-          we.textContent = watched.plays > 1 ? '✓ ' + watched.plays : '✓';
-          we.style.display = 'block';
-        }
+        var slot = card.querySelector('[data-tk-marks]');
+        if (!slot) return;
+        var bits = [];
+        if (rating && rating.rating) bits.push(STAR_ICON + ' ' + rating.rating + ' ' + MINE_LABEL);
+        if (watched && watched.plays) bits.push(SEEN_LABEL + (watched.plays > 1 ? ' x' + watched.plays : ''));
+        if (bits.length) slot.innerHTML = ' · ' + bits.join(' · ');
       });
     })
     .catch(function () {});
@@ -258,13 +206,13 @@
   }
 
   grid.addEventListener('click', function (e) {
-    var card = e.target.closest('.tk-card');
+    var card = e.target.closest('.media-card');
     if (!card) return;
     var payload = {
       tmdb_id: parseInt(card.dataset.tmdbId, 10),
-      type: card.dataset.type,
-      title: card.dataset.title,
-      year: card.dataset.year ? parseInt(card.dataset.year, 10) : null,
+      type: card.dataset.tmdbType,
+      title: card.dataset.tmdbTitle,
+      year: card.dataset.tmdbYear ? parseInt(card.dataset.tmdbYear, 10) : null,
     };
 
     var reqBtn = e.target.closest('[data-tk-request]');
@@ -296,17 +244,6 @@
     }
   });
 
-  // ── Detail modal ──────────────────────────────────────────────────────
-  // Same modal as Decouverte, included from the shared partial.
-  grid.addEventListener('click', function (e) {
-    var link = e.target.closest('[data-tk-detail]');
-    if (!link) return;
-    var card = link.closest('.tk-card');
-    if (!card || !window.PrismarrDetail || !window.PrismarrDetail.load) return; // let the href navigate
-    e.preventDefault();
-    window.PrismarrDetail.load(card.dataset.type, card.dataset.tmdbId);
-  });
-
 {% if can_write %}
   // Contribute a "remove from Trakt" button to the modal's action column.
   window.PrismarrDetail = window.PrismarrDetail || {};
@@ -321,8 +258,8 @@
     if (!btn) return;
     var id = btn.dataset.tmdbId;
     var type = btn.dataset.type;
-    var card = grid.querySelector('.tk-card[data-tmdb-id="' + id + '"][data-type="' + type + '"]');
-    var name = card ? card.dataset.title : '';
+    var card = grid.querySelector('.media-card[data-tmdb-id="' + id + '"][data-tmdb-type="' + type + '"]');
+    var name = card ? card.dataset.tmdbTitle : '';
     if (!window.confirm({{ 'trakt.action.remove_confirm'|trans({title: '__T__'})|json_encode|raw }}.replace('__T__', name))) return;
 
     btn.disabled = true;
@@ -344,15 +281,15 @@
   grid.addEventListener('click', function (e) {
     var rmBtn = e.target.closest('[data-tk-remove]');
     if (!rmBtn) return;
-    var card = rmBtn.closest('.tk-card');
+    var card = rmBtn.closest('.media-card');
     if (!card) return;
     if (!window.confirm({{ 'trakt.action.remove_confirm'|trans({title: '__T__'})|json_encode|raw }}
-        .replace('__T__', card.dataset.title))) return;
+        .replace('__T__', card.dataset.tmdbTitle))) return;
 
     rmBtn.disabled = true;
     post({{ path('trakt_remove')|json_encode|raw }}, {
       tmdb_id: parseInt(card.dataset.tmdbId, 10),
-      type: card.dataset.type,
+      type: card.dataset.tmdbType,
     }).then(function (res) {
       if (res.ok) {
         card.remove();

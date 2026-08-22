@@ -5622,8 +5622,12 @@ trakt:
     movies: 'Films ({count})'
     shows: 'Séries ({count})'
   count: '{count} affichés'
+  mark:
+    mine: la vôtre
+    seen: Vu
   badge:
     in_watchlist: Déjà dans votre watchlist Prismarr
+    in_watchlist_short: Watchlist
   action:
     request: Demander
     requested: Demandé

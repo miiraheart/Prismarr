@@ -5624,8 +5624,12 @@ trakt:
     movies: 'Movies ({count})'
     shows: 'TV ({count})'
   count: '{count} shown'
+  mark:
+    mine: yours
+    seen: Watched
   badge:
     in_watchlist: Already in your Prismarr watchlist
+    in_watchlist_short: Watchlist
   action:
     request: Request
     requested: Requested
