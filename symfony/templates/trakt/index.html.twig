@@ -17,6 +17,11 @@
     background: var(--tblr-bg-surface-secondary); color: var(--tblr-body-color);
   }
   .tmdb-results-grid .media-card .h-actions .btn { font-size: .68rem; padding: .15rem .45rem; }
+  /* Reuses the shared .lib-badge component; only the corner and colour differ,
+     since quality-badge and lib-badge already occupy the top left. */
+  .tmdb-results-grid .media-card .lib-badge.tk-watched {
+    left: auto; right: .4rem; background: rgba(34,197,94,.92);
+  }
 </style>
 
 <div class="container-xl">
@@ -75,6 +80,7 @@
       {% if item.in_local %}
         <span class="lib-badge" style="background:#6366f1;">{{ 'trakt.badge.in_watchlist_short'|trans }}</span>
       {% endif %}
+      <span class="lib-badge tk-watched" data-tk-watched style="display:none;"></span>
       <span class="vote-badge" data-tk-vote style="display:none;"></span>
       <div class="card-overlay">
         <div class="card-title-text" title="{{ item.title }}">{{ item.title }}</div>
@@ -183,8 +189,21 @@
         if (!slot) return;
         var bits = [];
         if (rating && rating.rating) bits.push(STAR_ICON + ' ' + rating.rating + ' ' + MINE_LABEL);
-        if (watched && watched.plays) bits.push(SEEN_LABEL + (watched.plays > 1 ? ' x' + watched.plays : ''));
         if (bits.length) slot.innerHTML = ' · ' + bits.join(' · ');
+
+        // Already-watched marker. Trakt holds the authoritative history here
+        // because Infuse scrobbles to it, so this covers anything watched
+        // anywhere, not just what Jellyfin saw.
+        if (watched && watched.plays) {
+          var wb = card.querySelector('[data-tk-watched]');
+          if (wb) {
+            wb.textContent = SEEN_LABEL + (watched.plays > 1 ? ' x' + watched.plays : '');
+            if (watched.last_watched_at) {
+              wb.title = SEEN_LABEL + ' ' + String(watched.last_watched_at).slice(0, 10);
+            }
+            wb.style.display = '';
+          }
+        }
       });
     })
     .catch(function () {});
