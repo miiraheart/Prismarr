@@ -267,10 +267,58 @@
   // Contribute a "remove from Trakt" button to the modal's action column.
   window.PrismarrDetail = window.PrismarrDetail || {};
   window.PrismarrDetail.extraActions = function (d) {
-    return ['<button type="button" class="btn btn-outline-danger" data-tk-modal-remove'
-      + ' data-tmdb-id="' + d.id + '" data-type="' + d.type + '">'
-      + {{ 'trakt.action.remove_modal'|trans|json_encode|raw }} + '</button>'];
+    var attrs = ' data-tmdb-id="' + d.id + '" data-type="' + d.type + '"';
+    return [
+      '<button type="button" class="btn btn-outline-success" data-tk-modal-watched' + attrs + '>'
+        + {{ 'trakt.action.mark_watched'|trans|json_encode|raw }} + '</button>',
+      '<button type="button" class="btn btn-outline-secondary" data-tk-modal-dropped' + attrs + '>'
+        + {{ 'trakt.action.mark_dropped'|trans|json_encode|raw }} + '</button>',
+      '<button type="button" class="btn btn-outline-danger" data-tk-modal-remove' + attrs + '>'
+        + {{ 'trakt.action.remove_modal'|trans|json_encode|raw }} + '</button>'
+    ];
   };
+
+  // Mark watched / dropped, both real writes against the Trakt account.
+  document.addEventListener('click', function (e) {
+    var wBtn = e.target.closest('[data-tk-modal-watched]');
+    var dBtn = e.target.closest('[data-tk-modal-dropped]');
+    var btn = wBtn || dBtn;
+    if (!btn) return;
+
+    var id = btn.dataset.tmdbId, type = btn.dataset.type;
+    var card = grid.querySelector('.media-card[data-tmdb-id="' + id + '"][data-tmdb-type="' + type + '"]');
+    var name = card ? card.dataset.tmdbTitle : '';
+
+    // A show-level history add marks every aired episode, so say so.
+    var msg = wBtn
+      ? (type === 'tv' ? {{ 'trakt.action.watched_confirm_tv'|trans({title: '__T__'})|json_encode|raw }}
+                       : {{ 'trakt.action.watched_confirm'|trans({title: '__T__'})|json_encode|raw }})
+      : {{ 'trakt.action.dropped_confirm'|trans({title: '__T__'})|json_encode|raw }};
+    if (!window.confirm(msg.replace('__T__', name))) return;
+
+    btn.disabled = true;
+    post(wBtn ? {{ path('trakt_watched')|json_encode|raw }} : {{ path('trakt_dropped')|json_encode|raw }},
+         { tmdb_id: parseInt(id, 10), type: type })
+      .then(function (res) {
+        if (!res.ok) { btn.disabled = false; btn.title = (res.data && res.data.error) || ''; return; }
+        if (wBtn) {
+          if (card) {
+            var wb = card.querySelector('[data-tk-watched]');
+            if (wb) { wb.textContent = SEEN_LABEL; wb.style.display = ''; }
+          }
+          btn.classList.remove('btn-outline-success');
+          btn.classList.add('btn-success');
+        } else {
+          // Dropped also leaves the Trakt watchlist, so the card goes.
+          if (card) {
+            card.remove();
+            cards = cards.filter(function (c) { return c !== card; });
+            updateCount();
+          }
+          if (window.PrismarrDetail.close) window.PrismarrDetail.close();
+        }
+      });
+  });
 
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-tk-modal-remove]');

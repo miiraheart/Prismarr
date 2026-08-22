@@ -254,6 +254,48 @@ class TraktController extends AbstractController
             : $this->json(['error' => $this->translator->trans('trakt.error.remove_failed')], 502);
     }
 
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    #[Route('/watched', name: 'watched', methods: ['POST'])]
+    public function markWatched(Request $request): JsonResponse
+    {
+        return $this->write($request, fn (int $id, string $type): bool => $this->trakt->markWatched($id, $type));
+    }
+
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    #[Route('/dropped', name: 'dropped', methods: ['POST'])]
+    public function markDropped(Request $request): JsonResponse
+    {
+        return $this->write($request, fn (int $id, string $type): bool => $this->trakt->markDropped($id, $type));
+    }
+
+    /**
+     * Shared shell for the write actions: validate, require the OAuth link,
+     * run the call, never let an exception reach the client.
+     *
+     * @param callable(int, string):bool $action
+     */
+    private function write(Request $request, callable $action): JsonResponse
+    {
+        [$tmdbId, $type] = $this->readTarget($request);
+        if ($tmdbId === 0) {
+            return $this->json(['error' => $this->translator->trans('trakt.error.invalid_params')], 400);
+        }
+        if (!$this->trakt->hasWriteAccess()) {
+            return $this->json(['error' => $this->translator->trans('trakt.connect.needed')], 403);
+        }
+
+        try {
+            $done = $action($tmdbId, $type);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt write failed', ['tmdb_id' => $tmdbId, 'message' => $e->getMessage()]);
+            $done = false;
+        }
+
+        return $done
+            ? $this->json(['ok' => true])
+            : $this->json(['error' => $this->translator->trans('trakt.error.write_failed')], 502);
+    }
+
     /**
      * @return array{0:int, 1:string} tmdb id (0 when invalid) and media type
      */

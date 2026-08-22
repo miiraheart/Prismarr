@@ -38,6 +38,8 @@ class TraktClient implements ResetInterface
     private const OAUTH_REDIRECT = 'urn:ietf:wg:oauth:2.0:oob';
     // Refresh this many seconds before the token actually lapses.
     private const TOKEN_MARGIN = 600;
+    // Trakt has no dropped state; this personal list stands in for one.
+    private const DROPPED_LIST = 'Dropped';
 
     private string $clientId = '';
     private string $username = '';
@@ -375,7 +377,7 @@ class TraktClient implements ResetInterface
     /** Drop the stored tokens. The read side keeps working without them. */
     public function disconnect(): void
     {
-        foreach (['trakt_access_token', 'trakt_refresh_token', 'trakt_token_expires', 'trakt_device_code'] as $key) {
+        foreach (['trakt_access_token', 'trakt_refresh_token', 'trakt_token_expires', 'trakt_device_code', 'trakt_dropped_list_id'] as $key) {
             $this->config->set($key, null);
         }
     }
@@ -413,6 +415,142 @@ class TraktClient implements ResetInterface
         $this->forgetCached('watchlist');
 
         return true;
+    }
+
+    /**
+     * Add a title to the Trakt watch history, which is what makes it count as
+     * watched everywhere. Needed because a film watched outside Infuse never
+     * scrobbles and so is missing from /watched.
+     *
+     * For a show this marks EVERY aired episode watched, which is Trakt's own
+     * behaviour for a show-level history add; the caller warns about it.
+     */
+    public function markWatched(int $tmdbId, string $type): bool
+    {
+        $this->ensureConfig();
+        $token = $this->accessToken();
+        if ($token === null) {
+            return false;
+        }
+
+        $bucket = $type === 'movie' ? 'movies' : 'shows';
+        $res = $this->postJson('/sync/history', [
+            $bucket => [['ids' => ['tmdb' => $tmdbId], 'watched_at' => 'released']],
+        ], $token);
+
+        $added = (int) ($res['data']['added']['movies'] ?? 0) + (int) ($res['data']['added']['episodes'] ?? 0);
+        if ($res['code'] !== 201 && $res['code'] !== 200) {
+            $this->logger->warning('Trakt history add failed', ['http' => $res['code'], 'tmdb_id' => $tmdbId]);
+
+            return false;
+        }
+        if ($added < 1) {
+            // Already in the history counts as success: the end state is right.
+            $this->logger->info('Trakt history add matched nothing new', ['tmdb_id' => $tmdbId]);
+        }
+
+        $this->forgetCached('watched');
+
+        return true;
+    }
+
+    /**
+     * Trakt has no native "dropped" state, so this uses the convention every
+     * other client uses: a personal list called Dropped. The title is added to
+     * that list and taken off the watchlist, since dropping it means it is no
+     * longer something to watch.
+     */
+    public function markDropped(int $tmdbId, string $type): bool
+    {
+        $this->ensureConfig();
+        $token = $this->accessToken();
+        if ($token === null) {
+            return false;
+        }
+
+        $listId = $this->droppedListId($token);
+        if ($listId === null) {
+            return false;
+        }
+
+        $bucket = $type === 'movie' ? 'movies' : 'shows';
+        $slug   = rawurlencode($this->username);
+        $res = $this->postJson("/users/{$slug}/lists/{$listId}/items", [
+            $bucket => [['ids' => ['tmdb' => $tmdbId]]],
+        ], $token);
+
+        if ($res['code'] !== 201 && $res['code'] !== 200) {
+            $this->logger->warning('Trakt dropped-list add failed', ['http' => $res['code'], 'tmdb_id' => $tmdbId]);
+
+            return false;
+        }
+
+        // Dropping it also takes it off the watchlist; ignore a miss there,
+        // the list membership is the part that matters.
+        $this->postJson('/sync/watchlist/remove', [$bucket => [['ids' => ['tmdb' => $tmdbId]]]], $token);
+        $this->forgetCached('watchlist');
+
+        return true;
+    }
+
+    /** Id of the personal "Dropped" list, created on first use. */
+    private function droppedListId(string $token): ?int
+    {
+        $cached = (string) $this->config->get('trakt_dropped_list_id');
+        if ($cached !== '') {
+            return (int) $cached;
+        }
+
+        $slug = rawurlencode($this->username);
+        foreach ($this->getJson("/users/{$slug}/lists", $token) as $list) {
+            if (strcasecmp((string) ($list['name'] ?? ''), self::DROPPED_LIST) === 0) {
+                $id = (int) ($list['ids']['trakt'] ?? 0);
+                if ($id > 0) {
+                    $this->config->set('trakt_dropped_list_id', (string) $id);
+
+                    return $id;
+                }
+            }
+        }
+
+        $res = $this->postJson("/users/{$slug}/lists", [
+            'name'        => self::DROPPED_LIST,
+            'description' => 'Started but abandoned. Maintained by Prismarr.',
+            'privacy'     => 'private',
+        ], $token);
+
+        $id = (int) ($res['data']['ids']['trakt'] ?? 0);
+        if ($id < 1) {
+            $this->logger->warning('Trakt dropped-list create failed', ['http' => $res['code']]);
+
+            return null;
+        }
+        $this->config->set('trakt_dropped_list_id', (string) $id);
+
+        return $id;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function getJson(string $path, string $token): array
+    {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => self::BASE_URL . $path,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_USERAGENT      => self::USER_AGENT,
+            CURLOPT_HTTPHEADER     => [
+                'Accept: application/json',
+                'trakt-api-version: ' . self::API_VERSION,
+                'trakt-api-key: ' . (string) $this->config->get('trakt_client_id'),
+                'Authorization: Bearer ' . $token,
+            ],
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+        $d = is_string($raw) ? json_decode($raw, true) : null;
+
+        return is_array($d) ? $d : [];
     }
 
     /**

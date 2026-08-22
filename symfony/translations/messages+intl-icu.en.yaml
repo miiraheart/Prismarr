@@ -5639,6 +5639,11 @@ trakt:
     importing: Importing…
     imported: '{count} imported'
     remove: Remove
+    mark_watched: Mark watched
+    mark_dropped: Dropped
+    watched_confirm: 'Mark {title} as watched on Trakt?'
+    watched_confirm_tv: 'Mark {title} watched on Trakt? For a show this marks every aired episode.'
+    dropped_confirm: 'Move {title} to your Trakt Dropped list? It also leaves your watchlist.'
     remove_title: Remove from your Trakt watchlist
     remove_modal: Remove from Trakt watchlist
     remove_confirm: 'Remove {title} from your Trakt watchlist? This changes Trakt itself.'
@@ -5661,3 +5666,4 @@ trakt:
     invalid_params: Invalid parameters.
     request_failed: Seerr refused the request.
     remove_failed: Trakt did not remove it.
+    write_failed: Trakt refused the change.

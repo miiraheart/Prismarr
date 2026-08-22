@@ -5637,6 +5637,11 @@ trakt:
     importing: 'Import en cours…'
     imported: '{count} importés'
     remove: Retirer
+    mark_watched: Marquer vu
+    mark_dropped: Abandonné
+    watched_confirm: 'Marquer {title} comme vu sur Trakt ?'
+    watched_confirm_tv: 'Marquer {title} comme vu sur Trakt ? Pour une série, tous les épisodes diffusés seront marqués.'
+    dropped_confirm: 'Déplacer {title} vers votre liste Trakt Abandonné ? Le titre quitte aussi la watchlist.'
     remove_title: Retirer de votre watchlist Trakt
     remove_modal: Retirer de la watchlist Trakt
     remove_confirm: 'Retirer {title} de votre watchlist Trakt ? Cela modifie Trakt lui-même.'
@@ -5659,3 +5664,4 @@ trakt:
     invalid_params: Paramètres invalides.
     request_failed: Seerr a refusé la demande.
     remove_failed: 'Trakt ne l''a pas retiré.'
+    write_failed: 'Trakt a refusé la modification.'
