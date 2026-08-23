@@ -54,7 +54,7 @@ class TraktClientTest extends TestCase
             'progress' => 79.0,
             'paused_at' => '2026-05-14T09:36:54.000Z',
             'episode'  => ['season' => 1, 'number' => 7, 'ids' => ['trakt' => 111, 'tmdb' => 999999]],
-            'show'     => ['title' => 'Fixture Show', 'ids' => ['trakt' => 222, 'tmdb' => 12345]],
+            'show'     => ['title' => 'Fixture Show', 'year' => 2024, 'ids' => ['trakt' => 222, 'tmdb' => 12345]],
         ]]);
 
         $this->assertArrayHasKey('tv:12345', $map);
@@ -62,6 +62,8 @@ class TraktClientTest extends TestCase
         $this->assertSame(79.0, $map['tv:12345']['progress']);
         $this->assertSame(1, $map['tv:12345']['season']);
         $this->assertSame(7, $map['tv:12345']['episode']);
+        $this->assertSame('Fixture Show', $map['tv:12345']['title']);
+        $this->assertSame(2024, $map['tv:12345']['year']);
     }
 
     public function testMovieProgressIsKeyedOnMovieTmdbIdWithNoSeasonOrEpisode(): void
@@ -70,13 +72,32 @@ class TraktClientTest extends TestCase
             'type'      => 'movie',
             'progress'  => 42.75,
             'paused_at' => '2026-05-01T12:00:00.000Z',
-            'movie'     => ['title' => 'Fixture Film', 'ids' => ['trakt' => 1, 'tmdb' => 555]],
+            'movie'     => ['title' => 'Fixture Film', 'year' => 2025, 'ids' => ['trakt' => 1, 'tmdb' => 555]],
         ]]);
 
         $this->assertArrayHasKey('movie:555', $map);
         $this->assertSame(42.8, $map['movie:555']['progress']);
         $this->assertNull($map['movie:555']['season']);
         $this->assertNull($map['movie:555']['episode']);
+        $this->assertSame('Fixture Film', $map['movie:555']['title']);
+        $this->assertSame(2025, $map['movie:555']['year']);
+    }
+
+    /**
+     * A media object with no title or year (should never happen against the
+     * live API, but nothing here should ever throw over it) degrades to an
+     * empty title and a null year rather than a missing array key.
+     */
+    public function testMissingTitleAndYearFallBackToEmptyStringAndNull(): void
+    {
+        $map = $this->mapPlayback($this->makeClient(), [[
+            'type'     => 'movie',
+            'progress' => 10.0,
+            'movie'    => ['ids' => ['tmdb' => 777]],
+        ]]);
+
+        $this->assertSame('', $map['movie:777']['title']);
+        $this->assertNull($map['movie:777']['year']);
     }
 
     /**

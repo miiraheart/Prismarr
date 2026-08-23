@@ -169,7 +169,7 @@ class TraktClient implements ResetInterface
      * 401 with just the client id, so this returns empty rather than trying
      * when the device flow has never been completed.
      *
-     * @return array<string, array{progress:float, paused_at:?string, season:?int, episode:?int}> keyed "{type}:{tmdb_id}"
+     * @return array<string, array{progress:float, paused_at:?string, season:?int, episode:?int, title:string, year:?int}> keyed "{type}:{tmdb_id}"
      */
     public function getPlayback(): array
     {
@@ -200,7 +200,7 @@ class TraktClient implements ResetInterface
      * same show are mid-watch, the one paused most recently wins.
      *
      * @param array<int, array<string, mixed>> $raw
-     * @return array<string, array{progress:float, paused_at:?string, season:?int, episode:?int}>
+     * @return array<string, array{progress:float, paused_at:?string, season:?int, episode:?int, title:string, year:?int}>
      */
     private function mapPlayback(array $raw): array
     {
@@ -244,6 +244,11 @@ class TraktClient implements ResetInterface
                 'paused_at' => $pausedAt,
                 'season'    => $season,
                 'episode'   => $episode,
+                // Present on the default (non-extended) /sync/playback payload,
+                // so the Continue Watching row can build a real card without a
+                // second lookup just for the title.
+                'title'     => (string) ($media['title'] ?? ''),
+                'year'      => isset($media['year']) ? (int) $media['year'] : null,
             ];
         }
 

@@ -452,10 +452,12 @@
   bindRowClicks(directory);
   bindRowClicks(continueWatchingRow);
 
-  // "Continue watching" row: the playback map has no title or poster, only
-  // ids, so each entry needs its own /trakt/meta lookup (the same one the
-  // in-library hydrate() path above uses for MDBList items missing a
-  // poster). Silent on any failure or an empty map: no row, no error.
+  // "Continue watching" row: the playback map carries title and year
+  // directly (TraktClient::getPlayback() reads them off the /sync/playback
+  // media object), but no poster or vote, so each entry still needs its own
+  // /trakt/meta lookup for those (the same one the in-library hydrate()
+  // path above uses for MDBList items missing a poster). Silent on any
+  // failure or an empty map: no row, no error.
   function loadContinueWatching() {
     if (!continueWatchingRow) return;
 
@@ -468,7 +470,12 @@
           var sep  = key.indexOf(':');
           var type = key.slice(0, sep);
           var id   = key.slice(sep + 1);
-          return { type: type, id: id, paused_at: map[key].paused_at || '' };
+          return {
+            type: type, id: id,
+            paused_at: map[key].paused_at || '',
+            title: map[key].title || '',
+            year: map[key].year || null
+          };
         });
         if (entries.length === 0) return;
 
@@ -482,7 +489,9 @@
           var url = template.replace(/0$/, String(e.id));
           return fetch(url, { headers: { Accept: 'application/json' } })
             .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (m) { return { id: e.id, type: e.type, poster: m && m.poster, vote: m && m.vote }; })
+            .then(function (m) {
+              return { id: e.id, type: e.type, title: e.title, year: e.year, poster: m && m.poster, vote: m && m.vote };
+            })
             .catch(function () { return null; });
         })).then(function (items) {
           items = items.filter(Boolean);
