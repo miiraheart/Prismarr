@@ -68,8 +68,15 @@
   };
 
   var pinned = {{ pinned|json_encode|raw }};
+  /* Same identity rule as ListSourceResolver::idFor() on the server: trailing
+     slash and case are both ignored. Comparing case-sensitively here would show
+     "Pin" for a list that is in fact already pinned. */
+  function pinKey(url) {
+    return String(url || '').trim().replace(/\/$/, '').toLowerCase();
+  }
+
   function isPinned(url) {
-    return pinned.some(function (p) { return p.url.replace(/\/$/, '') === url.replace(/\/$/, ''); });
+    return pinned.some(function (p) { return pinKey(p.url) === pinKey(url); });
   }
 
   var directory = document.getElementById('dv-directory');
@@ -150,7 +157,7 @@
       var unpinning = isPinned(url);
       var target = unpinning ? ROUTES.unpin : ROUTES.pin;
       var body   = unpinning
-        ? { id: (pinned.filter(function (p) { return p.url.replace(/\/$/, '') === url.replace(/\/$/, ''); })[0] || {}).id }
+        ? { id: (pinned.filter(function (p) { return pinKey(p.url) === pinKey(url); })[0] || {}).id }
         : { url: url, label: label };
       fetch(target, {
         method: 'POST',
@@ -198,6 +205,9 @@
   document.getElementById('dv-back').addEventListener('click', function () {
     listView.classList.add('d-none');
     directory.classList.remove('d-none');
+    // Redraw so a list pinned or unpinned while it was open is reflected in the
+    // pinned strip straight away, rather than after the next search keystroke.
+    loadDirectory(search.value.trim());
   });
 
   var timer = null;
