@@ -63,6 +63,82 @@ class MdblistClient implements ResetInterface
         }
     }
 
+    private const TTL_DIRECTORY = 3600;
+
+    /**
+     * The website's own toplists ranking, which is the directory the Lists tab
+     * opens on.
+     *
+     * @return list<array{id:int, name:string, slug:string, user:string, items:int, likes:int, mediatype:string, url:string}>
+     */
+    public function getTopLists(int $limit = 60): array
+    {
+        return $this->cachedGet('top_' . $limit, function () use ($limit): array {
+            return $this->mapListRows($this->request('/lists/top', ['limit' => $limit])['data'] ?? []);
+        });
+    }
+
+    /** @return list<array{id:int, name:string, slug:string, user:string, items:int, likes:int, mediatype:string, url:string}> */
+    public function searchLists(string $query, int $limit = 60): array
+    {
+        $query = trim($query);
+        if ($query === '') {
+            return [];
+        }
+
+        return $this->cachedGet('search_' . sha1($query) . '_' . $limit, function () use ($query, $limit): array {
+            return $this->mapListRows($this->request('/lists/search', ['query' => $query, 'limit' => $limit])['data'] ?? []);
+        });
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>> $raw
+     * @return list<array{id:int, name:string, slug:string, user:string, items:int, likes:int, mediatype:string, url:string}>
+     */
+    private function mapListRows(array $raw): array
+    {
+        $rows = [];
+        foreach ($raw as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $slug = (string) ($row['slug'] ?? '');
+            $user = (string) ($row['user_name'] ?? '');
+            // Without both, the list cannot be opened or pinned.
+            if ($slug === '' || $user === '') {
+                continue;
+            }
+
+            $rows[] = [
+                'id'        => (int) ($row['id'] ?? 0),
+                'name'      => (string) ($row['name'] ?? $slug),
+                'slug'      => $slug,
+                'user'      => $user,
+                'items'     => (int) ($row['items'] ?? 0),
+                'likes'     => (int) ($row['likes'] ?? 0),
+                'mediatype' => (string) ($row['mediatype'] ?? ''),
+                'url'       => 'https://mdblist.com/lists/' . $user . '/' . $slug,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param callable():array $producer
+     */
+    private function cachedGet(string $key, callable $producer): array
+    {
+        $this->ensureConfig();
+        $full = 'prismarr_mdblist_v1_' . sha1($key);
+
+        return $this->cache->get($full, function (\Symfony\Contracts\Cache\ItemInterface $item) use ($producer) {
+            $item->expiresAfter(self::TTL_DIRECTORY);
+
+            return $producer();
+        });
+    }
+
     /**
      * The credential is a query parameter, not a header: the OpenAPI schema at
      * api.mdblist.com/schema/ declares only `apikey` in query plus a bearer
