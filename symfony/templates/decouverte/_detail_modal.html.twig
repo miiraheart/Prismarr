@@ -1365,12 +1365,23 @@
    this partial is included in (Decouverte, Lists, Trakt). Cards on those
    pages render late (lazy-loaded rows, JS grids, search results), so a
    MutationObserver picks up anything added after the initial pass instead
-   of re-fetching. Fails completely silently: no map, no badge, no noise. #}
+   of re-fetching. Fails completely silently: no map, no badge, no noise.
+
+   Turbo Drive swaps document.body wholesale on navigation, so this also
+   re-runs on turbo:load (same pattern as the health widget in
+   base.html.twig), not only on DOMContentLoaded. That means it must
+   tolerate running more than once: a fetch already in flight is never
+   duplicated, a card already carrying the stamp dataset flag (including
+   one Turbo just restored from its page cache, badge markup and all) is
+   left alone, and the MutationObserver is only re-attached when the body
+   it would watch has actually changed. #}
 <script>
 (function () {
   var WATCHING_LABEL = {{ 'decouverte.badge.watching'|trans|json_encode|raw }};
   var STAMP_ATTR = 'watchingStamped';
   var playback = null;
+  var fetchInFlight = false;
+  var observedBody = null;
 
   function stampCard(card) {
     if (!playback || card.dataset[STAMP_ATTR]) return;
@@ -1409,6 +1420,14 @@
   }
 
   function watchForNewCards() {
+    // A real Turbo visit (or a cached-page restore) hands the browser a new
+    // document.body, which detaches whatever this was previously observing.
+    // Only attach a fresh observer when the body actually changed, so a
+    // re-init on the same page never ends up with two observers stamping
+    // the same node twice.
+    if (observedBody === document.body) return;
+    observedBody = document.body;
+
     new MutationObserver(function (mutations) {
       mutations.forEach(function (m) {
         m.addedNodes.forEach(function (node) {
@@ -1421,17 +1440,22 @@
   }
 
   function init() {
+    if (fetchInFlight) return;
+    fetchInFlight = true;
+
     fetch('/trakt/playback', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : {}; })
       .then(function (map) {
+        fetchInFlight = false;
         playback = (map && typeof map === 'object') ? map : {};
         if (Object.keys(playback).length === 0) return;
         stampAll();
         watchForNewCards();
       })
-      .catch(function () { /* no badge, no noise */ });
+      .catch(function () { fetchInFlight = false; /* no badge, no noise */ });
   }
 
+  document.addEventListener('turbo:load', init);
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
