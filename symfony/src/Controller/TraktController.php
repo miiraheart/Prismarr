@@ -304,6 +304,60 @@ class TraktController extends AbstractController
     }
 
     /**
+     * Mira's personal lists, for the kebab menu's "Add to list" picker.
+     */
+    #[Route('/lists', name: 'lists', methods: ['GET'])]
+    public function lists(): JsonResponse
+    {
+        try {
+            return $this->json(['lists' => $this->trakt->getLists()]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt lists failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+
+            return $this->json(['lists' => []]);
+        }
+    }
+
+    /**
+     * Create a new personal list from the kebab menu's "New list..." entry.
+     */
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    #[Route('/lists', name: 'lists_create', methods: ['POST'])]
+    public function createList(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true) ?? [];
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name === '') {
+            return $this->json(['error' => $this->translator->trans('trakt.error.list_name_required')], 400);
+        }
+        if (!$this->trakt->hasWriteAccess()) {
+            return $this->json(['error' => $this->translator->trans('trakt.connect.needed')], 403);
+        }
+
+        try {
+            $list = $this->trakt->createList($name);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt list create failed', ['message' => $e->getMessage()]);
+            $list = null;
+        }
+
+        return $list !== null
+            ? $this->json(['ok' => true, 'list' => $list])
+            : $this->json(['error' => $this->translator->trans('trakt.error.list_create_failed')], 502);
+    }
+
+    /**
+     * Add the current title to one of Mira's personal lists. Reuses write()'s
+     * guard, target parsing and error shape, same as watched/watchlist.
+     */
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    #[Route('/lists/{id}/items', name: 'lists_add_item', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function addListItem(int $id, Request $request): JsonResponse
+    {
+        return $this->write($request, fn (int $tmdbId, string $type): bool => $this->trakt->addToList($id, $type, $tmdbId));
+    }
+
+    /**
      * Shared shell for the write actions: validate, require the OAuth link,
      * run the call, never let an exception reach the client.
      *
