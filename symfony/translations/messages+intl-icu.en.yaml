@@ -74,6 +74,7 @@ sidebar:
     prowlarr: Prowlarr
     jellyseerr: Seerr
     trakt: Trakt
+    lists: Lists
     films: Movies
     series: TV Shows
   footer:
@@ -5670,3 +5671,17 @@ trakt:
     request_failed: Seerr refused the request.
     remove_failed: Trakt did not remove it.
     write_failed: Trakt refused the change.
+discover:
+  page:
+    title: Lists
+  tab:
+    lists: Lists
+  search:
+    placeholder: Search lists
+  action:
+    pin: Pin this list
+    unpin: Unpin
+    back: Back to lists
+    more: Load more
+  error:
+    not_configured: 'Add an MDBList API key in Settings to browse lists.'

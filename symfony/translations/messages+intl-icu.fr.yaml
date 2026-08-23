@@ -73,6 +73,7 @@ sidebar:
     prowlarr: Prowlarr
     jellyseerr: Seerr
     trakt: Trakt
+    lists: Listes
     films: Films
     series: Séries
   footer:
@@ -5668,3 +5669,17 @@ trakt:
     request_failed: Seerr a refusé la demande.
     remove_failed: 'Trakt ne l''a pas retiré.'
     write_failed: 'Trakt a refusé la modification.'
+discover:
+  page:
+    title: Listes
+  tab:
+    lists: Listes
+  search:
+    placeholder: Rechercher des listes
+  action:
+    pin: Épingler cette liste
+    unpin: Retirer
+    back: Retour aux listes
+    more: Charger plus
+  error:
+    not_configured: "Ajoutez une clé API MDBList dans les réglages pour parcourir les listes."
