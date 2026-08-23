@@ -5683,6 +5683,7 @@ discover:
     likes_count: "{count} j'aime"
   row:
     empty: 'Aucun élément dans cette liste.'
+    continue_watching: Continuer à regarder
   rows:
     capped: 'Affichage des {count} premières listes sur {total}.'
   scroll:

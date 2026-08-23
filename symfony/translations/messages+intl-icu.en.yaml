@@ -5685,6 +5685,7 @@ discover:
     likes_count: '{count} likes'
   row:
     empty: 'No items in this list.'
+    continue_watching: Continue watching
   rows:
     capped: 'Showing the first {count} of {total} lists.'
   scroll:

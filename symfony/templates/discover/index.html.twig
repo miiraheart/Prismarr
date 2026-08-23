@@ -81,6 +81,13 @@
 
   {% include 'decouverte/_detail_modal.html.twig' %}
 
+  {# Filled client-side from /trakt/playback (see loadContinueWatching()
+     below). Kept outside #dv-directory so a search or "back to lists" pass,
+     which rewrites that container's innerHTML, never wipes it out. Left
+     empty (no card markup, no styling hook) whenever there is nothing to
+     show, so no empty row is ever visible. #}
+  <div id="dv-continue-watching"></div>
+
   {# Row shells (title, owner, counts) are rendered here so the directory
      never needs a client fetch just to know what rows exist. The first
      inlineRows rows also carry their cards already (see initialRows below,
@@ -164,6 +171,7 @@
   var ROW_CAP = {{ rowCap }};
 
   var directory  = document.getElementById('dv-directory');
+  var continueWatchingRow = document.getElementById('dv-continue-watching');
   var listView   = document.getElementById('dv-list-view');
   var grid       = document.getElementById('dv-grid');
   var moreBtn    = document.getElementById('dv-more');
@@ -195,6 +203,11 @@
   var SCROLL_PREV = {{ 'discover.scroll.prev'|trans|json_encode|raw }};
   var SCROLL_NEXT = {{ 'discover.scroll.next'|trans|json_encode|raw }};
   var ROW_EMPTY   = {{ 'discover.row.empty'|trans|json_encode|raw }};
+  var CONTINUE_WATCHING_LABEL = {{ 'discover.row.continue_watching'|trans|json_encode|raw }};
+  // Trakt playback entries have no title, poster or year: the caller has to
+  // resolve those itself. Bounded to a sensible number so this never turns
+  // into a burst of per-title lookups.
+  var CONTINUE_WATCHING_CAP = 12;
 
   var SCROLL_BTNS_HTML =
       '<div class="tmdb-section-actions">'
@@ -404,29 +417,88 @@
     });
   }
 
-  directory.addEventListener('click', function (e) {
-    var scrollBtn = e.target.closest('.tmdb-scroll-btn');
-    if (scrollBtn) {
-      var section = scrollBtn.closest('.tmdb-section');
-      var row = section && section.querySelector('.tmdb-row');
-      if (row) {
-        var dir = scrollBtn.dataset.scroll === 'right' ? 1 : -1;
-        row.scrollBy({ left: dir * row.clientWidth * 0.75, behavior: 'smooth' });
+  // Shared by #dv-directory and #dv-continue-watching: both are carousels
+  // of .tmdb-section rows built from the same markup. A row title is only
+  // ever a real list link inside the directory (.dv-row-title carries a
+  // data-url there); a container without any just falls through to the
+  // card-click handling below.
+  function bindRowClicks(container) {
+    if (!container) return;
+    container.addEventListener('click', function (e) {
+      var scrollBtn = e.target.closest('.tmdb-scroll-btn');
+      if (scrollBtn) {
+        var section = scrollBtn.closest('.tmdb-section');
+        var row = section && section.querySelector('.tmdb-row');
+        if (row) {
+          var dir = scrollBtn.dataset.scroll === 'right' ? 1 : -1;
+          row.scrollBy({ left: dir * row.clientWidth * 0.75, behavior: 'smooth' });
+        }
+        return;
       }
-      return;
-    }
-    var titleLink = e.target.closest('.dv-row-title');
-    if (titleLink) {
-      e.preventDefault();
-      openList(titleLink.dataset.url, titleLink.dataset.label);
-      return;
-    }
-    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
-    var card = e.target.closest('.media-card[data-tmdb-id]');
-    if (card && window.PrismarrDetail) {
-      window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);
-    }
-  });
+      var titleLink = e.target.closest('.dv-row-title');
+      if (titleLink) {
+        e.preventDefault();
+        openList(titleLink.dataset.url, titleLink.dataset.label);
+        return;
+      }
+      if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
+      var card = e.target.closest('.media-card[data-tmdb-id]');
+      if (card && window.PrismarrDetail) {
+        window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);
+      }
+    });
+  }
+
+  bindRowClicks(directory);
+  bindRowClicks(continueWatchingRow);
+
+  // "Continue watching" row: the playback map has no title or poster, only
+  // ids, so each entry needs its own /trakt/meta lookup (the same one the
+  // in-library hydrate() path above uses for MDBList items missing a
+  // poster). Silent on any failure or an empty map: no row, no error.
+  function loadContinueWatching() {
+    if (!continueWatchingRow) return;
+
+    fetch('/trakt/playback', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (map) {
+        if (!map || typeof map !== 'object') return;
+
+        var entries = Object.keys(map).map(function (key) {
+          var sep  = key.indexOf(':');
+          var type = key.slice(0, sep);
+          var id   = key.slice(sep + 1);
+          return { type: type, id: id, paused_at: map[key].paused_at || '' };
+        });
+        if (entries.length === 0) return;
+
+        // ISO 8601 timestamps sort lexically, most recently paused first.
+        entries.sort(function (a, b) { return b.paused_at.localeCompare(a.paused_at); });
+        entries = entries.slice(0, CONTINUE_WATCHING_CAP);
+
+        return Promise.all(entries.map(function (e) {
+          var template = ROUTES.meta[e.type];
+          if (!template) return null;
+          var url = template.replace(/0$/, String(e.id));
+          return fetch(url, { headers: { Accept: 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (m) { return { id: e.id, type: e.type, poster: m && m.poster, vote: m && m.vote }; })
+            .catch(function () { return null; });
+        })).then(function (items) {
+          items = items.filter(Boolean);
+          if (items.length === 0) return;
+
+          continueWatchingRow.innerHTML = '<div class="tmdb-section">'
+            + '<div class="tmdb-section-header">'
+            +   '<h3>' + esc(CONTINUE_WATCHING_LABEL) + '</h3>'
+            +   SCROLL_BTNS_HTML
+            + '</div>'
+            + '<div class="tmdb-row">' + items.map(window.renderCardHTML).join('') + '</div>'
+            + '</div>';
+        });
+      })
+      .catch(function () { /* no row, no noise */ });
+  }
 
   grid.addEventListener('click', function (e) {
     if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
@@ -461,6 +533,7 @@
 
   window.PrismarrDiscover = { routes: ROUTES, openList: openList, current: current };
   wireDirectoryRows();
+  loadContinueWatching();
 })();
 </script>
 {% endblock %}
