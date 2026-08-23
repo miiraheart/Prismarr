@@ -1,0 +1,76 @@
+{% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as ico %}
+
+{% block title %}{{ 'discover.page.title'|trans }}{% endblock %}
+{% block page_title %}{{ 'discover.page.title'|trans }}{% endblock %}
+
+{% block body %}
+<style>
+  /* Cards, grid and badges all come from decouverte/_detail_modal.html.twig
+     (.tmdb-results-grid / .media-card / .vote-badge / .lib-badge), so this page
+     looks exactly like Decouverte and Trakt. Only page furniture lives here. */
+  .dv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+  .dv-list-card {
+    border: 1px solid var(--tblr-border-color); border-radius: .5rem;
+    background: var(--tblr-bg-surface); padding: .7rem .8rem; cursor: pointer;
+    display: flex; flex-direction: column; gap: .2rem;
+  }
+  .dv-list-card:hover { border-color: var(--tblr-primary); }
+  .dv-list-card .dv-list-name { font-weight: 600; font-size: .9rem; }
+  .dv-list-card .dv-list-meta { font-size: .75rem; color: var(--tblr-secondary); }
+  .dv-directory { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .6rem; }
+</style>
+
+<div class="container-xl">
+  {% if not configured %}
+    <div class="alert alert-warning">{{ 'discover.error.not_configured'|trans }}</div>
+  {% endif %}
+
+  <div id="dv-tabs" class="dv-toolbar">
+    <div class="btn-group btn-group-sm" role="group">
+      <button type="button" class="btn btn-outline-secondary active" data-dv-tab="lists">{{ 'discover.tab.lists'|trans }}</button>
+    </div>
+    <input type="search" class="form-control form-control-sm w-auto" id="dv-search"
+           placeholder="{{ 'discover.search.placeholder'|trans }}">
+    <span class="text-secondary" id="dv-count"></span>
+  </div>
+
+  {% include 'decouverte/_detail_modal.html.twig' %}
+
+  <div id="dv-directory" class="dv-directory"></div>
+
+  <div id="dv-list-view" class="d-none">
+    <div class="dv-toolbar">
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="dv-back">{{ 'discover.action.back'|trans }}</button>
+      <strong id="dv-list-title"></strong>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="dv-pin"></button>
+    </div>
+    <div class="tmdb-results-grid" id="dv-grid"></div>
+    <div class="text-center my-3">
+      <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="dv-more">{{ 'discover.action.more'|trans }}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var ROUTES = {
+    lists: {{ path('discover_lists')|json_encode|raw }},
+    list:  {{ path('discover_list')|json_encode|raw }},
+    // Shared with the Trakt page: it takes a TMDB id and answers poster + vote,
+    // with nothing Trakt-specific in it. Phase 2 renames it when the Discover
+    // feeds land; duplicating it now would be a second copy of four lines.
+    //
+    // Generated once per type, because the route requires type to match
+    // `movie|tv`: passing a placeholder like 'TYPE' makes the URL generator
+    // throw InvalidParameterException at render time. The trailing 0 is the
+    // tmdbId placeholder, which does satisfy its `\d+` requirement.
+    meta: {
+      movie: {{ path('trakt_meta', {type: 'movie', tmdbId: 0})|json_encode|raw }},
+      tv:    {{ path('trakt_meta', {type: 'tv',    tmdbId: 0})|json_encode|raw }}
+    }
+  };
+  window.PrismarrDiscover = { routes: ROUTES };
+})();
+</script>
+{% endblock %}
