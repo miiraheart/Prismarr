@@ -5643,7 +5643,7 @@ trakt:
     mark_dropped: Dropped
     watched_confirm: 'Mark {title} as watched on Trakt?'
     watched_confirm_tv: 'Mark {title} watched on Trakt? For a show this marks every aired episode.'
-    dropped_confirm: 'Move {title} to your Trakt Dropped list? It also leaves your watchlist.'
+    dropped_confirm: 'Drop {title} on Trakt? A show is hidden from Up Next, Progress and the calendar, your watch history is kept, and it leaves your watchlist.'
     remove_title: Remove from your Trakt watchlist
     remove_modal: Remove from Trakt watchlist
     remove_confirm: 'Remove {title} from your Trakt watchlist? This changes Trakt itself.'

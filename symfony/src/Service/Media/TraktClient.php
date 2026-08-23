@@ -38,8 +38,6 @@ class TraktClient implements ResetInterface
     private const OAUTH_REDIRECT = 'urn:ietf:wg:oauth:2.0:oob';
     // Refresh this many seconds before the token actually lapses.
     private const TOKEN_MARGIN = 600;
-    // Trakt has no dropped state; this personal list stands in for one.
-    private const DROPPED_LIST = 'Dropped';
 
     private string $clientId = '';
     private string $username = '';
@@ -377,7 +375,7 @@ class TraktClient implements ResetInterface
     /** Drop the stored tokens. The read side keeps working without them. */
     public function disconnect(): void
     {
-        foreach (['trakt_access_token', 'trakt_refresh_token', 'trakt_token_expires', 'trakt_device_code', 'trakt_dropped_list_id'] as $key) {
+        foreach (['trakt_access_token', 'trakt_refresh_token', 'trakt_token_expires', 'trakt_device_code'] as $key) {
             $this->config->set($key, null);
         }
     }
@@ -455,10 +453,16 @@ class TraktClient implements ResetInterface
     }
 
     /**
-     * Trakt has no native "dropped" state, so this uses the convention every
-     * other client uses: a personal list called Dropped. The title is added to
-     * that list and taken off the watchlist, since dropping it means it is no
-     * longer something to watch.
+     * Drop a title. Trakt shipped a native Drop Show in 2025 and it is built
+     * on the hidden-items API, not on a list: hiding a show under
+     * progress_watched takes it out of Up Next and Progress, and under
+     * calendar takes it off the calendar, while the watch history is kept.
+     * Verified against the live API: /users/hidden/{section} answers 401
+     * (exists, needs OAuth) where an invented route answers 404.
+     *
+     * progress_watched is a show/season section, so for a movie the only
+     * meaningful equivalent is dropping it from the watchlist, which this
+     * does for both kinds anyway.
      */
     public function markDropped(int $tmdbId, string $type): bool
     {
@@ -468,89 +472,40 @@ class TraktClient implements ResetInterface
             return false;
         }
 
-        $listId = $this->droppedListId($token);
-        if ($listId === null) {
-            return false;
-        }
-
         $bucket = $type === 'movie' ? 'movies' : 'shows';
-        $slug   = rawurlencode($this->username);
-        $res = $this->postJson("/users/{$slug}/lists/{$listId}/items", [
-            $bucket => [['ids' => ['tmdb' => $tmdbId]]],
-        ], $token);
+        $ok = true;
 
-        if ($res['code'] !== 201 && $res['code'] !== 200) {
-            $this->logger->warning('Trakt dropped-list add failed', ['http' => $res['code'], 'tmdb_id' => $tmdbId]);
-
-            return false;
-        }
-
-        // Dropping it also takes it off the watchlist; ignore a miss there,
-        // the list membership is the part that matters.
-        $this->postJson('/sync/watchlist/remove', [$bucket => [['ids' => ['tmdb' => $tmdbId]]]], $token);
-        $this->forgetCached('watchlist');
-
-        return true;
-    }
-
-    /** Id of the personal "Dropped" list, created on first use. */
-    private function droppedListId(string $token): ?int
-    {
-        $cached = (string) $this->config->get('trakt_dropped_list_id');
-        if ($cached !== '') {
-            return (int) $cached;
-        }
-
-        $slug = rawurlencode($this->username);
-        foreach ($this->getJson("/users/{$slug}/lists", $token) as $list) {
-            if (strcasecmp((string) ($list['name'] ?? ''), self::DROPPED_LIST) === 0) {
-                $id = (int) ($list['ids']['trakt'] ?? 0);
-                if ($id > 0) {
-                    $this->config->set('trakt_dropped_list_id', (string) $id);
-
-                    return $id;
+        if ($type === 'tv') {
+            $hidden = 0;
+            foreach (['progress_watched', 'calendar'] as $section) {
+                $res = $this->postJson('/users/hidden/' . $section, [
+                    'shows' => [['ids' => ['tmdb' => $tmdbId]]],
+                ], $token);
+                $hidden += (int) ($res['data']['added']['shows'] ?? 0);
+                if ($res['code'] !== 200 && $res['code'] !== 201) {
+                    $this->logger->warning('Trakt hide failed', [
+                        'section' => $section, 'http' => $res['code'], 'tmdb_id' => $tmdbId,
+                    ]);
+                    $ok = false;
                 }
+            }
+            // Already hidden reports added=0, which is still the wanted state.
+            if ($hidden === 0) {
+                $this->logger->info('Trakt drop hid nothing new', ['tmdb_id' => $tmdbId]);
             }
         }
 
-        $res = $this->postJson("/users/{$slug}/lists", [
-            'name'        => self::DROPPED_LIST,
-            'description' => 'Started but abandoned. Maintained by Prismarr.',
-            'privacy'     => 'private',
+        // Dropping also clears the watchlist entry: it is no longer something
+        // to watch, which is the whole point of pruning the list.
+        $res = $this->postJson('/sync/watchlist/remove', [
+            $bucket => [['ids' => ['tmdb' => $tmdbId]]],
         ], $token);
-
-        $id = (int) ($res['data']['ids']['trakt'] ?? 0);
-        if ($id < 1) {
-            $this->logger->warning('Trakt dropped-list create failed', ['http' => $res['code']]);
-
-            return null;
+        if ($res['code'] !== 200) {
+            $ok = false;
         }
-        $this->config->set('trakt_dropped_list_id', (string) $id);
+        $this->forgetCached('watchlist');
 
-        return $id;
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function getJson(string $path, string $token): array
-    {
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => self::BASE_URL . $path,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_USERAGENT      => self::USER_AGENT,
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                'trakt-api-version: ' . self::API_VERSION,
-                'trakt-api-key: ' . (string) $this->config->get('trakt_client_id'),
-                'Authorization: Bearer ' . $token,
-            ],
-        ]);
-        $raw = curl_exec($ch);
-        curl_close($ch);
-        $d = is_string($raw) ? json_decode($raw, true) : null;
-
-        return is_array($d) ? $d : [];
+        return $ok;
     }
 
     /**

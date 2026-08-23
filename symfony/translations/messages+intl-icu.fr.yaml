@@ -5641,7 +5641,7 @@ trakt:
     mark_dropped: Abandonné
     watched_confirm: 'Marquer {title} comme vu sur Trakt ?'
     watched_confirm_tv: 'Marquer {title} comme vu sur Trakt ? Pour une série, tous les épisodes diffusés seront marqués.'
-    dropped_confirm: 'Déplacer {title} vers votre liste Trakt Abandonné ? Le titre quitte aussi la watchlist.'
+    dropped_confirm: 'Abandonner {title} sur Trakt ? Une série est masquée de Up Next, Progress et du calendrier, l''historique est conservé, et le titre quitte la watchlist.'
     remove_title: Retirer de votre watchlist Trakt
     remove_modal: Retirer de la watchlist Trakt
     remove_confirm: 'Retirer {title} de votre watchlist Trakt ? Cela modifie Trakt lui-même.'
