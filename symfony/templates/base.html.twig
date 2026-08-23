@@ -3089,9 +3089,6 @@
       // v1.1.0 — radarr/sonarr can have multiple instances; we render
       // each instance on its own row instead of a single aggregate row.
       var INSTANCE_TYPES = ['radarr', 'sonarr'];
-      // Must stay in step with HealthController::FLAT_SERVICES: that endpoint
-      // decides which services are reported, this list decides which are drawn.
-      var FLAT_SERVICES = ['tmdb', 'prowlarr', 'jellyseerr', 'qbittorrent', 'sabnzbd', 'nzbget', 'trakt', 'mdblist'];
       var dot   = document.getElementById('topbar-health-dot');
       var summ  = document.getElementById('topbar-health-summary');
       var list  = document.getElementById('topbar-health-list');
@@ -3146,7 +3143,7 @@
           });
         });
         // Remaining flat services.
-        ['prowlarr', 'jellyseerr', 'qbittorrent', 'sabnzbd', 'nzbget'].forEach(function (id) {
+        ['prowlarr', 'jellyseerr', 'qbittorrent', 'sabnzbd', 'nzbget', 'trakt', 'mdblist'].forEach(function (id) {
           html += rowFor(SERVICE_LABELS[id], services[id]);
         });
         list.innerHTML = html;

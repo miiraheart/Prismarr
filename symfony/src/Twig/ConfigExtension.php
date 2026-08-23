@@ -32,6 +32,7 @@ class ConfigExtension extends AbstractExtension
         'gluetun'     => 'gluetun_url',
         'tautulli'    => 'tautulli_url',
         'trakt'       => 'trakt_client_id',
+        'mdblist'     => 'mdblist_api_key',
     ];
 
     /** Services backed by service_instance instead of a flat setting. */
