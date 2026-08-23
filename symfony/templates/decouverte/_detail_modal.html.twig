@@ -160,6 +160,46 @@
   .media-card[data-tmdb-id] .wl-star.in-wl:hover { background: rgba(245,158,11,1); }
   .media-card[data-tmdb-id] .wl-star:not(.in-wl):hover { background: rgba(245,158,11,.6); }
 
+  /* Kebab (⋮) action menu: same treatment as the watchlist star, one slot
+     to its left so the two never overlap. */
+  .media-card[data-tmdb-id] .dv-kebab-wrap { position: absolute; top: .3rem; right: 2.05rem; z-index: 7; }
+  .media-card[data-tmdb-id] .dv-kebab {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(0,0,0,.5); border: none; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity .15s;
+    padding: 0;
+  }
+  .media-card[data-tmdb-id]:hover .dv-kebab,
+  .media-card[data-tmdb-id] .dv-kebab.menu-open { opacity: 1; }
+  .media-card[data-tmdb-id] .dv-kebab:hover { background: rgba(0,0,0,.75); }
+  .media-card[data-tmdb-id] .dv-kebab svg { width: 14px; height: 14px; }
+  /* position: fixed and appended to document.body (not inside the card):
+     .media-card has overflow: hidden for its poster's rounded corners, which
+     would otherwise clip a menu nested inside it. JS sets top/left inline
+     from the kebab button's own position. z-index above both the detail
+     modal and its backdrop lightbox (1080), since a card inside the "similar
+     titles" row of an open modal carries a kebab too. */
+  .dv-kebab-menu {
+    position: fixed;
+    min-width: 175px; max-width: 230px;
+    background: var(--tblr-bg-surface); color: var(--tblr-body-color);
+    border: 1px solid var(--tblr-border-color); border-radius: .4rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    z-index: 1090; padding: .25rem; font-size: .78rem; cursor: default;
+  }
+  .dv-kebab-menu .dv-kebab-item {
+    display: flex; align-items: center; gap: .4rem;
+    width: 100%; padding: .4rem .5rem; border: none; background: none;
+    color: inherit; text-align: left; border-radius: .3rem; cursor: pointer;
+  }
+  .dv-kebab-menu .dv-kebab-item:hover { background: var(--tblr-bg-surface-secondary); }
+  .dv-kebab-menu .dv-kebab-item[disabled] { opacity: .55; cursor: default; }
+  .dv-kebab-menu .dv-kebab-item[disabled]:hover { background: none; }
+  .dv-kebab-menu .dv-kebab-sep { height: 1px; background: var(--tblr-border-color); margin: .25rem 0; }
+  .dv-kebab-menu .dv-kebab-sub { max-height: 200px; overflow-y: auto; }
+  .dv-kebab-menu .dv-kebab-note { padding: .4rem .5rem; color: var(--tblr-secondary); font-size: .72rem; }
+
   /* Overrides contextuels */
   /* Canonical media-card grid, moved here from decouverte/index.html.twig so
      any page including this partial gets the same cards, not a lookalike. */
@@ -1426,7 +1466,7 @@
   }
 
   document.addEventListener('click', function(e) {
-    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
+    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star') || e.target.closest('.dv-kebab-wrap')) return;
     var card = e.target.closest('.media-card[data-tmdb-id]');
     if (!card) return;
     e.preventDefault();
@@ -1647,6 +1687,343 @@
       });
     }
   };
+
+  document.addEventListener('turbo:load', init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+
+{# ── Kebab (⋮) card action menu ─────────────────────────────────────────
+   Add to a Trakt list (including creating one on the spot), mark watched,
+   add to the watchlist, open on Trakt. Stamped onto cards from here rather
+   than inside renderCardHTML(): most cards on Decouverte render server-side
+   from an upstream Twig macro this fork must not edit, so a change inside
+   renderCardHTML() alone would miss every one of them. Same treatment as
+   the watch badge script above: an idempotence guard so a card never gets
+   stamped twice, a MutationObserver for cards that land later (lazy rows,
+   search results, JS grids), and a turbo:load re-init because Turbo Drive
+   swaps document.body wholesale on navigation.
+
+   List names are Mira's own account data, so anything built from them goes
+   through textContent (or esc() when it must land inside an HTML string),
+   never raw string concatenation into innerHTML. #}
+<script>
+(function () {
+  var I18N = {
+    menuLabel:     {{ 'decouverte.kebab.menu_label'|trans|json_encode|raw }},
+    addToList:     {{ 'decouverte.kebab.add_to_list'|trans|json_encode|raw }},
+    loadingLists:  {{ 'decouverte.kebab.loading_lists'|trans|json_encode|raw }},
+    noLists:       {{ 'decouverte.kebab.no_lists'|trans|json_encode|raw }},
+    newList:       {{ 'decouverte.kebab.new_list'|trans|json_encode|raw }},
+    newListPrompt: {{ 'decouverte.kebab.new_list_prompt'|trans|json_encode|raw }},
+    markWatched:   {{ 'decouverte.kebab.mark_watched'|trans|json_encode|raw }},
+    addWatchlist:  {{ 'decouverte.kebab.add_watchlist'|trans|json_encode|raw }},
+    openTrakt:     {{ 'decouverte.kebab.open_trakt'|trans|json_encode|raw }},
+    unavailable:   {{ 'decouverte.kebab.unavailable'|trans|json_encode|raw }},
+    watchedOk:     {{ 'decouverte.kebab.watched_ok'|trans|json_encode|raw }},
+    watchlistOk:   {{ 'decouverte.kebab.watchlist_ok'|trans|json_encode|raw }},
+    noTraktLink:   {{ 'decouverte.kebab.no_trakt_link'|trans|json_encode|raw }},
+    actionFailed:  {{ 'decouverte.kebab.action_failed'|trans|json_encode|raw }},
+    // Sentinels, same trick error_prefix/watched_confirm use elsewhere in
+    // this file: trans() fills in the ICU placeholder server-side with a
+    // marker token, JS swaps the marker for the real (untrusted) value
+    // afterwards instead of re-interpolating into the translated string.
+    listCreated:   {{ 'decouverte.kebab.list_created'|trans({name: '__NAME__'})|json_encode|raw }},
+    addedToList:   {{ 'decouverte.kebab.added_to_list'|trans({name: '__NAME__'})|json_encode|raw }}
+  };
+  var DOTS_ICON  = {{ ico.icon('dots-vertical', '', 14)|json_encode|raw }};
+  var STAMP_ATTR = 'kebabStamped';
+  var observedBody = null;
+  var openMenu = null;
+  var openBtn  = null;
+  var listsPromise = null;
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function toast(msg, type) {
+    if (window._prismarrToast) window._prismarrToast(msg, type);
+  }
+
+  function note(text) {
+    var n = document.createElement('div');
+    n.className = 'dv-kebab-note';
+    n.textContent = text;
+    return n;
+  }
+
+  function sep() {
+    var s = document.createElement('div');
+    s.className = 'dv-kebab-sep';
+    return s;
+  }
+
+  // label is always a translated string or (for list names) plain text
+  // assigned via textContent below, never HTML, so nothing here needs escHtml.
+  function actionItem(label, onClick) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dv-kebab-item';
+    btn.textContent = label;
+    btn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      onClick();
+    });
+    return btn;
+  }
+
+  function closeMenu() {
+    if (openMenu) openMenu.remove();
+    if (openBtn) openBtn.classList.remove('menu-open');
+    openMenu = null;
+    openBtn  = null;
+  }
+
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        return { ok: r.ok, data: j };
+      });
+    }).catch(function () {
+      return { ok: false, data: {} };
+    });
+  }
+
+  // Cached for the page's lifetime (a fresh IIFE instance runs on every
+  // turbo:load, same as the watch badge script, so this never survives a
+  // real navigation). Busted by createListFlow() so a list made from the
+  // kebab menu itself shows up on the very next "Add to list" open, not
+  // just after TraktClient's own cache TTL.
+  function fetchLists() {
+    if (listsPromise) return listsPromise;
+    listsPromise = fetch('/trakt/lists', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var lists = (j && Array.isArray(j.lists)) ? j.lists : null;
+        return { ok: lists !== null, lists: lists || [] };
+      })
+      .catch(function () { return { ok: false, lists: [] }; });
+    return listsPromise;
+  }
+
+  function target(card) {
+    return {
+      tmdb_id: parseInt(card.dataset.tmdbId, 10),
+      type:    card.dataset.tmdbType,
+      title:   card.dataset.tmdbTitle || '',
+      year:    card.dataset.tmdbYear ? parseInt(card.dataset.tmdbYear, 10) : null
+    };
+  }
+
+  function markWatchedFlow(card) {
+    post('/trakt/watched', target(card)).then(function (res) {
+      if (res.ok) {
+        if (window.PrismarrWatchBadge) window.PrismarrWatchBadge.markWatched(card.dataset.tmdbType, card.dataset.tmdbId);
+        toast(I18N.watchedOk, 'success');
+      } else {
+        toast((res.data && res.data.error) || I18N.actionFailed, 'danger');
+      }
+    });
+  }
+
+  function addWatchlistFlow(card) {
+    post('/trakt/watchlist', target(card)).then(function (res) {
+      toast(res.ok ? I18N.watchlistOk : ((res.data && res.data.error) || I18N.actionFailed), res.ok ? 'success' : 'danger');
+    });
+  }
+
+  function openTraktFlow(card) {
+    fetch('/trakt/link/' + card.dataset.tmdbType + '/' + card.dataset.tmdbId, { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (j && j.url) {
+          window.open(j.url, '_blank', 'noopener');
+        } else {
+          toast(I18N.noTraktLink, 'warning');
+        }
+      })
+      .catch(function () { toast(I18N.noTraktLink, 'warning'); });
+  }
+
+  function addToListFlow(card, listId, listName) {
+    post('/trakt/lists/' + listId + '/items', target(card)).then(function (res) {
+      if (res.ok) {
+        toast(I18N.addedToList.replace('__NAME__', listName || ''), 'success');
+      } else {
+        toast((res.data && res.data.error) || I18N.actionFailed, 'danger');
+      }
+    });
+  }
+
+  // Blank/whitespace-only input is treated the same as Cancel (no toast):
+  // the server rejects a blank name too (trakt.error.list_name_required),
+  // but there is nothing to tell Mira here that "you closed the prompt"
+  // did not already say.
+  function createListFlow(card) {
+    var name = window.prompt(I18N.newListPrompt, '');
+    if (name === null) return;
+    name = name.trim();
+    if (name === '') return;
+
+    closeMenu();
+    post('/trakt/lists', { name: name }).then(function (res) {
+      var list = res.ok ? (res.data && res.data.list) : null;
+      if (list && list.id) {
+        listsPromise = null;
+        toast(I18N.listCreated.replace('__NAME__', list.name || name), 'success');
+        addToListFlow(card, list.id, list.name || name);
+      } else {
+        toast((res.data && res.data.error) || I18N.actionFailed, 'danger');
+      }
+    });
+  }
+
+  // Morphs the already-open menu in place into the list picker instead of
+  // opening a second menu, so "never leave more than one open" still holds.
+  function renderListPicker(menu, card) {
+    menu.innerHTML = '';
+    menu.appendChild(note(I18N.loadingLists));
+
+    fetchLists().then(function (res) {
+      // The menu may have been closed, or a different card's menu opened,
+      // while this fetch was in flight.
+      if (openMenu !== menu) return;
+      menu.innerHTML = '';
+
+      if (!res.ok) {
+        menu.appendChild(note(I18N.unavailable));
+        positionMenu(menu, openBtn);
+        return;
+      }
+
+      var sub = document.createElement('div');
+      sub.className = 'dv-kebab-sub';
+      if (res.lists.length === 0) {
+        sub.appendChild(note(I18N.noLists));
+      } else {
+        res.lists.forEach(function (list) {
+          sub.appendChild(actionItem(list.name || ('#' + list.id), function () {
+            closeMenu();
+            addToListFlow(card, list.id, list.name);
+          }));
+        });
+      }
+      menu.appendChild(sub);
+      menu.appendChild(sep());
+      menu.appendChild(actionItem(I18N.newList, function () { createListFlow(card); }));
+      // Content just changed height (and possibly width), so the fixed
+      // position picked when the menu first opened may no longer fit.
+      positionMenu(menu, openBtn);
+    });
+  }
+
+  function buildMenu(card) {
+    var menu = document.createElement('div');
+    menu.className = 'dv-kebab-menu';
+
+    menu.appendChild(actionItem(I18N.addToList, function () { renderListPicker(menu, card); }));
+    menu.appendChild(sep());
+    menu.appendChild(actionItem(I18N.markWatched,  function () { closeMenu(); markWatchedFlow(card); }));
+    menu.appendChild(actionItem(I18N.addWatchlist, function () { closeMenu(); addWatchlistFlow(card); }));
+    menu.appendChild(sep());
+    menu.appendChild(actionItem(I18N.openTrakt,    function () { closeMenu(); openTraktFlow(card); }));
+
+    return menu;
+  }
+
+  // Appended to document.body (not the card, which clips overflow) and
+  // positioned from the button's own on-screen rect, so it works the same
+  // whether the card is in the main grid or a lazy row that has scrolled.
+  function positionMenu(menu, btn) {
+    var rect = btn.getBoundingClientRect();
+    var width = menu.offsetWidth;
+    var left = rect.right - width;
+    var maxLeft = window.innerWidth - width - 8;
+    if (left > maxLeft) left = maxLeft;
+    if (left < 8) left = 8;
+
+    var top = rect.bottom + 4;
+    var maxTop = window.innerHeight - menu.offsetHeight - 8;
+    if (top > maxTop) top = Math.max(8, rect.top - menu.offsetHeight - 4);
+
+    menu.style.left = left + 'px';
+    menu.style.top  = top + 'px';
+  }
+
+  function openMenuFor(btn, card) {
+    var menu = buildMenu(card);
+    document.body.appendChild(menu);
+    positionMenu(menu, btn);
+    btn.classList.add('menu-open');
+    openMenu = menu;
+    openBtn  = btn;
+  }
+
+  function stampCard(card) {
+    if (card.dataset[STAMP_ATTR]) return;
+    card.dataset[STAMP_ATTR] = '1';
+    if (!card.dataset.tmdbType || !card.dataset.tmdbId) return;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'dv-kebab-wrap';
+    wrap.innerHTML = '<button type="button" class="dv-kebab" title="' + esc(I18N.menuLabel) + '" aria-label="' + esc(I18N.menuLabel) + '">' + DOTS_ICON + '</button>';
+    card.appendChild(wrap);
+  }
+
+  function stampAll() {
+    document.querySelectorAll('.media-card[data-tmdb-id]').forEach(stampCard);
+  }
+
+  function watchForNewCards() {
+    if (observedBody === document.body) return;
+    observedBody = document.body;
+
+    new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        m.addedNodes.forEach(function (node) {
+          if (node.nodeType !== 1) return;
+          if (node.matches && node.matches('.media-card[data-tmdb-id]')) stampCard(node);
+          if (node.querySelectorAll) node.querySelectorAll('.media-card[data-tmdb-id]').forEach(stampCard);
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.dv-kebab');
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (openBtn === btn) { closeMenu(); return; }
+      var card = btn.closest('.media-card[data-tmdb-id]');
+      if (!card) return;
+      closeMenu();
+      openMenuFor(btn, card);
+      return;
+    }
+    if (openMenu && !e.target.closest('.dv-kebab-menu')) closeMenu();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && openMenu) closeMenu();
+  });
+
+  function init() {
+    stampAll();
+    watchForNewCards();
+  }
 
   document.addEventListener('turbo:load', init);
   if (document.readyState === 'loading') {

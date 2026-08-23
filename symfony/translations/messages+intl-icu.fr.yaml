@@ -1063,6 +1063,23 @@ decouverte:
     in_library: En bibliothèque
     watching: En cours
     watched: Vu
+  kebab:
+    menu_label: 'Plus d''actions'
+    add_to_list: 'Ajouter à une liste'
+    loading_lists: 'Chargement des listes…'
+    no_lists: 'Aucune liste pour l''instant'
+    new_list: 'Nouvelle liste…'
+    new_list_prompt: 'Nom de la nouvelle liste :'
+    mark_watched: 'Marquer comme vu'
+    add_watchlist: 'Ajouter à la watchlist'
+    open_trakt: 'Ouvrir sur Trakt'
+    unavailable: 'Trakt n''est pas connecté'
+    list_created: 'Liste « {name} » créée'
+    added_to_list: 'Ajouté à {name}'
+    watched_ok: 'Marqué comme vu sur Trakt'
+    watchlist_ok: 'Ajouté à votre watchlist Trakt'
+    no_trakt_link: 'Aucune page Trakt trouvée pour ce titre'
+    action_failed: 'Trakt a refusé cette action.'
   action:
     add: Ajouter
     close: Fermer
@@ -5670,6 +5687,8 @@ trakt:
     request_failed: Seerr a refusé la demande.
     remove_failed: 'Trakt ne l''a pas retiré.'
     write_failed: 'Trakt a refusé la modification.'
+    list_name_required: 'Entrez un nom pour la liste.'
+    list_create_failed: 'Trakt n''a pas pu créer la liste.'
 discover:
   page:
     title: Listes

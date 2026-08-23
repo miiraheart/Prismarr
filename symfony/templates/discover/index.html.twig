@@ -441,7 +441,7 @@
         openList(titleLink.dataset.url, titleLink.dataset.label);
         return;
       }
-      if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
+      if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star') || e.target.closest('.dv-kebab-wrap')) return;
       var card = e.target.closest('.media-card[data-tmdb-id]');
       if (card && window.PrismarrDetail) {
         window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);
@@ -510,7 +510,7 @@
   }
 
   grid.addEventListener('click', function (e) {
-    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
+    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star') || e.target.closest('.dv-kebab-wrap')) return;
     var card = e.target.closest('.media-card[data-tmdb-id]');
     if (card && window.PrismarrDetail) {
       window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);

@@ -1064,6 +1064,23 @@ decouverte:
     in_library: In library
     watching: Watching
     watched: Watched
+  kebab:
+    menu_label: More actions
+    add_to_list: Add to list
+    loading_lists: Loading lists…
+    no_lists: No lists yet
+    new_list: 'New list…'
+    new_list_prompt: 'Name for the new list:'
+    mark_watched: Mark watched
+    add_watchlist: Add to watchlist
+    open_trakt: Open in Trakt
+    unavailable: Trakt is not connected
+    list_created: 'List "{name}" created'
+    added_to_list: 'Added to {name}'
+    watched_ok: Marked watched on Trakt
+    watchlist_ok: Added to your Trakt watchlist
+    no_trakt_link: No Trakt page found for this title
+    action_failed: Trakt refused that.
   action:
     add: Add
     close: Close
@@ -5672,6 +5689,8 @@ trakt:
     request_failed: Seerr refused the request.
     remove_failed: Trakt did not remove it.
     write_failed: Trakt refused the change.
+    list_name_required: Enter a name for the list.
+    list_create_failed: Trakt could not create the list.
 discover:
   page:
     title: Lists
