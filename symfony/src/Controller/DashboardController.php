@@ -689,7 +689,7 @@ class DashboardController extends AbstractController
             }
         }
 
-        $labels = ['prowlarr' => 'Prowlarr', 'jellyseerr' => 'Seerr', 'qbittorrent' => 'qBittorrent', 'tmdb' => 'TMDb', 'tautulli' => 'Tautulli', 'trakt' => 'Trakt'];
+        $labels = ['prowlarr' => 'Prowlarr', 'jellyseerr' => 'Seerr', 'qbittorrent' => 'qBittorrent', 'tmdb' => 'TMDb', 'tautulli' => 'Tautulli', 'trakt' => 'Trakt', 'mdblist' => 'MDBList'];
         foreach ($labels as $service => $label) {
             try {
                 $s = $this->health->statusFor($service);

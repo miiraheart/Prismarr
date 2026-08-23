@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\ServiceInstance;
 use App\Service\Media\DelugeClient;
 use App\Service\Media\JellyseerrClient;
+use App\Service\Media\MdblistClient;
 use App\Service\Media\ProwlarrClient;
 use App\Service\Media\QBittorrentClient;
 use App\Service\Media\RadarrClient;
@@ -81,6 +82,7 @@ class HealthService
         // Trakt: nullable + last for the same legacy-test-constructor
         // reason as the clients above.
         private readonly ?TraktClient      $trakt = null,
+        private readonly ?MdblistClient    $mdblist = null,
     ) {}
 
     /**
@@ -253,6 +255,7 @@ class HealthService
             'tautulli'    => $this->tautulli?->ping() ?? false,
             'transmission' => $this->transmission?->ping() ?? false,
             'trakt'       => $this->trakt?->ping() ?? false,
+            'mdblist'     => $this->mdblist?->ping() ?? false,
             default       => true,
         };
     }
@@ -269,7 +272,7 @@ class HealthService
      * (issue #15). Radarr/Sonarr are absent on purpose — they enable/disable
      * per instance via the `enabled` flag on `service_instance`.
      */
-    public const TOGGLEABLE_SERVICES = ['prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt'];
+    public const TOGGLEABLE_SERVICES = ['prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt', 'mdblist'];
 
     public function isConfigured(string $service): bool
     {
@@ -328,6 +331,9 @@ class HealthService
             // the endpoint is always api.trakt.tv.
             'trakt' =>
                 $this->config->has('trakt_client_id') && $this->config->has('trakt_username'),
+            // MDBList needs only the API key: the endpoint is always
+            // api.mdblist.com and the key is a query parameter.
+            'mdblist' => $this->config->has('mdblist_api_key'),
             default => true,
         };
     }
@@ -354,7 +360,7 @@ class HealthService
         if ($service === null) {
             $this->statusCache = [];
             if ($this->serviceHealthCache !== null) {
-                foreach (['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt'] as $svc) {
+                foreach (['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt', 'mdblist'] as $svc) {
                     $this->serviceHealthCache->clear($svc);
                 }
             }
@@ -582,6 +588,21 @@ class HealthService
                         'trakt-api-key: ' . $key,
                         // Cloudflare fronts api.trakt.tv and 403s a request with no
                         // User-Agent. See the same header in TraktClient::request().
+                        'User-Agent: Prismarr/1.0',
+                    ],
+                ];
+            }
+            case 'mdblist': {
+                $key = $get('mdblist_api_key');
+                if ($key === '') return null;
+
+                // Same call MdblistClient::ping() makes. The key is a query
+                // parameter, not a header, and the endpoint 403s a request
+                // with no User-Agent exactly like api.trakt.tv does.
+                return [
+                    'url'     => 'https://api.mdblist.com/user?apikey=' . urlencode($key),
+                    'headers' => [
+                        'Accept: application/json',
                         'User-Agent: Prismarr/1.0',
                     ],
                 ];

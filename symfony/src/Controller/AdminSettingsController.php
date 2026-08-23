@@ -104,6 +104,9 @@ class AdminSettingsController extends AbstractController
             // Trakt account goes through. Reading a public profile never uses it.
             ['key' => 'trakt_client_secret', 'type' => 'password', 'label' => 'admin.field.trakt.client_secret', 'clearable' => true],
         ],
+        'mdblist' => [
+            ['key' => 'mdblist_api_key', 'type' => 'password', 'label' => 'admin.field.mdblist.api_key'],
+        ],
     ];
 
     /**
@@ -153,6 +156,7 @@ class AdminSettingsController extends AbstractController
         'gluetun'     => 'Gluetun',
         'tautulli'    => 'Tautulli',
         'trakt'       => 'Trakt',
+        'mdblist'     => 'MDBList',
     ];
 
     /**
@@ -558,6 +562,7 @@ class AdminSettingsController extends AbstractController
             'nzbget'                                     => ['nzbget_url', 'nzbget_user', 'nzbget_password'],
             'tautulli'                                   => ['tautulli_url', 'tautulli_api_key'],
             'trakt'                                      => ['trakt_client_id', 'trakt_username'],
+            'mdblist'                                    => ['mdblist_api_key'],
             default                                      => [],
         };
         $overrides = [];
@@ -606,7 +611,7 @@ class AdminSettingsController extends AbstractController
     public function healthInvalidate(string $service): JsonResponse
     {
         $service = strtolower($service);
-        $allowed = ['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt'];
+        $allowed = ['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt', 'mdblist'];
         if (!in_array($service, $allowed, true)) {
             return new JsonResponse(['ok' => false], 400);
         }

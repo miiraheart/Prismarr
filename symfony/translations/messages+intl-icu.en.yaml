@@ -693,6 +693,7 @@ admin:
       gluetun: 'VPN / port forwarding'
       tautulli: 'Plex activity (via Tautulli)'
       trakt: Watchlist & ratings
+      mdblist: 'Curated lists & ratings'
     sidebar_toggle: Menu
     sidebar_toggle_title: Show in sidebar
     status:
@@ -903,6 +904,8 @@ admin:
       client_id: Client ID
       username: Trakt username
       client_secret: Client secret
+    mdblist:
+      api_key: API key
   internal:
     calendar:
       label: Calendar
