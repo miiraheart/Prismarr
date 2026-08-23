@@ -62,8 +62,15 @@
     meta: {
       movie: {{ path('trakt_meta', {type: 'movie', tmdbId: 0})|json_encode|raw }},
       tv:    {{ path('trakt_meta', {type: 'tv',    tmdbId: 0})|json_encode|raw }}
-    }
+    },
+    pin:   {{ path('discover_pin')|json_encode|raw }},
+    unpin: {{ path('discover_unpin')|json_encode|raw }}
   };
+
+  var pinned = {{ pinned|json_encode|raw }};
+  function isPinned(url) {
+    return pinned.some(function (p) { return p.url.replace(/\/$/, '') === url.replace(/\/$/, ''); });
+  }
 
   var directory = document.getElementById('dv-directory');
   var listView  = document.getElementById('dv-list-view');
@@ -85,7 +92,13 @@
       .then(function (d) {
         var lists = d.lists || [];
         count.textContent = lists.length ? lists.length + ' lists' : '';
-        directory.innerHTML = lists.map(function (l) {
+        var pins = (d.pinned || []).map(function (p) {
+          return '<div class="dv-list-card" data-url="' + esc(p.url) + '" data-label="' + esc(p.label) + '">'
+            + '<span class="dv-list-name">📌 ' + esc(p.label) + '</span>'
+            + '<span class="dv-list-meta">' + esc(p.source) + '</span>'
+            + '</div>';
+        }).join('');
+        directory.innerHTML = pins + lists.map(function (l) {
           return '<div class="dv-list-card" data-url="' + esc(l.url) + '" data-label="' + esc(l.name) + '">'
             + '<span class="dv-list-name">' + esc(l.name) + '</span>'
             + '<span class="dv-list-meta">' + esc(l.user) + ' · ' + esc(l.items) + ' items · ' + esc(l.likes) + ' likes</span>'
@@ -129,6 +142,30 @@
     current.url = url;
     current.cursor = null;
     title.textContent = label;
+    var pinBtn = document.getElementById('dv-pin');
+    pinBtn.textContent = isPinned(url)
+      ? {{ 'discover.action.unpin'|trans|json_encode|raw }}
+      : {{ 'discover.action.pin'|trans|json_encode|raw }};
+    pinBtn.onclick = function () {
+      var unpinning = isPinned(url);
+      var target = unpinning ? ROUTES.unpin : ROUTES.pin;
+      var body   = unpinning
+        ? { id: (pinned.filter(function (p) { return p.url.replace(/\/$/, '') === url.replace(/\/$/, ''); })[0] || {}).id }
+        : { url: url, label: label };
+      fetch(target, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body)
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) return;
+          pinned = d.pinned || [];
+          pinBtn.textContent = isPinned(url)
+            ? {{ 'discover.action.unpin'|trans|json_encode|raw }}
+            : {{ 'discover.action.pin'|trans|json_encode|raw }};
+        });
+    };
     directory.classList.add('d-none');
     listView.classList.remove('d-none');
     grid.innerHTML = '';

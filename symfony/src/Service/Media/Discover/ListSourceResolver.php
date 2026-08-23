@@ -33,4 +33,10 @@ final class ListSourceResolver
 
         return ['source' => 'mdblist', 'user' => $parts[1], 'slug' => $parts[2]];
     }
+
+    /** Stable per list, so relabelling a pin never creates a second row. */
+    public static function idFor(string $url): string
+    {
+        return substr(sha1(strtolower(rtrim(trim($url), '/'))), 0, 12);
+    }
 }

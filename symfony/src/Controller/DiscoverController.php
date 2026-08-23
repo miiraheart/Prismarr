@@ -95,6 +95,54 @@ class DiscoverController extends AbstractController
         ]);
     }
 
+    // No CSRF token: internal app, routes protected by the class-level IsGranted.
+    // Same call as TraktController's write routes.
+    #[Route('/pin', name: 'pin', methods: ['POST'])]
+    public function pin(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true);
+        $url     = trim((string) ($payload['url'] ?? ''));
+        $parsed  = ListSourceResolver::parse($url);
+
+        if ($parsed === null) {
+            return $this->json(['ok' => false, 'error' => 'unsupported_source'], 400);
+        }
+
+        $id     = ListSourceResolver::idFor($url);
+        $pinned = $this->pinned();
+        foreach ($pinned as $row) {
+            if (($row['id'] ?? '') === $id) {
+                return $this->json(['ok' => true, 'pinned' => $pinned]);
+            }
+        }
+
+        $pinned[] = [
+            'id'       => $id,
+            'url'      => $url,
+            'source'   => $parsed['source'],
+            'label'    => trim((string) ($payload['label'] ?? '')) ?: $parsed['slug'],
+            'added_at' => date(DATE_ATOM),
+        ];
+        $this->config->set(self::PINNED_KEY, json_encode(array_values($pinned)));
+
+        return $this->json(['ok' => true, 'pinned' => $pinned]);
+    }
+
+    #[Route('/unpin', name: 'unpin', methods: ['POST'])]
+    public function unpin(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true);
+        $id      = trim((string) ($payload['id'] ?? ''));
+
+        $pinned = array_values(array_filter(
+            $this->pinned(),
+            static fn (array $row): bool => ($row['id'] ?? '') !== $id,
+        ));
+        $this->config->set(self::PINNED_KEY, json_encode($pinned));
+
+        return $this->json(['ok' => true, 'pinned' => $pinned]);
+    }
+
     /**
      * Badge the titles Radarr or Sonarr already owns. The spec's rule is badge
      * everything and hide nothing, so a watched or owned title still renders.

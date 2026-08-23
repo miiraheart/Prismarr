@@ -36,4 +36,14 @@ class ListSourceResolverTest extends TestCase
         $this->assertNull(ListSourceResolver::parse('not a url at all'));
         $this->assertNull(ListSourceResolver::parse(''));
     }
+
+    /** A pinned row needs a stable id that survives a relabel. */
+    public function testIdIsStableForTheSameList(): void
+    {
+        $a = ListSourceResolver::idFor('https://mdblist.com/lists/bob/my-list');
+        $b = ListSourceResolver::idFor('https://mdblist.com/lists/bob/my-list/');
+
+        $this->assertSame($a, $b);
+        $this->assertNotSame($a, ListSourceResolver::idFor('https://mdblist.com/lists/bob/other'));
+    }
 }
