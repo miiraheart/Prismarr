@@ -124,6 +124,130 @@ class MdblistClient implements ResetInterface
         return $rows;
     }
 
+    private const PAGE_LIMIT = 100;
+
+    /**
+     * One page of a list.
+     *
+     * Paging is cursor based: the caller passes back the `next_cursor` from the
+     * previous answer until it is absent. The `offset` parameter still works
+     * but is deprecated in the API.
+     *
+     * @return array{items:list<array<string,mixed>>, next_cursor:?string, total:int}
+     */
+    public function getListItems(string $user, string $slug, ?string $cursor = null, int $limit = self::PAGE_LIMIT): array
+    {
+        $key = 'items_' . sha1($user . '/' . $slug . '/' . ($cursor ?? '') . '/' . $limit);
+
+        return $this->cachedGet($key, function () use ($user, $slug, $cursor, $limit): array {
+            $res = $this->request(
+                '/lists/' . rawurlencode($user) . '/' . rawurlencode($slug) . '/items',
+                [
+                    'limit'  => $limit,
+                    'cursor' => $cursor,
+                    // Ratings ride along with the items, which is far cheaper
+                    // than the batch rating endpoint: that one is capped at 10
+                    // ids per request for a non-supporter key.
+                    'append_to_response' => 'poster,ratings',
+                ],
+            );
+
+            return [
+                'items'       => $this->mapItems($res['data'] ?? []),
+                'next_cursor' => $res['cursor'],
+                'total'       => $res['total'],
+            ];
+        });
+    }
+
+    /**
+     * Flatten MDBList's movies/shows split into the card shape that
+     * renderCardHTML() in decouverte/_detail_modal.html.twig already reads.
+     *
+     * @param  array<string, mixed> $payload
+     * @return list<array<string, mixed>>
+     */
+    private function mapItems(array $payload): array
+    {
+        $out = [];
+        foreach (['movies' => 'movie', 'shows' => 'tv'] as $bucket => $type) {
+            foreach ((array) ($payload[$bucket] ?? []) as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $tmdb = $row['ids']['tmdb'] ?? null;
+                if (!is_int($tmdb) || $tmdb <= 0) {
+                    continue;
+                }
+
+                $out[] = [
+                    'id'         => $tmdb,
+                    // MDBList says "show", the rest of this codebase says "tv".
+                    'type'       => $type,
+                    'title'      => (string) ($row['title'] ?? ''),
+                    'year'       => isset($row['release_year']) ? (int) $row['release_year'] : null,
+                    'imdb'       => $row['ids']['imdb'] ?? ($row['imdb_id'] ?? null),
+                    'poster'     => $this->posterFrom($row),
+                    'vote'       => $this->voteFrom($row),
+                    'in_library' => false,
+                    'lib_status' => null,
+                    'lib_id'     => null,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * MEASURED 2026-08-23: every item carries an absolute
+     * https://image.tmdb.org/t/p/w200/... URL, so the grid needs no per-title
+     * TMDb hydration at all. w342 is the size Decouverte's own cards use.
+     */
+    private function posterFrom(array $row): ?string
+    {
+        $poster = $row['poster'] ?? null;
+        if (!is_string($poster) || !str_starts_with($poster, 'http')) {
+            return null;
+        }
+
+        return str_replace('/t/p/w200/', '/t/p/w342/', $poster);
+    }
+
+    /**
+     * MEASURED 2026-08-23: `ratings` is an ARRAY of {source, value, score,
+     * votes}, not a map, and the scales differ per source: imdb `value` is
+     * 0 to 10 (8.0) while tmdb `value` is 0 to 100 (82). The shared card badge
+     * expects TMDb's native 0-to-10 scale, so prefer imdb's value and fall
+     * back to a tmdb score divided by 10.
+     */
+    private function voteFrom(array $row): ?float
+    {
+        $ratings = $row['ratings'] ?? null;
+        if (!is_array($ratings)) {
+            return null;
+        }
+
+        $bySource = [];
+        foreach ($ratings as $rating) {
+            if (is_array($rating) && isset($rating['source'])) {
+                $bySource[(string) $rating['source']] = $rating;
+            }
+        }
+
+        $imdb = $bySource['imdb']['value'] ?? null;
+        if (is_numeric($imdb) && $imdb > 0) {
+            return round((float) $imdb, 1);
+        }
+
+        $tmdb = $bySource['tmdb']['score'] ?? null;
+        if (is_numeric($tmdb) && $tmdb > 0) {
+            return round((float) $tmdb / 10, 1);
+        }
+
+        return null;
+    }
+
     /**
      * @param callable():array $producer
      */

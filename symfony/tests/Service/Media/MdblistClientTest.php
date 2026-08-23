@@ -96,4 +96,115 @@ class MdblistClientTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertSame(2, $rows[0]['id']);
     }
+
+    private function mapItems(MdblistClient $client, array $payload): array
+    {
+        $m = new ReflectionMethod($client, 'mapItems');
+        $m->setAccessible(true);
+
+        return $m->invoke($client, $payload);
+    }
+
+    /**
+     * MDBList splits its answer into `movies` and `shows`. Prismarr says
+     * "tv" where MDBList says "show", the same normalisation TraktClient does.
+     */
+    public function testMoviesAndShowsAreFlattenedAndTypeNormalised(): void
+    {
+        $items = $this->mapItems($this->makeClient(), [
+            'movies' => [
+                ['id' => 1, 'title' => 'Longlegs', 'release_year' => 2024, 'imdb_id' => 'tt23468450', 'ids' => ['tmdb' => 976893]],
+            ],
+            'shows' => [
+                ['id' => 2, 'title' => 'Severance', 'release_year' => 2022, 'imdb_id' => 'tt11280740', 'ids' => ['tmdb' => 95396]],
+            ],
+        ]);
+
+        $this->assertCount(2, $items);
+        $this->assertSame(976893, $items[0]['id']);
+        $this->assertSame('movie', $items[0]['type']);
+        $this->assertSame(2024, $items[0]['year']);
+        $this->assertSame(95396, $items[1]['id']);
+        $this->assertSame('tv', $items[1]['type']);
+    }
+
+    /**
+     * Everything downstream (Prismarr, Radarr, Sonarr, the detail modal) is
+     * keyed on a TMDB id. An entry without one has nothing to join against.
+     */
+    public function testEntriesWithoutATmdbIdAreDropped(): void
+    {
+        $items = $this->mapItems($this->makeClient(), [
+            'movies' => [
+                ['id' => 1, 'title' => 'Ghost', 'release_year' => 1990, 'ids' => ['imdb' => 'tt0099653']],
+                ['id' => 2, 'title' => 'Real', 'release_year' => 1991, 'ids' => ['tmdb' => 42]],
+            ],
+        ]);
+
+        $this->assertCount(1, $items);
+        $this->assertSame(42, $items[0]['id']);
+    }
+
+    public function testCardFieldsDefaultToNullSoTheSharedRendererNeverBranches(): void
+    {
+        $items = $this->mapItems($this->makeClient(), [
+            'movies' => [['id' => 1, 'title' => 'X', 'release_year' => 2022, 'ids' => ['tmdb' => 7]]],
+        ]);
+
+        $this->assertArrayHasKey('poster', $items[0]);
+        $this->assertNull($items[0]['poster']);
+        $this->assertNull($items[0]['vote']);
+        $this->assertFalse($items[0]['in_library']);
+        $this->assertNull($items[0]['lib_status']);
+    }
+
+    /**
+     * Measured against the live API on 2026-08-23: `ratings` is an ARRAY of
+     * {source, value, score, votes}, and the scales differ per source. imdb
+     * value is 0 to 10, tmdb value is 0 to 100. The shared card badge wants
+     * TMDb's native 0-to-10 scale.
+     */
+    public function testVoteComesFromTheRatingsArrayOnATenPointScale(): void
+    {
+        $items = $this->mapItems($this->makeClient(), [
+            'shows' => [[
+                'id' => 95350, 'title' => 'Lanterns', 'release_year' => 2026,
+                'ids' => ['tmdb' => 95350],
+                'ratings' => [
+                    ['source' => 'imdb',    'value' => 8.0, 'score' => 80, 'votes' => 8919],
+                    ['source' => 'tmdb',    'value' => 82,  'score' => 82, 'votes' => 141],
+                    ['source' => 'mdblist', 'value' => null, 'score' => 82, 'votes' => null],
+                ],
+            ]],
+        ]);
+
+        $this->assertSame(8.0, $items[0]['vote']);
+    }
+
+    public function testVoteFallsBackToTmdbScoreDividedByTen(): void
+    {
+        $items = $this->mapItems($this->makeClient(), [
+            'movies' => [[
+                'id' => 1, 'title' => 'X', 'release_year' => 2024,
+                'ids' => ['tmdb' => 7],
+                'ratings' => [['source' => 'tmdb', 'value' => 63, 'score' => 63, 'votes' => 6]],
+            ]],
+        ]);
+
+        $this->assertSame(6.3, $items[0]['vote']);
+    }
+
+    /** Posters arrive absolute; only the size segment is rewritten. */
+    public function testPosterIsUpscaledFromW200ToW342(): void
+    {
+        $items = $this->mapItems($this->makeClient(), [
+            'movies' => [[
+                'id' => 1, 'title' => 'X', 'release_year' => 2024,
+                'ids' => ['tmdb' => 7],
+                'poster' => 'https://image.tmdb.org/t/p/w200/abc.jpg',
+            ]],
+        ]);
+
+        $this->assertSame('https://image.tmdb.org/t/p/w342/abc.jpg', $items[0]['poster']);
+    }
 }
