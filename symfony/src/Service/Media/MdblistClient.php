@@ -321,8 +321,20 @@ class MdblistClient implements ResetInterface
             'data'    => is_array($data) ? $data : null,
             'hasMore' => strtolower(trim($this->header($headers, 'x-has-more'))) === 'true',
             'total'   => (int) $this->header($headers, 'x-total-items'),
-            'cursor'  => is_array($data) ? ($data['next_cursor'] ?? null) : null,
+            'cursor'  => $this->cursorFrom(is_array($data) ? $data : null),
         ];
+    }
+
+    /**
+     * The paging cursor is nested under `pagination`, measured against the live
+     * API on 2026-08-23. Reading it from the top level silently stops paging
+     * after the first page.
+     */
+    private function cursorFrom(?array $data): ?string
+    {
+        $cursor = $data['pagination']['next_cursor'] ?? null;
+
+        return is_string($cursor) && $cursor !== '' ? $cursor : null;
     }
 
     /**

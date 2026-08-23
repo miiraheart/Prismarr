@@ -207,4 +207,49 @@ class MdblistClientTest extends TestCase
 
         $this->assertSame('https://image.tmdb.org/t/p/w342/abc.jpg', $items[0]['poster']);
     }
+
+    private function cursorFrom(MdblistClient $client, ?array $data): ?string
+    {
+        $m = new ReflectionMethod($client, 'cursorFrom');
+        $m->setAccessible(true);
+
+        return $m->invoke($client, $data);
+    }
+
+    public function testCursorIsReadFromTheNestedPaginationBlock(): void
+    {
+        $cursor = $this->cursorFrom($this->makeClient(), [
+            'pagination' => ['next_cursor' => 'eyJzIjoxMH0='],
+        ]);
+
+        $this->assertSame('eyJzIjoxMH0=', $cursor);
+    }
+
+    public function testCursorIsNullWhenPaginationHasNoNextCursor(): void
+    {
+        $cursor = $this->cursorFrom($this->makeClient(), [
+            'pagination' => ['limit' => 100, 'offset' => 0, 'total' => 40, 'has_more' => false],
+        ]);
+
+        $this->assertNull($cursor);
+    }
+
+    /**
+     * The regression this fixes: reading `next_cursor` from the top level,
+     * where the real payload never puts it, silently stopped paging dead
+     * after the first page.
+     */
+    public function testCursorIsNullWhenOnlyPresentAtTheTopLevel(): void
+    {
+        $cursor = $this->cursorFrom($this->makeClient(), [
+            'next_cursor' => 'eyJzIjoxMH0=',
+        ]);
+
+        $this->assertNull($cursor);
+    }
+
+    public function testCursorIsNullForANullPayload(): void
+    {
+        $this->assertNull($this->cursorFrom($this->makeClient(), null));
+    }
 }
