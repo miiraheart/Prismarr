@@ -17,11 +17,6 @@
     background: var(--tblr-bg-surface-secondary); color: var(--tblr-body-color);
   }
   .tmdb-results-grid .media-card .h-actions .btn { font-size: .68rem; padding: .15rem .45rem; }
-  /* Reuses the shared .lib-badge component; only the corner and colour differ,
-     since quality-badge and lib-badge already occupy the top left. */
-  .tmdb-results-grid .media-card .lib-badge.tk-watched {
-    left: auto; right: .4rem; background: rgba(34,197,94,.92);
-  }
 </style>
 
 <div class="container-xl">
@@ -80,7 +75,6 @@
       {% if item.in_local %}
         <span class="lib-badge" style="background:#6366f1;">{{ 'trakt.badge.in_watchlist_short'|trans }}</span>
       {% endif %}
-      <span class="lib-badge tk-watched" data-tk-watched style="display:none;"></span>
       <span class="vote-badge" data-tk-vote style="display:none;"></span>
       <div class="card-overlay">
         <div class="card-title-text" title="{{ item.title }}">{{ item.title }}</div>
@@ -119,7 +113,6 @@
   var BASE = {{ path('trakt_index')|json_encode|raw }};
   var STAR_ICON = {{ ico.icon('star-filled', '', 14)|json_encode|raw }};
   var MINE_LABEL = {{ 'trakt.mark.mine'|trans|json_encode|raw }};
-  var SEEN_LABEL = {{ 'trakt.mark.seen'|trans|json_encode|raw }};
   var grid = document.getElementById('tk-grid');
   if (!grid) return;
   var cards = Array.from(grid.querySelectorAll('.media-card'));
@@ -176,7 +169,12 @@
   }
   for (var i = 0; i < 6; i++) pump();
 
-  // ── Rating / watched marks ────────────────────────────────────────────
+  // ── Rating marks ─────────────────────────────────────────────────────
+  // Watched state used to be marked here too, in a page-local badge; that
+  // is now the shared one _detail_modal.html.twig stamps on every page,
+  // this one included, so this fetch only needs to surface Mira's own
+  // rating. /trakt/marks still carries watched state as well, this page
+  // just no longer reads that half of the response.
   fetch({{ path('trakt_marks')|json_encode|raw }})
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
@@ -184,26 +182,11 @@
       cards.forEach(function (card) {
         var key = card.dataset.tmdbType + ':' + card.dataset.tmdbId;
         var rating = d.ratings && d.ratings[key];
-        var watched = d.watched && d.watched[key];
         var slot = card.querySelector('[data-tk-marks]');
         if (!slot) return;
         var bits = [];
         if (rating && rating.rating) bits.push(STAR_ICON + ' ' + rating.rating + ' ' + MINE_LABEL);
         if (bits.length) slot.innerHTML = ' · ' + bits.join(' · ');
-
-        // Already-watched marker. Trakt holds the authoritative history here
-        // because Infuse scrobbles to it, so this covers anything watched
-        // anywhere, not just what Jellyfin saw.
-        if (watched && watched.plays) {
-          var wb = card.querySelector('[data-tk-watched]');
-          if (wb) {
-            wb.textContent = SEEN_LABEL + (watched.plays > 1 ? ' x' + watched.plays : '');
-            if (watched.last_watched_at) {
-              wb.title = SEEN_LABEL + ' ' + String(watched.last_watched_at).slice(0, 10);
-            }
-            wb.style.display = '';
-          }
-        }
       });
     })
     .catch(function () {});
@@ -302,10 +285,11 @@
       .then(function (res) {
         if (!res.ok) { btn.disabled = false; btn.title = (res.data && res.data.error) || ''; return; }
         if (wBtn) {
-          if (card) {
-            var wb = card.querySelector('[data-tk-watched]');
-            if (wb) { wb.textContent = SEEN_LABEL; wb.style.display = ''; }
-          }
+          // Instant feedback on the card itself, via the shared badge
+          // rather than a page-local one: this write bypasses the periodic
+          // /trakt/marks fetch that badge makes, so without this the card
+          // would not show as watched until the next full page load.
+          if (window.PrismarrWatchBadge) window.PrismarrWatchBadge.markWatched(type, id);
           btn.classList.remove('btn-outline-success');
           btn.classList.add('btn-success');
         } else {

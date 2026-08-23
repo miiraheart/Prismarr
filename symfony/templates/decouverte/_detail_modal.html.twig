@@ -74,14 +74,15 @@
   .media-card[data-tmdb-id] .vote-badge.bad  { background: rgba(239,68,68,.9); }
 
   /* "Currently watching" / "already watched" indicator, stamped client-side
-     from /trakt/playback and /trakt/marks. Bottom-left corner is the one
-     spot free of quality-badge, lib-badge, vote-badge and (on the Trakt
-     page) tk-watched, all of which live in the other three corners. Icon
-     only, no text on the poster; the detail lives in the title attribute.
-     Both states share this one slot rather than each claiming a corner: a
-     card is only ever watching or watched (watching wins), never both, so
-     there is nothing to collide with. The green here matches tk-watched's
-     rgba(34,197,94,.92) in trakt/index.html.twig. */
+     from /trakt/playback and /trakt/marks. This is the one implementation:
+     the Trakt page used to carry its own separate tk-watched badge, which
+     was removed in favour of this shared one once both existed side by
+     side on the same cards. Bottom-left corner is the one spot free of
+     quality-badge, lib-badge and vote-badge, which live in the other three
+     corners. Icon only, no text on the poster; the detail lives in the
+     title attribute. Both states share this one slot rather than each
+     claiming a corner: a card is only ever watching or watched (watching
+     wins), never both, so there is nothing to collide with. */
   .media-card[data-tmdb-id] .watching-badge {
     position: absolute; bottom: 0; left: 0;
     display: flex; align-items: center; justify-content: center;
@@ -1502,6 +1503,31 @@
       watchForNewCards();
     }).catch(function () { fetchInFlight = false; /* no badge, no noise */ });
   }
+
+  // Public hook for a page that marks a title watched through its own
+  // direct write against Trakt (the Trakt page's "mark watched" button, for
+  // instance), so that card gets the watched icon immediately instead of
+  // waiting for the next full re-init. Keeps this the single place that
+  // knows how a watched badge looks, rather than a second page growing its
+  // own copy of the markup just for the instant-feedback case.
+  window.PrismarrWatchBadge = {
+    markWatched: function (type, id) {
+      document.querySelectorAll(
+        '.media-card[data-tmdb-type="' + type + '"][data-tmdb-id="' + id + '"]'
+      ).forEach(function (card) {
+        var oldBadge = card.querySelector('.watching-badge');
+        if (oldBadge) oldBadge.remove();
+        var oldBar = card.querySelector('.watching-progress');
+        if (oldBar) oldBar.remove();
+
+        var badge = document.createElement('span');
+        badge.className = 'watching-badge is-watched';
+        badge.innerHTML = ICON_WATCHED;
+        badge.title = WATCHED_LABEL;
+        card.appendChild(badge);
+      });
+    }
+  };
 
   document.addEventListener('turbo:load', init);
   if (document.readyState === 'loading') {
