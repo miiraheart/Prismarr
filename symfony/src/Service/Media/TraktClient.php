@@ -36,6 +36,11 @@ class TraktClient implements ResetInterface
     // (which just falls back to nothing rendering) against calling
     // /search/tmdb on every single detail-modal open.
     private const TTL_LINK = 2592000;
+    // Personal lists change only when Mira creates or edits one, so this
+    // could sit as long as the other reads, but createList() invalidates it
+    // immediately anyway; kept short (matching TTL_PLAYBACK) so a list made
+    // from somewhere other than the kebab menu still shows up quickly.
+    private const TTL_LISTS = 300;
     // api.trakt.tv sits behind Cloudflare, which answers a UA-less request with
     // a 403 HTML block page instead of passing it to Trakt. PHP's curl sends no
     // User-Agent by default, so one has to be set explicitly.
@@ -249,6 +254,64 @@ class TraktClient implements ResetInterface
                 // second lookup just for the title.
                 'title'     => (string) ($media['title'] ?? ''),
                 'year'      => isset($media['year']) ? (int) $media['year'] : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Mira's personal lists (custom playlists), for the kebab menu's "Add to
+     * list" picker. OAuth only, unlike the public-profile reads above:
+     * verified against the live API, GET /users/me/lists needs a bearer
+     * token.
+     *
+     * @return array<int, array{id:int, name:string, slug:string, item_count:int, privacy:string}>
+     */
+    public function getLists(): array
+    {
+        try {
+            $this->ensureConfig();
+            $token = $this->accessToken();
+            if ($token === null) {
+                return [];
+            }
+
+            return $this->cachedGet('lists', function () use ($token): array {
+                $res = $this->request('/users/me/lists', [], $token);
+
+                return is_array($res['data']) ? $this->mapLists($res['data']) : [];
+            }, self::TTL_LISTS);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt lists failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $raw
+     * @return array<int, array{id:int, name:string, slug:string, item_count:int, privacy:string}>
+     */
+    private function mapLists(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $id = $entry['ids']['trakt'] ?? null;
+            if (!is_int($id) || $id <= 0) {
+                continue;
+            }
+
+            $out[] = [
+                'id'         => $id,
+                'name'       => (string) ($entry['name'] ?? ''),
+                'slug'       => (string) ($entry['ids']['slug'] ?? ''),
+                'item_count' => (int) ($entry['item_count'] ?? 0),
+                'privacy'    => (string) ($entry['privacy'] ?? ''),
             ];
         }
 
@@ -674,6 +737,75 @@ class TraktClient implements ResetInterface
         $this->forgetCached('watchlist');
 
         return $ok;
+    }
+
+    /**
+     * Create a new personal list. The write response shape for this
+     * endpoint was deliberately not probed against the live account (to
+     * avoid leaving a junk list behind while building this), so only the
+     * fields this class already trusts elsewhere (ids.trakt, name) are
+     * read from the response; anything else is treated as absent rather
+     * than assumed.
+     *
+     * @return array{id:int, name:string}|null
+     */
+    public function createList(string $name): ?array
+    {
+        $this->ensureConfig();
+        $token = $this->accessToken();
+        if ($token === null) {
+            return null;
+        }
+
+        $res = $this->postJson('/users/me/lists', ['name' => $name], $token);
+        $id  = $res['data']['ids']['trakt'] ?? null;
+        if ($res['code'] !== 201 || !is_int($id) || $id <= 0) {
+            $this->logger->warning('Trakt list create failed', ['http' => $res['code']]);
+
+            return null;
+        }
+
+        $this->forgetCached('lists');
+
+        return [
+            'id'   => $id,
+            'name' => (string) ($res['data']['name'] ?? $name),
+        ];
+    }
+
+    /**
+     * Add one title to a personal list.
+     *
+     * @param string $type movie|tv in Prismarr's vocabulary
+     */
+    public function addToList(int $listId, string $type, int $tmdbId): bool
+    {
+        $this->ensureConfig();
+        $token = $this->accessToken();
+        if ($token === null) {
+            return false;
+        }
+
+        $bucket = $type === 'movie' ? 'movies' : 'shows';
+        $res = $this->postJson("/users/me/lists/{$listId}/items", [
+            $bucket => [['ids' => ['tmdb' => $tmdbId]]],
+        ], $token);
+
+        $added = (int) ($res['data']['added']['movies'] ?? 0) + (int) ($res['data']['added']['shows'] ?? 0);
+        if ($res['code'] !== 201 && $res['code'] !== 200) {
+            $this->logger->warning('Trakt list item add failed', [
+                'http' => $res['code'], 'list_id' => $listId, 'tmdb_id' => $tmdbId,
+            ]);
+
+            return false;
+        }
+        if ($added < 1) {
+            // Already on the list counts as success: the end state is
+            // right, same convention markWatched()/markDropped() use above.
+            $this->logger->info('Trakt list item add matched nothing new', ['list_id' => $listId, 'tmdb_id' => $tmdbId]);
+        }
+
+        return true;
     }
 
     /**

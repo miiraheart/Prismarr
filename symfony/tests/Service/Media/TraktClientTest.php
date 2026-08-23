@@ -43,6 +43,14 @@ class TraktClientTest extends TestCase
         return $m->invoke($client, $type, $results);
     }
 
+    private function mapLists(TraktClient $client, array $raw): array
+    {
+        $m = new ReflectionMethod($client, 'mapLists');
+        $m->setAccessible(true);
+
+        return $m->invoke($client, $raw);
+    }
+
     /**
      * The card an episode's progress lands on is the SHOW's card, so the map
      * must be keyed on the show's tmdb id, never the episode's own tmdb id.
@@ -186,5 +194,57 @@ class TraktClientTest extends TestCase
     public function testEmptyResultsReturnNull(): void
     {
         $this->assertNull($this->traktUrlFromSearch($this->makeClient(), 'movie', []));
+    }
+
+    /**
+     * Coverage of TraktClient::mapLists(), the row shape the kebab menu's
+     * "Add to list" picker renders from GET /users/me/lists.
+     *
+     * Fixtures below are invented, not the account data used to probe the
+     * live endpoint while building this feature.
+     */
+    public function testMapListsReadsIdNameSlugCountAndPrivacy(): void
+    {
+        $rows = $this->mapLists($this->makeClient(), [[
+            'name'       => 'Fixture Watchlist A',
+            'privacy'    => 'private',
+            'item_count' => 4,
+            'ids'        => ['slug' => 'fixture-watchlist-a', 'trakt' => 909090],
+        ]]);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(909090, $rows[0]['id']);
+        $this->assertSame('Fixture Watchlist A', $rows[0]['name']);
+        $this->assertSame('fixture-watchlist-a', $rows[0]['slug']);
+        $this->assertSame(4, $rows[0]['item_count']);
+        $this->assertSame('private', $rows[0]['privacy']);
+    }
+
+    public function testMapListsDropsEntriesWithoutATraktId(): void
+    {
+        $rows = $this->mapLists($this->makeClient(), [
+            ['name' => 'No id', 'ids' => ['slug' => 'no-id']],
+            ['name' => 'Has id', 'ids' => ['slug' => 'has-id', 'trakt' => 1]],
+        ]);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('Has id', $rows[0]['name']);
+    }
+
+    public function testMapListsFallsBackToEmptyStringAndZeroCount(): void
+    {
+        $rows = $this->mapLists($this->makeClient(), [
+            ['ids' => ['trakt' => 42]],
+        ]);
+
+        $this->assertSame('', $rows[0]['name']);
+        $this->assertSame('', $rows[0]['slug']);
+        $this->assertSame(0, $rows[0]['item_count']);
+        $this->assertSame('', $rows[0]['privacy']);
+    }
+
+    public function testMapListsReturnsEmptyArrayForEmptyInput(): void
+    {
+        $this->assertSame([], $this->mapLists($this->makeClient(), []));
     }
 }
