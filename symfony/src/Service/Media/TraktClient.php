@@ -30,6 +30,12 @@ class TraktClient implements ResetInterface
     // much shorter TTL than the other reads: 15 minutes on a "currently
     // watching" badge would leave it stuck at a stale percentage.
     private const TTL_PLAYBACK = 300;
+    // A tmdb id -> Trakt slug mapping is effectively permanent (a title's
+    // slug does not change once Trakt has assigned it), so this can sit far
+    // longer than the other reads. 30 days trades a stale-for-a-month link
+    // (which just falls back to nothing rendering) against calling
+    // /search/tmdb on every single detail-modal open.
+    private const TTL_LINK = 2592000;
     // api.trakt.tv sits behind Cloudflare, which answers a UA-less request with
     // a 403 HTML block page instead of passing it to Trakt. PHP's curl sends no
     // User-Agent by default, so one has to be set explicitly.
@@ -242,6 +248,65 @@ class TraktClient implements ResetInterface
         }
 
         return $out;
+    }
+
+    /**
+     * The app.trakt.tv page for a title, resolved from its tmdb id.
+     *
+     * trakt.tv/search/tmdb/{id}?id_type=... used to redirect to the slug
+     * page; verified against the live site, that redirect now dead-ends in a
+     * 404. The working route is api.trakt.tv/search/tmdb/{id}, which needs
+     * only the client id (no OAuth) and returns the slug app.trakt.tv itself
+     * uses, e.g. https://app.trakt.tv/movies/{slug} or /shows/{slug}.
+     *
+     * @param string $type movie|tv in Prismarr's vocabulary
+     */
+    public function getTraktUrl(string $type, int $tmdbId): ?string
+    {
+        try {
+            $cached = $this->cachedGet("link_{$type}_{$tmdbId}", function () use ($type, $tmdbId): array {
+                // Trakt says "show", the rest of this codebase says "tv".
+                $bucket = $type === 'movie' ? 'movie' : 'show';
+                $res    = $this->request("/search/tmdb/{$tmdbId}", ['type' => $bucket]);
+
+                return ['url' => is_array($res['data']) ? $this->traktUrlFromSearch($type, $res['data']) : null];
+            }, self::TTL_LINK);
+
+            return $cached['url'] ?? null;
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt link lookup failed', ['exception' => $e::class, 'message' => $e->getMessage(), 'tmdb_id' => $tmdbId]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Pick the matching entry out of a /search/tmdb response and build the
+     * app.trakt.tv URL from its slug. Pure logic, no network: isolated so it
+     * can be unit tested without a live call.
+     *
+     * @param string $type movie|tv in Prismarr's vocabulary
+     * @param array<int, array<string, mixed>> $results
+     */
+    private function traktUrlFromSearch(string $type, array $results): ?string
+    {
+        $key = $type === 'movie' ? 'movie' : 'show';
+        foreach ($results as $entry) {
+            if (!is_array($entry) || ($entry['type'] ?? null) !== $key) {
+                continue;
+            }
+
+            $slug = $entry[$key]['ids']['slug'] ?? null;
+            if (!is_string($slug) || $slug === '') {
+                continue;
+            }
+
+            $segment = $type === 'movie' ? 'movies' : 'shows';
+
+            return "https://app.trakt.tv/{$segment}/{$slug}";
+        }
+
+        return null;
     }
 
     /**

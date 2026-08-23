@@ -101,6 +101,23 @@ class TraktController extends AbstractController
     }
 
     /**
+     * The app.trakt.tv page for a title, resolved from its tmdb id. Used by
+     * the detail modal's external-links row, alongside TMDb and IMDb.
+     */
+    #[Route('/link/{type}/{tmdbId}', name: 'link', requirements: ['type' => 'movie|tv', 'tmdbId' => '\d+'], methods: ['GET'])]
+    public function link(string $type, int $tmdbId): JsonResponse
+    {
+        try {
+            $url = $this->trakt->getTraktUrl($type, $tmdbId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt link lookup failed', ['tmdb_id' => $tmdbId, 'message' => $e->getMessage()]);
+            $url = null;
+        }
+
+        return $this->json(['url' => $url]);
+    }
+
+    /**
      * Personal ratings and watched state, keyed "{type}:{tmdb_id}". Fetched
      * separately from the page because /watched is the largest collection on
      * the account and a cold cache would otherwise stall the first paint.

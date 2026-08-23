@@ -902,6 +902,20 @@
     if (d.homepage && /^https?:\/\//.test(d.homepage)) ext.push('<a href="' + d.homepage + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Site ↗</a>');
     document.getElementById('td-external-links').innerHTML = ext.join('');
 
+    // Trakt link is fetched separately (resolving a tmdb id to a Trakt slug
+    // needs a live API call) so it must not block the links above. Guarded
+    // by the same detailSeq the fetch in loadDetail() uses, so a slow reply
+    // for a title the user has since closed never lands on the wrong modal.
+    var extSeq = detailSeq;
+    fetch('/trakt/link/' + d.type + '/' + d.id, { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(j) {
+        if (extSeq !== detailSeq || !j || !j.url) return;
+        var links = document.getElementById('td-external-links');
+        if (links) links.insertAdjacentHTML('beforeend', '<a href="' + j.url + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Trakt ↗</a>');
+      })
+      .catch(function() {});
+
     // Synopsis
     var ovBlock = document.getElementById('td-overview-block');
     if (d.overview) {

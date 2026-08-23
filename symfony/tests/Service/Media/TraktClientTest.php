@@ -35,6 +35,14 @@ class TraktClientTest extends TestCase
         return $m->invoke($client, $raw);
     }
 
+    private function traktUrlFromSearch(TraktClient $client, string $type, array $results): ?string
+    {
+        $m = new ReflectionMethod($client, 'traktUrlFromSearch');
+        $m->setAccessible(true);
+
+        return $m->invoke($client, $type, $results);
+    }
+
     /**
      * The card an episode's progress lands on is the SHOW's card, so the map
      * must be keyed on the show's tmdb id, never the episode's own tmdb id.
@@ -118,5 +126,44 @@ class TraktClientTest extends TestCase
         ]);
 
         $this->assertSame([], $map);
+    }
+
+    /**
+     * Prismarr's "tv" must be sent to Trakt's /search/tmdb as "show", and the
+     * matching entry's slug must build a /shows/ URL, not /movies/.
+     */
+    public function testTvTypeMapsToShowAndBuildsShowsUrl(): void
+    {
+        $url = $this->traktUrlFromSearch($this->makeClient(), 'tv', [[
+            'type' => 'show',
+            'show' => ['ids' => ['slug' => 'fixture-show', 'tmdb' => 12345, 'trakt' => 222]],
+        ]]);
+
+        $this->assertSame('https://app.trakt.tv/shows/fixture-show', $url);
+    }
+
+    public function testMovieTypeBuildsMoviesUrl(): void
+    {
+        $url = $this->traktUrlFromSearch($this->makeClient(), 'movie', [[
+            'type'  => 'movie',
+            'movie' => ['ids' => ['slug' => 'fixture-film-2026', 'tmdb' => 555, 'trakt' => 1]],
+        ]]);
+
+        $this->assertSame('https://app.trakt.tv/movies/fixture-film-2026', $url);
+    }
+
+    public function testMissingSlugReturnsNull(): void
+    {
+        $url = $this->traktUrlFromSearch($this->makeClient(), 'movie', [[
+            'type'  => 'movie',
+            'movie' => ['ids' => ['tmdb' => 555, 'trakt' => 1]],
+        ]]);
+
+        $this->assertNull($url);
+    }
+
+    public function testEmptyResultsReturnNull(): void
+    {
+        $this->assertNull($this->traktUrlFromSearch($this->makeClient(), 'movie', []));
     }
 }
