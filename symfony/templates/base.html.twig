@@ -3068,11 +3068,14 @@
         radarr: 'Radarr', sonarr: 'Sonarr', prowlarr: 'Prowlarr',
         jellyseerr: 'Seerr', qbittorrent: 'qBittorrent',
         sabnzbd: 'SABnzbd', nzbget: 'NZBGet', tmdb: 'TMDb',
+        trakt: 'Trakt', mdblist: 'MDBList',
       };
       // v1.1.0 — radarr/sonarr can have multiple instances; we render
       // each instance on its own row instead of a single aggregate row.
       var INSTANCE_TYPES = ['radarr', 'sonarr'];
-      var FLAT_SERVICES = ['tmdb', 'prowlarr', 'jellyseerr', 'qbittorrent', 'sabnzbd', 'nzbget'];
+      // Must stay in step with HealthController::FLAT_SERVICES: that endpoint
+      // decides which services are reported, this list decides which are drawn.
+      var FLAT_SERVICES = ['tmdb', 'prowlarr', 'jellyseerr', 'qbittorrent', 'sabnzbd', 'nzbget', 'trakt', 'mdblist'];
       var dot   = document.getElementById('topbar-health-dot');
       var summ  = document.getElementById('topbar-health-summary');
       var list  = document.getElementById('topbar-health-list');
