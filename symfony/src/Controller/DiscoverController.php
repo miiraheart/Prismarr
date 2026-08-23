@@ -23,7 +23,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * pinned lists live in a single `setting` row as JSON.
  */
 #[IsGranted('ROLE_USER')]
-#[Route('/discover', name: 'discover_')]
+#[Route('/lists', name: 'lists_')]
 class DiscoverController extends AbstractController
 {
     private const PINNED_KEY = 'discover_pinned_lists';
@@ -45,7 +45,7 @@ class DiscoverController extends AbstractController
     }
 
     /** The Lists tab default view: the MDBList toplists directory, or a search over it. */
-    #[Route('/lists', name: 'lists', methods: ['GET'])]
+    #[Route('/directory', name: 'directory', methods: ['GET'])]
     public function lists(Request $request): JsonResponse
     {
         $query = trim((string) $request->query->get('q', ''));
@@ -63,7 +63,7 @@ class DiscoverController extends AbstractController
     }
 
     /** One list, as a page of cards. */
-    #[Route('/list', name: 'list', methods: ['GET'])]
+    #[Route('/items', name: 'items', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
         $src    = (string) $request->query->get('src', '');

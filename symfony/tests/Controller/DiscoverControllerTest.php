@@ -13,7 +13,7 @@ class DiscoverControllerTest extends AbstractWebTestCase
 {
     public function testDiscoverPageRendersWithoutMdblistConfigured(): void
     {
-        $this->client->request('GET', '/discover');
+        $this->client->request('GET', '/lists');
 
         $this->assertResponseIsSuccessful();
         $this->assertSelectorExists('#dv-tabs');
@@ -21,7 +21,7 @@ class DiscoverControllerTest extends AbstractWebTestCase
 
     public function testListsFeedReturnsAnEmptyPayloadWhenUnconfigured(): void
     {
-        $this->client->request('GET', '/discover/lists');
+        $this->client->request('GET', '/lists/directory');
 
         $this->assertResponseIsSuccessful();
         $payload = json_decode($this->client->getResponse()->getContent(), true);
@@ -32,7 +32,7 @@ class DiscoverControllerTest extends AbstractWebTestCase
 
     public function testListFeedRejectsAnUnsupportedSource(): void
     {
-        $this->client->request('GET', '/discover/list', ['src' => 'https://example.com/not/a/list']);
+        $this->client->request('GET', '/lists/items', ['src' => 'https://example.com/not/a/list']);
 
         $this->assertResponseIsSuccessful();
         $payload = json_decode($this->client->getResponse()->getContent(), true);
@@ -49,7 +49,7 @@ class DiscoverControllerTest extends AbstractWebTestCase
     {
         $this->client->request(
             'POST',
-            '/discover/pin',
+            '/lists/pin',
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],

@@ -810,8 +810,8 @@
 
             {% if service_visible_in_sidebar('mdblist') %}
             <li class="nav-item">
-              <a class="nav-link {{ app.request.attributes.get('_route') starts with 'discover_' ? 'active' }}"
-                 href="{{ path('discover_index') }}">
+              <a class="nav-link {{ app.request.attributes.get('_route') starts with 'lists_' ? 'active' }}"
+                 href="{{ path('lists_index') }}">
                 <span class="nav-link-icon d-md-none d-lg-inline-block">
                   {# currentColor, not Trakt's brand red: this is a different service. #}
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">

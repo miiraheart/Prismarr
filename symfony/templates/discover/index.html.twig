@@ -83,16 +83,16 @@
 <script>
 (function () {
   var ROUTES = {
-    lists: {{ path('discover_lists')|json_encode|raw }},
-    list:  {{ path('discover_list')|json_encode|raw }},
+    lists: {{ path('lists_directory')|json_encode|raw }},
+    list:  {{ path('lists_items')|json_encode|raw }},
     // One URL per type: the route requires `movie|tv`, so a placeholder such
     // as 'TYPE' would throw InvalidParameterException when Twig renders it.
     meta: {
       movie: {{ path('trakt_meta', {type: 'movie', tmdbId: 0})|json_encode|raw }},
       tv:    {{ path('trakt_meta', {type: 'tv',    tmdbId: 0})|json_encode|raw }}
     },
-    pin:   {{ path('discover_pin')|json_encode|raw }},
-    unpin: {{ path('discover_unpin')|json_encode|raw }}
+    pin:   {{ path('lists_pin')|json_encode|raw }},
+    unpin: {{ path('lists_unpin')|json_encode|raw }}
   };
 
   var pinned = {{ pinned|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_QUOT'))|raw }};
