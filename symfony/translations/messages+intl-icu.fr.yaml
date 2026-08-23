@@ -5676,6 +5676,17 @@ discover:
     lists: Listes
   search:
     placeholder: Rechercher des listes
+    count: '{count} listes'
+  list:
+    items_count: '{count} éléments'
+    likes_count: "{count} j'aime"
+  row:
+    empty: 'Aucun élément dans cette liste.'
+  rows:
+    capped: 'Affichage des {count} premières listes sur {total}.'
+  scroll:
+    prev: Précédent
+    next: Suivant
   action:
     pin: Épingler cette liste
     unpin: Retirer

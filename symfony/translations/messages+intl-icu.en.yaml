@@ -5678,6 +5678,17 @@ discover:
     lists: Lists
   search:
     placeholder: Search lists
+    count: '{count} lists'
+  list:
+    items_count: '{count} items'
+    likes_count: '{count} likes'
+  row:
+    empty: 'No items in this list.'
+  rows:
+    capped: 'Showing the first {count} of {total} lists.'
+  scroll:
+    prev: Previous
+    next: Next
   action:
     pin: Pin this list
     unpin: Unpin

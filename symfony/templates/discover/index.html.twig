@@ -6,19 +6,46 @@
 
 {% block body %}
 <style>
-  /* Cards, grid and badges all come from decouverte/_detail_modal.html.twig
-     (.tmdb-results-grid / .media-card / .vote-badge / .lib-badge), so this page
-     looks exactly like Decouverte and Trakt. Only page furniture lives here. */
+  /* Cards and badges come from decouverte/_detail_modal.html.twig
+     (.media-card / .vote-badge / .lib-badge), so this page looks exactly like
+     Decouverte and Trakt. Only page furniture and the row layout live here. */
   .dv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 1rem; }
-  .dv-list-card {
-    border: 1px solid var(--tblr-border-color); border-radius: .5rem;
-    background: var(--tblr-bg-surface); padding: .7rem .8rem; cursor: pointer;
-    display: flex; flex-direction: column; gap: .2rem;
+  .dv-cap-note { font-size: .75rem; color: var(--tblr-secondary); }
+  .dv-row-title { color: inherit; text-decoration: none; }
+  .dv-row-title:hover { color: var(--tblr-primary); text-decoration: underline; }
+
+  /* Copied from decouverte/index.html.twig: this page does not load that
+     page's stylesheet, so each list row needs its own copy to look identical
+     to a Decouverte carousel. */
+  .tmdb-section { margin-bottom: 1.75rem; }
+  .tmdb-section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 0.5rem; padding: 0 0.25rem;
   }
-  .dv-list-card:hover { border-color: var(--tblr-primary); }
-  .dv-list-card .dv-list-name { font-weight: 600; font-size: .9rem; }
-  .dv-list-card .dv-list-meta { font-size: .75rem; color: var(--tblr-secondary); }
-  .dv-directory { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .6rem; }
+  .tmdb-section-header h3 {
+    margin: 0; font-size: 1rem; font-weight: 600;
+    color: var(--tblr-body-color);
+  }
+  .tmdb-section-header h3 .count {
+    font-size: 0.75rem; color: var(--tblr-secondary); font-weight: 400;
+    margin-left: 0.4rem;
+  }
+  .tmdb-section-actions { display: flex; gap: 0.25rem; }
+  .tmdb-scroll-btn {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--tblr-border-color);
+    background: var(--tblr-bg-surface); color: var(--tblr-body-color);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .tmdb-scroll-btn:hover { background: var(--tblr-primary); color: #fff; border-color: var(--tblr-primary); }
+
+  .tmdb-row {
+    display: flex; gap: 0.75rem; overflow-x: auto; scroll-behavior: smooth;
+    padding: 0.25rem 0.25rem 0.75rem; scrollbar-width: thin;
+  }
+  .tmdb-row::-webkit-scrollbar { height: 6px; }
+  .tmdb-row::-webkit-scrollbar-thumb { background: var(--tblr-border-color); border-radius: 3px; }
 </style>
 
 <div class="container-xl">
@@ -33,11 +60,12 @@
     <input type="search" class="form-control form-control-sm w-auto" id="dv-search"
            placeholder="{{ 'discover.search.placeholder'|trans }}">
     <span class="text-secondary" id="dv-count"></span>
+    <span class="dv-cap-note d-none" id="dv-cap-note"></span>
   </div>
 
   {% include 'decouverte/_detail_modal.html.twig' %}
 
-  <div id="dv-directory" class="dv-directory"></div>
+  <div id="dv-directory"></div>
 
   <div id="dv-list-view" class="d-none">
     <div class="dv-toolbar">
@@ -79,46 +107,60 @@
     return pinned.some(function (p) { return pinKey(p.url) === pinKey(url); });
   }
 
-  var directory = document.getElementById('dv-directory');
-  var listView  = document.getElementById('dv-list-view');
-  var grid      = document.getElementById('dv-grid');
-  var moreBtn   = document.getElementById('dv-more');
-  var title     = document.getElementById('dv-list-title');
-  var count     = document.getElementById('dv-count');
-  var search    = document.getElementById('dv-search');
-  var current   = { url: '', cursor: null };
+  // Rendering every list MDBList returns as its own row would mean up to 50
+  // observers and 50 potential fetch chains on one page load. MDBList's free
+  // plan allows 1000 requests/day, so the directory is capped here and each
+  // row only fetches once it is about to scroll into view (see observeRow).
+  var ROW_CAP = 24;
+
+  var directory  = document.getElementById('dv-directory');
+  var listView   = document.getElementById('dv-list-view');
+  var grid       = document.getElementById('dv-grid');
+  var moreBtn    = document.getElementById('dv-more');
+  var title      = document.getElementById('dv-list-title');
+  var count      = document.getElementById('dv-count');
+  var capNote    = document.getElementById('dv-cap-note');
+  var search     = document.getElementById('dv-search');
+  var current    = { url: '', cursor: null };
+  var rowObserver = null;
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   }); }
 
-  function loadDirectory(q) {
-    directory.innerHTML = '';
-    fetch(ROUTES.lists + (q ? '?q=' + encodeURIComponent(q) : ''), { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var lists = d.lists || [];
-        count.textContent = lists.length ? lists.length + ' lists' : '';
-        var pins = (d.pinned || []).map(function (p) {
-          return '<div class="dv-list-card" data-url="' + esc(p.url) + '" data-label="' + esc(p.label) + '">'
-            + '<span class="dv-list-name">📌 ' + esc(p.label) + '</span>'
-            + '<span class="dv-list-meta">' + esc(p.source) + '</span>'
-            + '</div>';
-        }).join('');
-        directory.innerHTML = pins + lists.map(function (l) {
-          return '<div class="dv-list-card" data-url="' + esc(l.url) + '" data-label="' + esc(l.name) + '">'
-            + '<span class="dv-list-name">' + esc(l.name) + '</span>'
-            + '<span class="dv-list-meta">' + esc(l.user) + ' · ' + esc(l.items) + ' items · ' + esc(l.likes) + ' likes</span>'
-            + '</div>';
-        }).join('');
-      });
+  function listsCountText(n) {
+    return {{ 'discover.search.count'|trans({count: '__N__'})|json_encode|raw }}.replace('__N__', n);
   }
+  function itemsCountText(n) {
+    return {{ 'discover.list.items_count'|trans({count: '__N__'})|json_encode|raw }}.replace('__N__', n);
+  }
+  function likesCountText(n) {
+    return {{ 'discover.list.likes_count'|trans({count: '__N__'})|json_encode|raw }}.replace('__N__', n);
+  }
+  function cappedText(shown, total) {
+    return {{ 'discover.rows.capped'|trans({count: '__N__', total: '__T__'})|json_encode|raw }}
+      .replace('__N__', shown).replace('__T__', total);
+  }
+
+  var SCROLL_PREV = {{ 'discover.scroll.prev'|trans|json_encode|raw }};
+  var SCROLL_NEXT = {{ 'discover.scroll.next'|trans|json_encode|raw }};
+  var ROW_EMPTY   = {{ 'discover.row.empty'|trans|json_encode|raw }};
+
+  var SCROLL_BTNS_HTML =
+      '<div class="tmdb-section-actions">'
+    + '<button type="button" class="tmdb-scroll-btn" data-scroll="left" aria-label="' + esc(SCROLL_PREV) + '">'
+    +   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6"/></svg>'
+    + '</button>'
+    + '<button type="button" class="tmdb-scroll-btn" data-scroll="right" aria-label="' + esc(SCROLL_NEXT) + '">'
+    +   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6"/></svg>'
+    + '</button>'
+    + '</div>';
 
   /* MEASURED 2026-08-23: MDBList returns an absolute poster URL on every
      item, so in practice this loop does nothing. It stays as a cheap safety
      net for the rare item with no poster, and costs one request only for
      those. */
-  function hydrate(items) {
+  function hydrate(items, container) {
     items.forEach(function (it) {
       if (it.poster) return;
       var template = ROUTES.meta[it.type];
@@ -128,7 +170,7 @@
         .then(function (r) { return r.json(); })
         .then(function (m) {
           if (!m || !m.poster) return;
-          var card = grid.querySelector('.media-card[data-tmdb-id="' + it.id + '"]');
+          var card = container.querySelector('.media-card[data-tmdb-id="' + it.id + '"]');
           if (!card) return;
           var ph = card.querySelector('.no-poster');
           if (ph) ph.outerHTML = '<img src="' + m.poster + '" alt="" loading="lazy">';
@@ -142,7 +184,7 @@
     if (append) { grid.insertAdjacentHTML('beforeend', html); } else { grid.innerHTML = html; }
     current.cursor = d.next_cursor || null;
     moreBtn.classList.toggle('d-none', !current.cursor);
-    hydrate(d.items || []);
+    hydrate(d.items || [], grid);
   }
 
   function openList(url, label) {
@@ -181,9 +223,131 @@
       .then(function (d) { renderPage(d, false); });
   }
 
+  // ── Row shells: rendered immediately for structure, filled on demand ──
+  function rowShellHTML(row) {
+    var pin = row.pinned ? '📌 ' : '';
+    return '<div class="tmdb-section">'
+      + '<div class="tmdb-section-header">'
+      +   '<h3>'
+      +     '<a href="#" class="dv-row-title" data-url="' + esc(row.url) + '" data-label="' + esc(row.label) + '">' + pin + esc(row.label) + '</a>'
+      +     '<span class="count">· ' + row.meta + '</span>'
+      +   '</h3>'
+      +   SCROLL_BTNS_HTML
+      + '</div>'
+      + '<div class="tmdb-row" data-url="' + esc(row.url) + '"></div>'
+      + '</div>';
+  }
+
+  function buildRows(d) {
+    var pins = (d.pinned || []).map(function (p) {
+      return { url: p.url, label: p.label, pinned: true, meta: esc(p.source) };
+    });
+    var lists = (d.lists || []).map(function (l) {
+      return {
+        url: l.url, label: l.name, pinned: false,
+        meta: esc(l.user) + ' · ' + itemsCountText(esc(l.items)) + ' · ' + likesCountText(esc(l.likes))
+      };
+    });
+    return pins.concat(lists);
+  }
+
+  // A row only calls /discover/list once it is about to scroll into view.
+  function observeRow(rowEl) {
+    if (!rowObserver) {
+      rowObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          var row = entry.target;
+          rowObserver.unobserve(row);
+          if (row.dataset.loaded === '1' || row.dataset.loading === '1') return;
+          loadRowPage(row, row.dataset.url, null, false);
+        });
+      }, { rootMargin: '600px 0px' });
+    }
+    rowObserver.observe(rowEl);
+  }
+
+  // Infinite horizontal scroll: fetch the next page once a row nears its
+  // right edge, guarded so a row already loading never fires twice.
+  function onRowScroll(e) {
+    var row = e.target;
+    if (row.dataset.loading === '1' || !row.dataset.cursor) return;
+    if (row.scrollLeft + row.clientWidth < row.scrollWidth - 300) return;
+    loadRowPage(row, row.dataset.url, row.dataset.cursor, true);
+  }
+
+  function loadRowPage(rowEl, url, cursor, append) {
+    rowEl.dataset.loading = '1';
+    var qs = '?src=' + encodeURIComponent(url) + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+    fetch(ROUTES.list + qs, { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var items = d.items || [];
+        var html = items.map(window.renderCardHTML).join('');
+        if (append) {
+          rowEl.insertAdjacentHTML('beforeend', html);
+        } else {
+          rowEl.innerHTML = html || '<div class="text-secondary py-2 px-2">' + ROW_EMPTY + '</div>';
+        }
+        rowEl.dataset.cursor = d.next_cursor || '';
+        rowEl.dataset.loaded = '1';
+        rowEl.dataset.loading = '0';
+        hydrate(items, rowEl);
+      })
+      .catch(function () {
+        rowEl.dataset.loading = '0';
+        rowEl.dataset.loaded = '1';
+      });
+  }
+
+  function loadDirectory(q) {
+    if (rowObserver) { rowObserver.disconnect(); }
+    directory.innerHTML = '';
+    fetch(ROUTES.lists + (q ? '?q=' + encodeURIComponent(q) : ''), { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var rows  = buildRows(d);
+        var shown = rows.slice(0, ROW_CAP);
+
+        count.textContent = rows.length ? listsCountText(rows.length) : '';
+        if (rows.length > shown.length) {
+          capNote.textContent = cappedText(shown.length, rows.length);
+          capNote.classList.remove('d-none');
+        } else {
+          capNote.classList.add('d-none');
+        }
+
+        directory.innerHTML = shown.map(rowShellHTML).join('');
+
+        Array.prototype.forEach.call(directory.querySelectorAll('.tmdb-row'), function (rowEl) {
+          rowEl.addEventListener('scroll', onRowScroll);
+          observeRow(rowEl);
+        });
+      });
+  }
+
   directory.addEventListener('click', function (e) {
-    var card = e.target.closest('.dv-list-card');
-    if (card) openList(card.dataset.url, card.dataset.label);
+    var scrollBtn = e.target.closest('.tmdb-scroll-btn');
+    if (scrollBtn) {
+      var section = scrollBtn.closest('.tmdb-section');
+      var row = section && section.querySelector('.tmdb-row');
+      if (row) {
+        var dir = scrollBtn.dataset.scroll === 'right' ? 1 : -1;
+        row.scrollBy({ left: dir * row.clientWidth * 0.75, behavior: 'smooth' });
+      }
+      return;
+    }
+    var titleLink = e.target.closest('.dv-row-title');
+    if (titleLink) {
+      e.preventDefault();
+      openList(titleLink.dataset.url, titleLink.dataset.label);
+      return;
+    }
+    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
+    var card = e.target.closest('.media-card[data-tmdb-id]');
+    if (card && window.PrismarrDetail) {
+      window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);
+    }
   });
 
   grid.addEventListener('click', function (e) {
