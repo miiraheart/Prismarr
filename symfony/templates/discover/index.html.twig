@@ -46,6 +46,22 @@
   }
   .tmdb-row::-webkit-scrollbar { height: 6px; }
   .tmdb-row::-webkit-scrollbar-thumb { background: var(--tblr-border-color); border-radius: 3px; }
+
+  /* Sized like .media-card[data-tmdb-id] in _detail_modal.html.twig so a row
+     below the fold neither shifts nor leaves a gap once its real cards land. */
+  .dv-skeleton-card {
+    flex: 0 0 150px; width: 150px; aspect-ratio: 2/3;
+    border-radius: .5rem;
+    background: var(--tblr-bg-surface-secondary);
+    animation: dv-skeleton-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dv-skeleton-pulse {
+    0%, 100% { opacity: .55; }
+    50%      { opacity: .85; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dv-skeleton-card { animation: none; }
+  }
 </style>
 
 <div class="container-xl">
@@ -59,13 +75,42 @@
     </div>
     <input type="search" class="form-control form-control-sm w-auto" id="dv-search"
            placeholder="{{ 'discover.search.placeholder'|trans }}">
-    <span class="text-secondary" id="dv-count"></span>
-    <span class="dv-cap-note d-none" id="dv-cap-note"></span>
+    <span class="text-secondary" id="dv-count">{% if totalRows > 0 %}{{ 'discover.search.count'|trans({count: totalRows}) }}{% endif %}</span>
+    <span class="dv-cap-note{% if totalRows <= rowCap %} d-none{% endif %}" id="dv-cap-note">{% if totalRows > rowCap %}{{ 'discover.rows.capped'|trans({count: rowCap, total: totalRows}) }}{% endif %}</span>
   </div>
 
   {% include 'decouverte/_detail_modal.html.twig' %}
 
-  <div id="dv-directory"></div>
+  {# Row shells (title, owner, counts) are rendered here so the directory
+     never needs a client fetch just to know what rows exist. The first
+     inlineRows rows also carry their cards already (see initialRows below,
+     filled in by the script at the bottom); the rest show skeleton
+     placeholders until the IntersectionObserver loads them. #}
+  <div id="dv-directory">
+    {% for row in rows %}
+      <div class="tmdb-section">
+        <div class="tmdb-section-header">
+          <h3>
+            <a href="#" class="dv-row-title" data-url="{{ row.url|e('html_attr') }}" data-label="{{ row.label|e('html_attr') }}">{% if row.pinned %}📌 {% endif %}{{ row.label }}</a>
+            <span class="count">· {% if row.pinned %}{{ row.source }}{% else %}{{ row.user }} · {{ 'discover.list.items_count'|trans({count: row.items}) }} · {{ 'discover.list.likes_count'|trans({count: row.likes}) }}{% endif %}</span>
+          </h3>
+          <div class="tmdb-section-actions">
+            <button type="button" class="tmdb-scroll-btn" data-scroll="left" aria-label="{{ 'discover.scroll.prev'|trans }}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6"/></svg>
+            </button>
+            <button type="button" class="tmdb-scroll-btn" data-scroll="right" aria-label="{{ 'discover.scroll.next'|trans }}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="tmdb-row" data-url="{{ row.url|e('html_attr') }}"{% if loop.index0 < inlineRows %} data-loaded="1"{% endif %}>
+          {% if loop.index0 >= inlineRows %}
+            {% for i in 1..6 %}<div class="dv-skeleton-card" aria-hidden="true"></div>{% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
 
   <div id="dv-list-view" class="d-none">
     <div class="dv-toolbar">
@@ -107,11 +152,16 @@
     return pinned.some(function (p) { return pinKey(p.url) === pinKey(url); });
   }
 
+  // The rows and cards DiscoverController::index() already fetched and
+  // rendered server-side, keyed by row url so wireDirectoryRows() below can
+  // find them without a fetch of its own.
+  var initialRows = {{ initialRows|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_QUOT'))|raw }};
+
   // Rendering every list MDBList returns as its own row would mean up to 50
   // observers and 50 potential fetch chains on one page load. MDBList's free
   // plan allows 1000 requests/day, so the directory is capped here and each
   // row only fetches once it is about to scroll into view (see observeRow).
-  var ROW_CAP = 24;
+  var ROW_CAP = {{ rowCap }};
 
   var directory  = document.getElementById('dv-directory');
   var listView   = document.getElementById('dv-list-view');
@@ -224,6 +274,9 @@
   }
 
   // ── Row shells: rendered immediately for structure, filled on demand ──
+  // Used only by loadDirectory() below, for a search or a return from an
+  // open list: the very first paint uses the shells already in the HTML
+  // (see wireDirectoryRows()), never this.
   function rowShellHTML(row) {
     var pin = row.pinned ? '📌 ' : '';
     return '<div class="tmdb-section">'
@@ -258,7 +311,7 @@
     return pins.concat(lists);
   }
 
-  // A row only calls /discover/list once it is about to scroll into view.
+  // A row only calls /lists/items once it is about to scroll into view.
   function observeRow(rowEl) {
     if (!rowObserver) {
       rowObserver = new IntersectionObserver(function (entries) {
@@ -333,6 +386,24 @@
       });
   }
 
+  // First paint: the row shells (and the first rows' cards) are already in
+  // the HTML DiscoverController::index() rendered, so this only wires up
+  // scrolling and lazy-loading instead of fetching anything.
+  function wireDirectoryRows() {
+    Array.prototype.forEach.call(directory.querySelectorAll('.tmdb-row'), function (rowEl) {
+      var pre = initialRows[rowEl.dataset.url];
+      if (pre) {
+        var items = pre.items || [];
+        rowEl.innerHTML = items.map(window.renderCardHTML).join('') || '<div class="text-secondary py-2 px-2">' + ROW_EMPTY + '</div>';
+        rowEl.dataset.cursor = pre.next_cursor || '';
+        rowEl.dataset.loaded = '1';
+        hydrate(items, rowEl);
+      }
+      rowEl.addEventListener('scroll', onRowScroll);
+      observeRow(rowEl);
+    });
+  }
+
   directory.addEventListener('click', function (e) {
     var scrollBtn = e.target.closest('.tmdb-scroll-btn');
     if (scrollBtn) {
@@ -389,7 +460,7 @@
   });
 
   window.PrismarrDiscover = { routes: ROUTES, openList: openList, current: current };
-  loadDirectory('');
+  wireDirectoryRows();
 })();
 </script>
 {% endblock %}

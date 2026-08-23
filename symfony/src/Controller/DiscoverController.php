@@ -28,6 +28,16 @@ class DiscoverController extends AbstractController
 {
     private const PINNED_KEY = 'discover_pinned_lists';
 
+    // Mirrors ROW_CAP in discover/index.html.twig: the free MDBList plan
+    // allows 1000 requests/day, so the directory (up to 60 lists) is capped
+    // before it ever reaches the row-shell markup or the client.
+    private const ROW_CAP = 24;
+
+    // Rows fetched and rendered server-side so the top of the page is
+    // complete on arrival. Rows beyond this stay lazy, loaded by the
+    // IntersectionObserver in the template as they scroll into view.
+    private const INLINE_ROWS = 3;
+
     public function __construct(
         private readonly MdblistClient  $mdblist,
         private readonly LibraryIndex   $libraryIndex,
@@ -38,9 +48,26 @@ class DiscoverController extends AbstractController
     #[Route('', name: 'index')]
     public function index(): Response
     {
+        $rows      = $this->directoryRows();
+        $totalRows = count($rows);
+        $shown     = array_slice($rows, 0, self::ROW_CAP);
+
+        // Only the first few rows are fetched here: every row would mean up
+        // to ROW_CAP round trips against MDBList on every page view, which
+        // the lazy rows exist specifically to avoid.
+        $initialRows = [];
+        foreach (array_slice($shown, 0, self::INLINE_ROWS) as $row) {
+            $initialRows[$row['url']] = $this->firstPageItems($row['url']);
+        }
+
         return $this->render('discover/index.html.twig', [
-            'pinned'     => $this->pinned(),
-            'configured' => $this->config->has('mdblist_api_key'),
+            'pinned'      => $this->pinned(),
+            'configured'  => $this->config->has('mdblist_api_key'),
+            'rows'        => $shown,
+            'totalRows'   => $totalRows,
+            'rowCap'      => self::ROW_CAP,
+            'inlineRows'  => self::INLINE_ROWS,
+            'initialRows' => $initialRows,
         ]);
     }
 
@@ -189,5 +216,83 @@ class DiscoverController extends AbstractController
         $decoded = json_decode($raw, true);
 
         return is_array($decoded) ? array_values($decoded) : [];
+    }
+
+    /**
+     * Server-side twin of buildRows() in discover/index.html.twig: pinned
+     * lists first, then the toplists directory with any list already pinned
+     * filtered out so it never renders as two identical rows.
+     *
+     * @return list<array{url:string, label:string, pinned:bool, source?:string, user?:string, items?:int, likes?:int}>
+     */
+    private function directoryRows(): array
+    {
+        try {
+            $lists = $this->mdblist->getTopLists();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Discover directory failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+            $lists = [];
+        }
+
+        $seen = [];
+        $rows = [];
+        foreach ($this->pinned() as $p) {
+            $rows[] = [
+                'url'    => $p['url'],
+                'label'  => $p['label'],
+                'pinned' => true,
+                'source' => $p['source'],
+            ];
+            $seen[$this->pinKey($p['url'])] = true;
+        }
+
+        foreach ($lists as $l) {
+            if (isset($seen[$this->pinKey($l['url'])])) {
+                continue;
+            }
+            $rows[] = [
+                'url'    => $l['url'],
+                'label'  => $l['name'],
+                'pinned' => false,
+                'user'   => $l['user'],
+                'items'  => $l['items'],
+                'likes'  => $l['likes'],
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * One row's first page, fetched and library-badged the same way /lists/items
+     * answers it, for the rows inlined straight into the page.
+     *
+     * @return array{items:list<array<string, mixed>>, next_cursor:?string}
+     */
+    private function firstPageItems(string $url): array
+    {
+        $parsed = ListSourceResolver::parse($url);
+        if ($parsed === null) {
+            return ['items' => [], 'next_cursor' => null];
+        }
+
+        try {
+            $page = $this->mdblist->getListItems($parsed['user'], $parsed['slug']);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Discover directory row failed', ['url' => $url, 'message' => $e->getMessage()]);
+
+            return ['items' => [], 'next_cursor' => null];
+        }
+
+        return [
+            'items'       => $this->withLibraryStatus($page['items']),
+            'next_cursor' => $page['next_cursor'],
+        ];
+    }
+
+    /** Same identity rule as the client's pinKey(): trailing slash and case are both ignored. */
+    private function pinKey(string $url): string
+    {
+        return strtolower(rtrim(trim($url), '/'));
     }
 }
