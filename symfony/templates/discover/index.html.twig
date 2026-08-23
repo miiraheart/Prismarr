@@ -242,7 +242,14 @@
     var pins = (d.pinned || []).map(function (p) {
       return { url: p.url, label: p.label, pinned: true, meta: esc(p.source) };
     });
-    var lists = (d.lists || []).map(function (l) {
+    // A pinned list is usually also in the top-lists directory. Rendering both
+    // would give two identical carousels, so the pinned copy wins.
+    var seen = {};
+    pins.forEach(function (p) { seen[pinKey(p.url)] = true; });
+
+    var lists = (d.lists || []).filter(function (l) {
+      return !seen[pinKey(l.url)];
+    }).map(function (l) {
       return {
         url: l.url, label: l.name, pinned: false,
         meta: esc(l.user) + ' · ' + itemsCountText(esc(l.items)) + ' · ' + likesCountText(esc(l.likes))
