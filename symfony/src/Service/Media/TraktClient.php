@@ -26,6 +26,10 @@ class TraktClient implements ResetInterface
     private const PAGE_LIMIT  = 100;
     private const MAX_PAGES   = 50;
     private const TTL_LIST    = 900;
+    // Playback state changes while Mira is actively watching, so it gets a
+    // much shorter TTL than the other reads: 15 minutes on a "currently
+    // watching" badge would leave it stuck at a stale percentage.
+    private const TTL_PLAYBACK = 300;
     // api.trakt.tv sits behind Cloudflare, which answers a UA-less request with
     // a 403 HTML block page instead of passing it to Trakt. PHP's curl sends no
     // User-Agent by default, so one has to be set explicitly.
@@ -152,6 +156,95 @@ class TraktClient implements ResetInterface
     }
 
     /**
+     * Titles currently mid-watch ("Continue Watching" on Trakt): movies and
+     * episodes that have a paused position but are not yet marked watched.
+     *
+     * OAuth only: verified against the live API, GET /sync/playback answers
+     * 401 with just the client id, so this returns empty rather than trying
+     * when the device flow has never been completed.
+     *
+     * @return array<string, array{progress:float, paused_at:?string, season:?int, episode:?int}> keyed "{type}:{tmdb_id}"
+     */
+    public function getPlayback(): array
+    {
+        try {
+            $this->ensureConfig();
+            $token = $this->accessToken();
+            if ($token === null) {
+                return [];
+            }
+
+            return $this->cachedGet('playback', function () use ($token): array {
+                $res = $this->request('/sync/playback', [], $token);
+
+                return is_array($res['data']) ? $this->mapPlayback($res['data']) : [];
+            }, self::TTL_PLAYBACK);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt playback failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Normalise a /sync/playback payload to Prismarr's vocabulary.
+     *
+     * The card this renders onto is show-level, so an episode entry is keyed
+     * on the show's tmdb id, not the episode's. When several episodes of the
+     * same show are mid-watch, the one paused most recently wins.
+     *
+     * @param array<int, array<string, mixed>> $raw
+     * @return array<string, array{progress:float, paused_at:?string, season:?int, episode:?int}>
+     */
+    private function mapPlayback(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $kind = $entry['type'] ?? null;
+            if ($kind === 'movie') {
+                $media   = $entry['movie'] ?? null;
+                $season  = null;
+                $episode = null;
+            } elseif ($kind === 'episode') {
+                $media   = $entry['show'] ?? null;
+                $season  = isset($entry['episode']['season']) ? (int) $entry['episode']['season'] : null;
+                $episode = isset($entry['episode']['number']) ? (int) $entry['episode']['number'] : null;
+            } else {
+                continue;
+            }
+
+            $tmdb = $media['ids']['tmdb'] ?? null;
+            if (!is_array($media) || !is_int($tmdb) || $tmdb <= 0) {
+                continue;
+            }
+
+            // Trakt says "show", the rest of this codebase says "tv".
+            $type     = $kind === 'movie' ? 'movie' : 'tv';
+            $key      = "{$type}:{$tmdb}";
+            $pausedAt = isset($entry['paused_at']) ? (string) $entry['paused_at'] : null;
+
+            // ISO 8601 timestamps sort lexically, same trick used to order the
+            // watchlist by listed_at in TraktController.
+            if (isset($out[$key]) && (string) $out[$key]['paused_at'] >= (string) $pausedAt) {
+                continue;
+            }
+
+            $out[$key] = [
+                'progress'  => round((float) ($entry['progress'] ?? 0), 1),
+                'paused_at' => $pausedAt,
+                'season'    => $season,
+                'episode'   => $episode,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Page through one /users/{slug}/{section}/{bucket} collection.
      *
      * @return array<int, array<string, mixed>>
@@ -217,15 +310,15 @@ class TraktClient implements ResetInterface
     /**
      * @param callable():array $producer
      */
-    private function cachedGet(string $key, callable $producer): array
+    private function cachedGet(string $key, callable $producer, int $ttl = self::TTL_LIST): array
     {
         $this->ensureConfig();
         // v2: bumped when the cached row shape changes, so an old entry is
         // never served against newer rendering code.
         $full = 'prismarr_trakt_v2_' . sha1($this->username . '_' . $key);
 
-        return $this->cache->get($full, function (ItemInterface $item) use ($producer) {
-            $item->expiresAfter(self::TTL_LIST);
+        return $this->cache->get($full, function (ItemInterface $item) use ($producer, $ttl) {
+            $item->expiresAfter($ttl);
 
             return $producer();
         });
@@ -234,10 +327,20 @@ class TraktClient implements ResetInterface
     /**
      * @return array{data:?array, pageCount:int}
      */
-    private function request(string $path, array $params = []): array
+    private function request(string $path, array $params = [], ?string $bearer = null): array
     {
         $this->ensureConfig();
         $url = self::BASE_URL . $path . '?' . http_build_query($params);
+
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'trakt-api-version: ' . self::API_VERSION,
+            'trakt-api-key: ' . $this->clientId,
+        ];
+        if ($bearer !== null) {
+            $headers[] = 'Authorization: Bearer ' . $bearer;
+        }
 
         $ch = curl_init();
         curl_setopt_array($ch, [
@@ -251,12 +354,7 @@ class TraktClient implements ResetInterface
             // Same SSRF guard as the other clients in this namespace.
             CURLOPT_PROTOCOLS       => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                'Content-Type: application/json',
-                'trakt-api-version: ' . self::API_VERSION,
-                'trakt-api-key: ' . $this->clientId,
-            ],
+            CURLOPT_HTTPHEADER     => $headers,
         ]);
 
         $raw        = curl_exec($ch);

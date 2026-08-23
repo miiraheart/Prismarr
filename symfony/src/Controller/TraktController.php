@@ -120,6 +120,24 @@ class TraktController extends AbstractController
         }
     }
 
+    /**
+     * Titles currently mid-watch, keyed "{type}:{tmdb_id}", so a media card
+     * anywhere in the app (Decouverte, Lists, this page) can stamp a
+     * "watching" badge on it. Cached 5 minutes in TraktClient, shorter than
+     * the other reads because progress changes while Mira is watching.
+     */
+    #[Route('/playback', name: 'playback', methods: ['GET'])]
+    public function playback(): JsonResponse
+    {
+        try {
+            return $this->json($this->trakt->getPlayback());
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt playback failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+
+            return $this->json([]);
+        }
+    }
+
     // No CSRF token: internal app, routes protected by the class-level IsGranted.
     #[Route('/request', name: 'request', methods: ['POST'])]
     public function createRequest(Request $request): JsonResponse

@@ -1062,6 +1062,7 @@ decouverte:
     clear_title: Clear history
   badge:
     in_library: In library
+    watching: Watching
   action:
     add: Add
     close: Close

@@ -73,6 +73,24 @@
   .media-card[data-tmdb-id] .vote-badge.mid  { background: rgba(245,158,11,.9); }
   .media-card[data-tmdb-id] .vote-badge.bad  { background: rgba(239,68,68,.9); }
 
+  /* "Currently watching" indicator, stamped client-side from /trakt/playback.
+     Bottom-left corner is the one spot free of quality-badge, lib-badge,
+     vote-badge and (on the Trakt page) tk-watched, all of which live in the
+     other three corners. The thin bar runs the full width, under them. */
+  .media-card[data-tmdb-id] .watching-badge {
+    position: absolute; bottom: 0; left: 0;
+    font-size: .62rem; font-weight: 700; padding: .1rem .35rem;
+    border-top-right-radius: .3rem;
+    background: rgba(139,92,246,.92); color: #fff; z-index: 2;
+  }
+  .media-card[data-tmdb-id] .watching-progress {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+    background: rgba(255,255,255,.2); z-index: 1;
+  }
+  .media-card[data-tmdb-id] .watching-progress-fill {
+    height: 100%; background: rgb(139,92,246);
+  }
+
   /* Hover info (style Radarr/Sonarr) */
   .media-card[data-tmdb-id] .hover-info {
     position: absolute; inset: 0; background: rgba(0,0,0,.8);
@@ -84,6 +102,8 @@
   .media-card[data-tmdb-id]:hover .card-overlay,
   .media-card[data-tmdb-id]:hover .quality-badge,
   .media-card[data-tmdb-id]:hover .lib-badge,
+  .media-card[data-tmdb-id]:hover .watching-badge,
+  .media-card[data-tmdb-id]:hover .watching-progress,
   .media-card[data-tmdb-id]:hover .vote-badge { opacity: 0; pointer-events: none; transition: opacity .2s; }
   .media-card[data-tmdb-id]:hover .wl-star { z-index: 8; }
 
@@ -101,6 +121,8 @@
   #tmdb-recent-row .media-card[data-tmdb-id] .quality-badge,
   #tmdb-recent-row .media-card[data-tmdb-id] .lib-badge,
   #tmdb-recent-row .media-card[data-tmdb-id] .countdown-badge,
+  #tmdb-recent-row .media-card[data-tmdb-id] .watching-badge,
+  #tmdb-recent-row .media-card[data-tmdb-id] .watching-progress,
   #tmdb-recent-row .media-card[data-tmdb-id] .vote-badge { display: none; }
   #tmdb-recent-row .media-card[data-tmdb-id] .card-title-text { font-size: .6rem; }
   #tmdb-recent-row .media-card[data-tmdb-id] .card-year { font-size: .5rem; }
@@ -1313,5 +1335,86 @@
   window.PrismarrDetail.load  = loadDetail;
   window.PrismarrDetail.open  = openDetailModal;
   window.PrismarrDetail.close = closeDetailModal;
+})();
+</script>
+
+{# ── "Currently watching" badge ────────────────────────────────────────────
+   Self-contained on purpose: reads /trakt/playback once per page load and
+   stamps every matching .media-card[data-tmdb-id] it finds, on every page
+   this partial is included in (Decouverte, Lists, Trakt). Cards on those
+   pages render late (lazy-loaded rows, JS grids, search results), so a
+   MutationObserver picks up anything added after the initial pass instead
+   of re-fetching. Fails completely silently: no map, no badge, no noise. #}
+<script>
+(function () {
+  var WATCHING_LABEL = {{ 'decouverte.badge.watching'|trans|json_encode|raw }};
+  var STAMP_ATTR = 'watchingStamped';
+  var playback = null;
+
+  function stampCard(card) {
+    if (!playback || card.dataset[STAMP_ATTR]) return;
+    card.dataset[STAMP_ATTR] = '1';
+
+    var type = card.dataset.tmdbType;
+    var id   = card.dataset.tmdbId;
+    if (!type || !id) return;
+
+    var entry = playback[type + ':' + id];
+    if (!entry) return;
+
+    var pct = Math.max(0, Math.min(100, Number(entry.progress) || 0));
+    var label = (entry.season != null && entry.episode != null)
+      ? 'S' + entry.season + 'E' + entry.episode + ' · ' + Math.round(pct) + '%'
+      : Math.round(pct) + '%';
+
+    var badge = document.createElement('span');
+    badge.className = 'watching-badge';
+    badge.title = WATCHING_LABEL;
+    badge.textContent = label;
+
+    var bar = document.createElement('div');
+    bar.className = 'watching-progress';
+    var fill = document.createElement('div');
+    fill.className = 'watching-progress-fill';
+    fill.style.width = pct + '%';
+    bar.appendChild(fill);
+
+    card.appendChild(badge);
+    card.appendChild(bar);
+  }
+
+  function stampAll() {
+    document.querySelectorAll('.media-card[data-tmdb-id]').forEach(stampCard);
+  }
+
+  function watchForNewCards() {
+    new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        m.addedNodes.forEach(function (node) {
+          if (node.nodeType !== 1) return;
+          if (node.matches && node.matches('.media-card[data-tmdb-id]')) stampCard(node);
+          if (node.querySelectorAll) node.querySelectorAll('.media-card[data-tmdb-id]').forEach(stampCard);
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+
+  function init() {
+    fetch('/trakt/playback', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (map) {
+        playback = (map && typeof map === 'object') ? map : {};
+        if (Object.keys(playback).length === 0) return;
+        stampAll();
+        watchForNewCards();
+      })
+      .catch(function () { /* no badge, no noise */ });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
 </script>
