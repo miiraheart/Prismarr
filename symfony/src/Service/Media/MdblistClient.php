@@ -49,18 +49,36 @@ class MdblistClient implements ResetInterface
         $this->apiKey = '';
     }
 
-    /** Light ping: /user is the cheapest authenticated call and needs no ids. */
+    private const TTL_PING = 900;
+
+    /**
+     * Light ping: /user is the cheapest authenticated call and needs no ids.
+     * Cached separately from the directory reads, on its own short TTL: the
+     * health widget polls this every 60s from every open tab, which would
+     * otherwise burn through MDBList's whole daily quota on its own. A
+     * cached failure is fine here too, it clears within 15 minutes.
+     */
     public function ping(): bool
     {
         try {
             $this->ensureConfig();
-
-            return is_array($this->request('/user')['data']);
         } catch (\Throwable $e) {
             $this->logger->warning('MDBList ping failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
 
             return false;
         }
+
+        return $this->cache->get('prismarr_mdblist_v1_' . sha1('ping'), function (\Symfony\Contracts\Cache\ItemInterface $item): bool {
+            $item->expiresAfter(self::TTL_PING);
+
+            try {
+                return is_array($this->request('/user')['data']);
+            } catch (\Throwable $e) {
+                $this->logger->warning('MDBList ping failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+
+                return false;
+            }
+        });
     }
 
     private const TTL_DIRECTORY = 3600;
