@@ -1062,6 +1062,7 @@ decouverte:
   badge:
     in_library: En bibliothèque
     watching: En cours
+    watched: Vu
   action:
     add: Ajouter
     close: Fermer

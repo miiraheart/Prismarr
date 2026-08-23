@@ -1063,6 +1063,7 @@ decouverte:
   badge:
     in_library: In library
     watching: Watching
+    watched: Watched
   action:
     add: Add
     close: Close

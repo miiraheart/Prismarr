@@ -73,15 +73,24 @@
   .media-card[data-tmdb-id] .vote-badge.mid  { background: rgba(245,158,11,.9); }
   .media-card[data-tmdb-id] .vote-badge.bad  { background: rgba(239,68,68,.9); }
 
-  /* "Currently watching" indicator, stamped client-side from /trakt/playback.
-     Bottom-left corner is the one spot free of quality-badge, lib-badge,
-     vote-badge and (on the Trakt page) tk-watched, all of which live in the
-     other three corners. The thin bar runs the full width, under them. */
+  /* "Currently watching" / "already watched" indicator, stamped client-side
+     from /trakt/playback and /trakt/marks. Bottom-left corner is the one
+     spot free of quality-badge, lib-badge, vote-badge and (on the Trakt
+     page) tk-watched, all of which live in the other three corners. Icon
+     only, no text on the poster; the detail lives in the title attribute.
+     Both states share this one slot rather than each claiming a corner: a
+     card is only ever watching or watched (watching wins), never both, so
+     there is nothing to collide with. The green here matches tk-watched's
+     rgba(34,197,94,.92) in trakt/index.html.twig. */
   .media-card[data-tmdb-id] .watching-badge {
     position: absolute; bottom: 0; left: 0;
-    font-size: .62rem; font-weight: 700; padding: .1rem .35rem;
+    display: flex; align-items: center; justify-content: center;
+    padding: .2rem .3rem; line-height: 0;
     border-top-right-radius: .3rem;
     background: rgba(139,92,246,.92); color: #fff; z-index: 2;
+  }
+  .media-card[data-tmdb-id] .watching-badge.is-watched {
+    background: rgba(34,197,94,.92);
   }
   .media-card[data-tmdb-id] .watching-progress {
     position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
@@ -1359,13 +1368,18 @@
 })();
 </script>
 
-{# ── "Currently watching" badge ────────────────────────────────────────────
-   Self-contained on purpose: reads /trakt/playback once per page load and
-   stamps every matching .media-card[data-tmdb-id] it finds, on every page
-   this partial is included in (Decouverte, Lists, Trakt). Cards on those
-   pages render late (lazy-loaded rows, JS grids, search results), so a
-   MutationObserver picks up anything added after the initial pass instead
-   of re-fetching. Fails completely silently: no map, no badge, no noise.
+{# ── "Currently watching" / "already watched" badge ───────────────────────
+   Self-contained on purpose: reads /trakt/playback and /trakt/marks once
+   per page load and stamps every matching .media-card[data-tmdb-id] it
+   finds, on every page this partial is included in (Decouverte, Lists,
+   Trakt). A card that is mid-watch gets the watching icon and progress
+   bar; one that is not in progress but has plays in the watched set gets
+   the watched icon instead; watching always wins when a title is both
+   (something you are part-way through beats knowing you have seen it
+   before). Cards on these pages render late (lazy-loaded rows, JS grids,
+   search results), so a MutationObserver picks up anything added after
+   the initial pass instead of re-fetching. Fails completely silently: no
+   map, no badge, no noise.
 
    Turbo Drive swaps document.body wholesale on navigation, so this also
    re-runs on turbo:load (same pattern as the health widget in
@@ -1378,41 +1392,62 @@
 <script>
 (function () {
   var WATCHING_LABEL = {{ 'decouverte.badge.watching'|trans|json_encode|raw }};
+  var WATCHED_LABEL   = {{ 'decouverte.badge.watched'|trans|json_encode|raw }};
+  // Text dropped from the card face in favour of an icon lives here instead,
+  // same trick renderCardHTML already uses for the vote-badge star.
+  var ICON_WATCHING = {{ ico.icon('hourglass', '', 12)|json_encode|raw }};
+  var ICON_WATCHED  = {{ ico.icon('eye', '', 12)|json_encode|raw }};
   var STAMP_ATTR = 'watchingStamped';
   var playback = null;
+  var watched  = null;
   var fetchInFlight = false;
   var observedBody = null;
 
   function stampCard(card) {
-    if (!playback || card.dataset[STAMP_ATTR]) return;
+    if ((!playback && !watched) || card.dataset[STAMP_ATTR]) return;
     card.dataset[STAMP_ATTR] = '1';
 
     var type = card.dataset.tmdbType;
     var id   = card.dataset.tmdbId;
     if (!type || !id) return;
+    var key = type + ':' + id;
 
-    var entry = playback[type + ':' + id];
-    if (!entry) return;
-
-    var pct = Math.max(0, Math.min(100, Number(entry.progress) || 0));
-    var label = (entry.season != null && entry.episode != null)
-      ? 'S' + entry.season + 'E' + entry.episode + ' · ' + Math.round(pct) + '%'
-      : Math.round(pct) + '%';
-
+    var inProgress = playback && playback[key];
     var badge = document.createElement('span');
     badge.className = 'watching-badge';
-    badge.title = WATCHING_LABEL;
-    badge.textContent = label;
 
-    var bar = document.createElement('div');
-    bar.className = 'watching-progress';
-    var fill = document.createElement('div');
-    fill.className = 'watching-progress-fill';
-    fill.style.width = pct + '%';
-    bar.appendChild(fill);
+    if (inProgress) {
+      var pct = Math.max(0, Math.min(100, Number(inProgress.progress) || 0));
+      var label = (inProgress.season != null && inProgress.episode != null)
+        ? 'S' + inProgress.season + 'E' + inProgress.episode + ' · ' + Math.round(pct) + '%'
+        : Math.round(pct) + '%';
 
+      badge.innerHTML = ICON_WATCHING;
+      badge.title = WATCHING_LABEL + ': ' + label;
+
+      var bar = document.createElement('div');
+      bar.className = 'watching-progress';
+      var fill = document.createElement('div');
+      fill.className = 'watching-progress-fill';
+      fill.style.width = pct + '%';
+      bar.appendChild(fill);
+
+      card.appendChild(badge);
+      card.appendChild(bar);
+      return;
+    }
+
+    var seen = watched && watched[key];
+    if (!seen || !seen.plays) return;
+
+    var title = WATCHED_LABEL;
+    if (seen.plays > 1) title += ' x' + seen.plays;
+    if (seen.last_watched_at) title += ' · ' + String(seen.last_watched_at).slice(0, 10);
+
+    badge.classList.add('is-watched');
+    badge.innerHTML = ICON_WATCHED;
+    badge.title = title;
     card.appendChild(badge);
-    card.appendChild(bar);
   }
 
   function stampAll() {
@@ -1439,20 +1474,33 @@
     }).observe(document.body, { childList: true, subtree: true });
   }
 
+  // Both maps come from cached, already-fetched Trakt state (TraktClient
+  // caches playback 5 minutes, marks/watched longer), so fetching them in
+  // parallel here costs one extra request, not one extra round trip. Each
+  // leg falls back to {} on its own failure so one endpoint being down
+  // still lets the other badge type render.
+  function fetchMap(url, pick) {
+    return fetch(url, { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (d) { return pick ? (d && d[pick]) || {} : (d || {}); })
+      .catch(function () { return {}; });
+  }
+
   function init() {
     if (fetchInFlight) return;
     fetchInFlight = true;
 
-    fetch('/trakt/playback', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : {}; })
-      .then(function (map) {
-        fetchInFlight = false;
-        playback = (map && typeof map === 'object') ? map : {};
-        if (Object.keys(playback).length === 0) return;
-        stampAll();
-        watchForNewCards();
-      })
-      .catch(function () { fetchInFlight = false; /* no badge, no noise */ });
+    Promise.all([
+      fetchMap('/trakt/playback'),
+      fetchMap('/trakt/marks', 'watched')
+    ]).then(function (maps) {
+      fetchInFlight = false;
+      playback = (maps[0] && typeof maps[0] === 'object') ? maps[0] : {};
+      watched  = (maps[1] && typeof maps[1] === 'object') ? maps[1] : {};
+      if (Object.keys(playback).length === 0 && Object.keys(watched).length === 0) return;
+      stampAll();
+      watchForNewCards();
+    }).catch(function () { fetchInFlight = false; /* no badge, no noise */ });
   }
 
   document.addEventListener('turbo:load', init);
