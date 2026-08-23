@@ -67,7 +67,7 @@
     unpin: {{ path('discover_unpin')|json_encode|raw }}
   };
 
-  var pinned = {{ pinned|json_encode|raw }};
+  var pinned = {{ pinned|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_QUOT'))|raw }};
   /* Same identity rule as ListSourceResolver::idFor() on the server: trailing
      slash and case are both ignored. Comparing case-sensitively here would show
      "Pin" for a list that is in fact already pinned. */
@@ -187,6 +187,7 @@
   });
 
   grid.addEventListener('click', function (e) {
+    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star')) return;
     var card = e.target.closest('.media-card[data-tmdb-id]');
     if (card && window.PrismarrDetail) {
       window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);

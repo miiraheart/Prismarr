@@ -39,4 +39,29 @@ class DiscoverControllerTest extends AbstractWebTestCase
         $this->assertSame([], $payload['items']);
         $this->assertNotSame('', (string) ($payload['error'] ?? ''));
     }
+
+    /**
+     * The stored url is rebuilt from the parsed user/slug rather than kept
+     * as submitted, so a query string or fragment smuggled through the pin
+     * request cannot survive into the pinned-lists JSON rendered on /discover.
+     */
+    public function testPinStripsQueryStringAndFragmentFromTheStoredUrl(): void
+    {
+        $this->client->request(
+            'POST',
+            '/discover/pin',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'url'   => 'https://mdblist.com/lists/bob/my-list?x=</script><script>alert(1)</script>',
+                'label' => 'My List',
+            ]),
+        );
+
+        $this->assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($payload['ok']);
+        $this->assertSame('https://mdblist.com/lists/bob/my-list', $payload['pinned'][0]['url']);
+    }
 }

@@ -108,8 +108,12 @@ class DiscoverController extends AbstractController
             return $this->json(['ok' => false, 'error' => 'unsupported_source'], 400);
         }
 
-        $id     = ListSourceResolver::idFor($url);
-        $pinned = $this->pinned();
+        // Canonical, not the submitted string: strips any query string or
+        // fragment an attacker could smuggle through the pin request before
+        // it is persisted and later replayed into the pinned-lists JSON.
+        $canonicalUrl = 'https://mdblist.com/lists/' . $parsed['user'] . '/' . $parsed['slug'];
+        $id           = ListSourceResolver::idFor($canonicalUrl);
+        $pinned       = $this->pinned();
         foreach ($pinned as $row) {
             if (($row['id'] ?? '') === $id) {
                 return $this->json(['ok' => true, 'pinned' => $pinned]);
@@ -118,7 +122,7 @@ class DiscoverController extends AbstractController
 
         $pinned[] = [
             'id'       => $id,
-            'url'      => $url,
+            'url'      => $canonicalUrl,
             'source'   => $parsed['source'],
             'label'    => trim((string) ($payload['label'] ?? '')) ?: $parsed['slug'],
             'added_at' => date(DATE_ATOM),
