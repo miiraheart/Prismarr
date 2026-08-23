@@ -57,20 +57,120 @@
   var ROUTES = {
     lists: {{ path('discover_lists')|json_encode|raw }},
     list:  {{ path('discover_list')|json_encode|raw }},
-    // Shared with the Trakt page: it takes a TMDB id and answers poster + vote,
-    // with nothing Trakt-specific in it. Phase 2 renames it when the Discover
-    // feeds land; duplicating it now would be a second copy of four lines.
-    //
-    // Generated once per type, because the route requires type to match
-    // `movie|tv`: passing a placeholder like 'TYPE' makes the URL generator
-    // throw InvalidParameterException at render time. The trailing 0 is the
-    // tmdbId placeholder, which does satisfy its `\d+` requirement.
+    // One URL per type: the route requires `movie|tv`, so a placeholder such
+    // as 'TYPE' would throw InvalidParameterException when Twig renders it.
     meta: {
       movie: {{ path('trakt_meta', {type: 'movie', tmdbId: 0})|json_encode|raw }},
       tv:    {{ path('trakt_meta', {type: 'tv',    tmdbId: 0})|json_encode|raw }}
     }
   };
-  window.PrismarrDiscover = { routes: ROUTES };
+
+  var directory = document.getElementById('dv-directory');
+  var listView  = document.getElementById('dv-list-view');
+  var grid      = document.getElementById('dv-grid');
+  var moreBtn   = document.getElementById('dv-more');
+  var title     = document.getElementById('dv-list-title');
+  var count     = document.getElementById('dv-count');
+  var search    = document.getElementById('dv-search');
+  var current   = { url: '', cursor: null };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  }); }
+
+  function loadDirectory(q) {
+    directory.innerHTML = '';
+    fetch(ROUTES.lists + (q ? '?q=' + encodeURIComponent(q) : ''), { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var lists = d.lists || [];
+        count.textContent = lists.length ? lists.length + ' lists' : '';
+        directory.innerHTML = lists.map(function (l) {
+          return '<div class="dv-list-card" data-url="' + esc(l.url) + '" data-label="' + esc(l.name) + '">'
+            + '<span class="dv-list-name">' + esc(l.name) + '</span>'
+            + '<span class="dv-list-meta">' + esc(l.user) + ' · ' + esc(l.items) + ' items · ' + esc(l.likes) + ' likes</span>'
+            + '</div>';
+        }).join('');
+      });
+  }
+
+  /* MEASURED 2026-08-23: MDBList returns an absolute poster URL on every
+     item, so in practice this loop does nothing. It stays as a cheap safety
+     net for the rare item with no poster, and costs one request only for
+     those. */
+  function hydrate(items) {
+    items.forEach(function (it) {
+      if (it.poster) return;
+      var template = ROUTES.meta[it.type];
+      if (!template) return;
+      var url = template.replace(/0$/, String(it.id));
+      fetch(url, { headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (m) {
+          if (!m || !m.poster) return;
+          var card = grid.querySelector('.media-card[data-tmdb-id="' + it.id + '"]');
+          if (!card) return;
+          var ph = card.querySelector('.no-poster');
+          if (ph) ph.outerHTML = '<img src="' + m.poster + '" alt="" loading="lazy">';
+        })
+        .catch(function () {});
+    });
+  }
+
+  function renderPage(d, append) {
+    var html = (d.items || []).map(window.renderCardHTML).join('');
+    if (append) { grid.insertAdjacentHTML('beforeend', html); } else { grid.innerHTML = html; }
+    current.cursor = d.next_cursor || null;
+    moreBtn.classList.toggle('d-none', !current.cursor);
+    hydrate(d.items || []);
+  }
+
+  function openList(url, label) {
+    current.url = url;
+    current.cursor = null;
+    title.textContent = label;
+    directory.classList.add('d-none');
+    listView.classList.remove('d-none');
+    grid.innerHTML = '';
+    fetch(ROUTES.list + '?src=' + encodeURIComponent(url), { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderPage(d, false); });
+  }
+
+  directory.addEventListener('click', function (e) {
+    var card = e.target.closest('.dv-list-card');
+    if (card) openList(card.dataset.url, card.dataset.label);
+  });
+
+  grid.addEventListener('click', function (e) {
+    var card = e.target.closest('.media-card[data-tmdb-id]');
+    if (card && window.PrismarrDetail) {
+      window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);
+    }
+  });
+
+  moreBtn.addEventListener('click', function () {
+    if (!current.cursor) return;
+    moreBtn.disabled = true;
+    fetch(ROUTES.list + '?src=' + encodeURIComponent(current.url) + '&cursor=' + encodeURIComponent(current.cursor),
+          { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderPage(d, true); moreBtn.disabled = false; });
+  });
+
+  document.getElementById('dv-back').addEventListener('click', function () {
+    listView.classList.add('d-none');
+    directory.classList.remove('d-none');
+  });
+
+  var timer = null;
+  search.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () { loadDirectory(search.value.trim()); }, 300);
+  });
+
+  window.PrismarrDiscover = { routes: ROUTES, openList: openList, current: current };
+  loadDirectory('');
 })();
 </script>
 {% endblock %}
