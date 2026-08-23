@@ -729,6 +729,21 @@
   // slower reply would otherwise paint over B.
   var detailSeq = 0;
 
+  // The title the watch-state chip (below) currently reflects, so a maps
+  // fetch that finishes after the modal has already moved on to a
+  // different title lands on the right one, or not at all.
+  var currentDetail = null;
+  var watchBadgeReadyRegistered = false;
+  var WATCHING_LABEL = {{ 'decouverte.badge.watching'|trans|json_encode|raw }};
+  var WATCHED_LABEL  = {{ 'decouverte.badge.watched'|trans|json_encode|raw }};
+  // mkBadge() below needs a bare <path> fragment, not the full <svg> the
+  // icon macro renders, so these mirror _icons.html.twig's hourglass/eye
+  // entries rather than reusing the macro directly (same reasoning as the
+  // "downloaded" checkmark path a few lines down, hardcoded for the same
+  // wrapper).
+  var ICON_PATH_HOURGLASS = '<path d="M6.5 7h11"/> <path d="M6.5 17h11"/> <path d="M6 20v-2a6 6 0 1 1 12 0v2a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1"/> <path d="M6 4v2a6 6 0 1 0 12 0v-2a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1"/>';
+  var ICON_PATH_EYE = '<path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/> <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/>';
+
   function openDetailModal() {
     detailLoading.innerHTML = loadingPristine;
     detailContent.innerHTML = detailPristine;
@@ -781,6 +796,68 @@
     if (v >= 7) return 'good';
     if (v >= 5) return 'mid';
     return 'bad';
+  }
+
+  // Hoisted out of renderDetail() (it used to be a nested function there)
+  // so updateWatchStateChip() can build a matching badge later too, from a
+  // maps-ready callback that fires outside of any renderDetail() call.
+  function mkBadge(bg, text, icon, id) {
+    var i = icon ? '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; vertical-align:-1px;">' + icon + '</svg>' : '';
+    return '<span' + (id ? ' id="' + id + '"' : '') + ' class="badge" style="background:' + bg + '; color:#fff; font-weight:600;">' + i + text + '</span>';
+  }
+
+  // Watching or watched, shown alongside the other status chips. Unlike the
+  // card badges this has room for words, so the detail (episode/percentage,
+  // or play count and last-watched date) is visible text, not just a title
+  // attribute. state.rating, when Mira has rated the title, rides along on
+  // whichever chip renders since Trakt only ever returns it for something
+  // that has actually been watched.
+  function watchStateBadgeHTML(state) {
+    if (state.kind === 'watching') {
+      var e = state.entry;
+      var pct = Math.max(0, Math.min(100, Number(e.progress) || 0));
+      var detail = (e.season != null && e.episode != null)
+        ? 'S' + e.season + 'E' + e.episode + ' · ' + Math.round(pct) + '%'
+        : Math.round(pct) + '%';
+      var text = WATCHING_LABEL + ': ' + detail;
+      if (state.rating) text += ' · ★ ' + state.rating.rating + '/10';
+      return mkBadge('rgba(139,92,246,.92)', escHtml(text), ICON_PATH_HOURGLASS, 'td-watch-state-badge');
+    }
+
+    var seen = state.entry;
+    var text = WATCHED_LABEL;
+    if (seen.plays > 1) text += ' x' + seen.plays;
+    if (seen.last_watched_at) text += ' · ' + String(seen.last_watched_at).slice(0, 10);
+    if (state.rating) text += ' · ★ ' + state.rating.rating + '/10';
+    return mkBadge('rgba(34,197,94,.92)', escHtml(text), ICON_PATH_EYE, 'td-watch-state-badge');
+  }
+
+  // Renders (or clears) the chip for whichever title currentDetail points
+  // at right now. Called both right after the other status badges are set
+  // (data may already be in) and later from PrismarrWatchBadge.onReady()
+  // (data was not in yet), so it has to re-check currentDetail itself
+  // rather than trusting whatever title it was originally meant for.
+  function updateWatchStateChip() {
+    var slot = document.getElementById('td-status-badges');
+    if (!slot) return;
+    var old = document.getElementById('td-watch-state-badge');
+    if (old) old.remove();
+
+    if (!currentDetail || !window.PrismarrWatchBadge) return;
+    var target = currentDetail;
+    if (target.seq !== detailSeq) return; // a newer title has since opened
+    var state = window.PrismarrWatchBadge.stateFor(target.type, target.id);
+    if (!state) return;
+
+    slot.insertAdjacentHTML('beforeend', watchStateBadgeHTML(state));
+  }
+
+  // One-time hookup so a maps fetch that finishes after the modal is
+  // already open still lands its chip, without polling.
+  function ensureWatchBadgeReadyListener() {
+    if (watchBadgeReadyRegistered || !window.PrismarrWatchBadge) return;
+    watchBadgeReadyRegistered = true;
+    window.PrismarrWatchBadge.onReady(updateWatchStateChip);
   }
 
   function renderDetail(d) {
@@ -845,10 +922,6 @@
 
     // Status badges (left column) — white text forced on colored background
     var badges = [];
-    function mkBadge(bg, text, icon) {
-      var i = icon ? '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; vertical-align:-1px;">' + icon + '</svg>' : '';
-      return '<span class="badge" style="background:' + bg + '; color:#fff; font-weight:600;">' + i + text + '</span>';
-    }
     if (d.in_library && d.lib_status) {
       var statusMap = {
         'downloaded':  { bg: '#22c55e', label: TMDB_I18N.lib_status.downloaded,  icon: '<path d="M5 12l5 5l10-10"/>' },
@@ -878,6 +951,13 @@
       badges.push(mkBadge('#ef4444', TMDB_I18N.canceled, null));
     }
     document.getElementById('td-status-badges').innerHTML = badges.join(' ');
+
+    // Watching/watched chip: renders now if PrismarrWatchBadge's maps are
+    // already loaded, or once they are if this title opened before that
+    // fetch settled (see ensureWatchBadgeReadyListener()).
+    currentDetail = { type: d.type, id: d.id, seq: detailSeq };
+    updateWatchStateChip();
+    ensureWatchBadgeReadyListener();
 
     // Actions (colonne gauche, verticales comme films modal)
     var actions = [];
@@ -1401,8 +1481,22 @@
   var STAMP_ATTR = 'watchingStamped';
   var playback = null;
   var watched  = null;
+  var ratings  = null;
   var fetchInFlight = false;
   var observedBody = null;
+
+  // Lets a caller that needs the maps before the initial fetch resolves
+  // (the detail modal, opened before or during that fetch) ask to be told
+  // once they are, instead of polling. Fires immediately for a caller that
+  // registers after the maps are already in, same as a resolved promise.
+  var mapsReady = false;
+  var readyCallbacks = [];
+  function notifyReady() {
+    mapsReady = true;
+    var callbacks = readyCallbacks;
+    readyCallbacks = [];
+    callbacks.forEach(function (cb) { try { cb(); } catch (e) {} });
+  }
 
   function stampCard(card) {
     if ((!playback && !watched) || card.dataset[STAMP_ATTR]) return;
@@ -1480,10 +1574,9 @@
   // parallel here costs one extra request, not one extra round trip. Each
   // leg falls back to {} on its own failure so one endpoint being down
   // still lets the other badge type render.
-  function fetchMap(url, pick) {
+  function fetchMap(url) {
     return fetch(url, { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : {}; })
-      .then(function (d) { return pick ? (d && d[pick]) || {} : (d || {}); })
       .catch(function () { return {}; });
   }
 
@@ -1493,24 +1586,50 @@
 
     Promise.all([
       fetchMap('/trakt/playback'),
-      fetchMap('/trakt/marks', 'watched')
-    ]).then(function (maps) {
+      fetchMap('/trakt/marks')
+    ]).then(function (results) {
       fetchInFlight = false;
-      playback = (maps[0] && typeof maps[0] === 'object') ? maps[0] : {};
-      watched  = (maps[1] && typeof maps[1] === 'object') ? maps[1] : {};
+      playback = (results[0] && typeof results[0] === 'object') ? results[0] : {};
+      // /trakt/marks answers {ratings, watched} in one call; the detail
+      // modal's rating chip and this script's watched badge both read out
+      // of the same response instead of fetching it twice.
+      var marks = (results[1] && typeof results[1] === 'object') ? results[1] : {};
+      watched = (marks.watched && typeof marks.watched === 'object') ? marks.watched : {};
+      ratings = (marks.ratings && typeof marks.ratings === 'object') ? marks.ratings : {};
+      notifyReady();
       if (Object.keys(playback).length === 0 && Object.keys(watched).length === 0) return;
       stampAll();
       watchForNewCards();
-    }).catch(function () { fetchInFlight = false; /* no badge, no noise */ });
+    }).catch(function () { fetchInFlight = false; notifyReady(); /* no badge, no noise */ });
   }
 
-  // Public hook for a page that marks a title watched through its own
-  // direct write against Trakt (the Trakt page's "mark watched" button, for
-  // instance), so that card gets the watched icon immediately instead of
-  // waiting for the next full re-init. Keeps this the single place that
-  // knows how a watched badge looks, rather than a second page growing its
-  // own copy of the markup just for the instant-feedback case.
+  // Public API. markWatched() lets a page that marks a title watched
+  // through its own direct write against Trakt (the Trakt page's "mark
+  // watched" button, for instance) update that card immediately instead of
+  // waiting for the next full re-init. stateFor() and onReady() let the
+  // detail modal show the same watching/watched state without a second
+  // fetch of its own: this is the single place that knows what these maps
+  // say and what a watched or watching badge looks like.
   window.PrismarrWatchBadge = {
+    // Watching entry, watched entry, or null, plus Mira's own rating when
+    // she has one (from the same /trakt/marks response), for one tmdb id.
+    // Watching wins when both apply, same rule the card badges use.
+    stateFor: function (type, id) {
+      var key = type + ':' + id;
+      var inProgress = playback && playback[key];
+      var seen = watched && watched[key];
+      var rating = (ratings && ratings[key]) || null;
+
+      if (inProgress) return { kind: 'watching', entry: inProgress, rating: rating };
+      if (seen && seen.plays) return { kind: 'watched', entry: seen, rating: rating };
+      return null;
+    },
+    // Calls back once the maps have loaded (immediately if they already
+    // have), so a caller that needs them before the initial fetch settles
+    // does not have to poll stateFor() itself.
+    onReady: function (cb) {
+      if (mapsReady) { cb(); } else { readyCallbacks.push(cb); }
+    },
     markWatched: function (type, id) {
       document.querySelectorAll(
         '.media-card[data-tmdb-type="' + type + '"][data-tmdb-id="' + id + '"]'
