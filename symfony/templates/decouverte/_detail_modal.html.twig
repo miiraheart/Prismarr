@@ -906,15 +906,22 @@
     // needs a live API call) so it must not block the links above. Guarded
     // by the same detailSeq the fetch in loadDetail() uses, so a slow reply
     // for a title the user has since closed never lands on the wrong modal.
+    //
+    // Not every title has a Trakt slug: /search/tmdb legitimately returns
+    // nothing for titles Trakt has not mapped. The button must still appear,
+    // so a title search on app.trakt.tv is the fallback whenever the slug
+    // lookup comes back empty or the request itself fails.
     var extSeq = detailSeq;
+    var traktFallbackUrl = 'https://app.trakt.tv/search?query=' + encodeURIComponent(d.title || '');
+    function appendTraktLink(url) {
+      if (extSeq !== detailSeq) return;
+      var links = document.getElementById('td-external-links');
+      if (links) links.insertAdjacentHTML('beforeend', '<a href="' + url + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Trakt ↗</a>');
+    }
     fetch('/trakt/link/' + d.type + '/' + d.id, { credentials: 'same-origin' })
       .then(function(r) { return r.json(); })
-      .then(function(j) {
-        if (extSeq !== detailSeq || !j || !j.url) return;
-        var links = document.getElementById('td-external-links');
-        if (links) links.insertAdjacentHTML('beforeend', '<a href="' + j.url + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Trakt ↗</a>');
-      })
-      .catch(function() {});
+      .then(function(j) { appendTraktLink((j && j.url) ? j.url : traktFallbackUrl); })
+      .catch(function() { appendTraktLink(traktFallbackUrl); });
 
     // Synopsis
     var ovBlock = document.getElementById('td-overview-block');
