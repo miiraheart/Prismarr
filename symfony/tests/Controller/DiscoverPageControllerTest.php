@@ -100,6 +100,32 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->assertResponseRedirects('/decouverte?tab=lists');
     }
 
+    public function testTheTraktTabFragmentRendersOnItsOwn(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/trakt');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('[data-dsc-pane="trakt"]');
+    }
+
+    public function testTheOldTraktUrlRedirectsIntoTheTraktTab(): void
+    {
+        $this->client->request('GET', '/trakt');
+
+        $this->assertResponseRedirects('/decouverte?tab=trakt');
+    }
+
+    public function testTheTraktTabShipsTheSharedCardGridNotBespokeMarkup(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/trakt');
+
+        $this->assertResponseIsSuccessful();
+        // The shared renderer fills this grid client-side. Its presence is
+        // what distinguishes the reworked tab from the old server-rendered
+        // bespoke cards, which emitted .media-card directly in Twig.
+        $this->assertSelectorExists('#tk-grid[data-tk-shared="1"]');
+    }
+
     /**
      * The page route deliberately does NOT start with `tmdb_`.
      *

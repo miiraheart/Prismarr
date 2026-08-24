@@ -6,6 +6,7 @@ use App\Service\ConfigService;
 use App\Service\Media\Discover\ListsTabContext;
 use App\Service\Media\LibraryIndex;
 use App\Service\Media\TmdbClient;
+use App\Service\Media\TraktClient;
 use App\Service\Media\TmdbEnricher;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -65,6 +66,7 @@ class DiscoverPageController extends AbstractController
         private readonly ConfigService   $config,
         private readonly LoggerInterface $logger,
         private readonly ListsTabContext $listsContext,
+        private readonly TraktClient     $trakt,
     ) {}
 
     #[Route('/decouverte', name: 'discover_page', priority: 10)]
@@ -107,6 +109,7 @@ class DiscoverPageController extends AbstractController
         return match ($tab) {
             'discover' => $this->renderDiscoverTab(),
             'lists'    => $this->renderListsTab(),
+            'trakt'    => $this->renderTraktTab(),
             default    => new Response('', Response::HTTP_NOT_FOUND),
         };
     }
@@ -119,6 +122,58 @@ class DiscoverPageController extends AbstractController
     private function renderListsTab(): Response
     {
         return $this->render('discover/_tab_lists.html.twig', $this->listsContext->build());
+    }
+
+    /**
+     * The Trakt tab.
+     *
+     * Enriched through LibraryIndex, which the standalone /trakt page never
+     * did: that is what gives these cards the Available badge and the
+     * watchlist star they used to lack.
+     */
+    private function renderTraktTab(): Response
+    {
+        $error = false;
+        $items = [];
+
+        try {
+            $items = $this->trakt->getWatchlist();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt tab watchlist failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+            $error = true;
+        }
+
+        try {
+            $library = $this->libraryIndex->build();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt tab library index failed', ['message' => $e->getMessage()]);
+            $library = ['movie' => [], 'tv' => []];
+        }
+
+        $rows = [];
+        foreach ($items as $item) {
+            $info = $item['type'] === 'movie'
+                ? ($library['movie'][(int) $item['tmdb_id']] ?? null)
+                : ($library['tv']['tmdb_' . (int) $item['tmdb_id']] ?? null);
+
+            $rows[] = $item + [
+                'in_library' => $info !== null,
+                'lib_status' => $info['status'] ?? null,
+                'lib_id'     => $info['id'] ?? null,
+            ];
+        }
+
+        // Newest listed first, the order the Trakt site itself uses.
+        usort($rows, static fn (array $a, array $b): int => ($b['listed_at'] ?? '') <=> ($a['listed_at'] ?? ''));
+
+        return $this->render('discover/_tab_trakt.html.twig', [
+            'items'       => $rows,
+            'error'       => $error,
+            'can_write'   => $this->trakt->hasWriteAccess(),
+            'can_connect' => $this->trakt->canStartDeviceAuth(),
+            'movies'      => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'movie')),
+            'shows'       => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'tv')),
+        ]);
     }
 
     /**

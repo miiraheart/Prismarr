@@ -43,37 +43,15 @@ class TraktController extends AbstractController
         private readonly TranslatorInterface      $translator,
     ) {}
 
+    /**
+     * The Trakt page is now a tab on the merged Discover page. Kept as a
+     * redirect for existing bookmarks. Every /trakt/* route below, including
+     * the whole write path, is unchanged.
+     */
     #[Route('', name: 'index')]
     public function index(): Response
     {
-        $error = false;
-        $items = [];
-
-        try {
-            $items = $this->trakt->getWatchlist();
-        } catch (\Throwable $e) {
-            $this->logger->warning('Trakt watchlist failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
-            $error = true;
-        }
-
-        $local = $this->localWatchlistIndex();
-
-        $rows = [];
-        foreach ($items as $item) {
-            $rows[] = $item + ['in_local' => isset($local[$item['type'] . ':' . $item['tmdb_id']])];
-        }
-
-        // Newest listed first, which is the order the Trakt site itself shows.
-        usort($rows, static fn (array $a, array $b): int => ($b['listed_at'] ?? '') <=> ($a['listed_at'] ?? ''));
-
-        return $this->render('trakt/index.html.twig', [
-            'items'        => $rows,
-            'error'        => $error,
-            'can_write'    => $this->trakt->hasWriteAccess(),
-            'can_connect'  => $this->trakt->canStartDeviceAuth(),
-            'movies'       => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'movie')),
-            'shows'        => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'tv')),
-        ]);
+        return $this->redirectToRoute('discover_page', ['tab' => 'trakt']);
     }
 
     /**
@@ -435,16 +413,4 @@ class TraktController extends AbstractController
         return true;
     }
 
-    /**
-     * @return array<string, true> keyed "{type}:{tmdb_id}"
-     */
-    private function localWatchlistIndex(): array
-    {
-        $index = [];
-        foreach ($this->watchlistRepo->findAllOrdered() as $row) {
-            $index[$row->getMediaType() . ':' . $row->getTmdbId()] = true;
-        }
-
-        return $index;
-    }
 }

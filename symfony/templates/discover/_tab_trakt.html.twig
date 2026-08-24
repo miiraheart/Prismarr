@@ -1,10 +1,10 @@
-{% extends 'base.html.twig' %}
+{# The Trakt tab. Was the standalone /trakt page until the tabbed merge.
+
+   The detail modal is NOT included here: the shell includes it once for all
+   three tabs. #}
 {% import '_icons.html.twig' as ico %}
 
-{% block title %}{{ 'trakt.page.title'|trans }}{% endblock %}
-{% block page_title %}Trakt{% endblock %}
-
-{% block body %}
+<div data-dsc-pane="trakt">
 <style>
   /* Cards, grid and badges all come from decouverte/_detail_modal.html.twig
      (.tmdb-results-grid / .media-card / .vote-badge / .lib-badge / .hover-info),
@@ -56,49 +56,16 @@
     <span class="tk-count" id="tk-count"></span>
   </div>
 
-{% include 'decouverte/_detail_modal.html.twig' %}
 
-  <div class="tmdb-results-grid" id="tk-grid">
-    {% for item in items %}
-    {# Same structure as the card macro in decouverte/index.html.twig, so the
-       theme is shared rather than imitated. Trakt-only facts (your rating,
-       watched state, Trakt community score) ride in the hover line. #}
-    <div class="media-card"
-         data-tmdb-id="{{ item.tmdb_id }}"
-         data-tmdb-type="{{ item.type }}"
-         data-tmdb-title="{{ item.title|e('html_attr') }}"
-         data-tmdb-year="{{ item.year ?: '' }}">
-      <div class="no-poster" data-tk-poster>
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 4v16l13 -8z"/></svg>
-      </div>
-      <span class="quality-badge {{ item.type }}">{{ item.type == 'movie' ? 'decouverte.modal.type_film'|trans : 'decouverte.modal.type_series'|trans }}</span>
-      {% if item.in_local %}
-        <span class="lib-badge" style="background:#6366f1;">{{ 'trakt.badge.in_watchlist_short'|trans }}</span>
-      {% endif %}
-      <span class="vote-badge" data-tk-vote style="display:none;"></span>
-      <div class="card-overlay">
-        <div class="card-title-text" title="{{ item.title }}">{{ item.title }}</div>
-        <div class="card-year">{{ item.year ?: '' }}</div>
-      </div>
-      <div class="hover-info">
-        <div class="h-title">{{ item.title }}</div>
-        <div class="h-year">
-          {{ item.year ?: '' }}
-          {% if item.community_rating %} · {{ ico.icon('star-filled', '', 14) }} {{ item.community_rating }} Trakt{% endif %}
-          <span data-tk-marks></span>
-        </div>
-        <div class="h-actions">
-          <button type="button" class="btn btn-primary btn-sm" data-tk-request>{{ 'trakt.action.request'|trans }}</button>
-          <button type="button" class="btn btn-sm btn-outline-warning" data-tk-watchlist>{{ 'trakt.action.watchlist'|trans }}</button>
-          {% if can_write %}
-            <button type="button" class="btn btn-sm btn-outline-danger" data-tk-remove
-                    title="{{ 'trakt.action.remove_title'|trans }}">{{ 'trakt.action.remove'|trans }}</button>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
+  {# Reworked onto the shared renderer at the tabbed merge. These cards used
+     to be bespoke Twig markup, which is why this page never showed the
+     watchlist star or the library Available badge: it only ever received
+     in_local (the Prismarr watchlist) and never Radarr/Sonarr status.
+     renderCardHTML plus LibraryIndex enrichment gives star, library badge,
+     watch badges and the kebab together. #}
+  <div class="tmdb-results-grid" id="tk-grid" data-tk-shared="1"></div>
+
+  <script type="application/json" id="tk-items">{{ items|json_encode|raw }}</script>
 
   {% if items is empty and not error %}
     <div class="empty">
@@ -115,6 +82,9 @@
   var MINE_LABEL = {{ 'trakt.mark.mine'|trans|json_encode|raw }};
   var grid = document.getElementById('tk-grid');
   if (!grid) return;
+  var seed  = document.getElementById('tk-items');
+  var items = seed ? JSON.parse(seed.textContent || '[]') : [];
+  grid.innerHTML = items.map(window.renderCardHTML).join('');
   var cards = Array.from(grid.querySelectorAll('.media-card'));
   var countEl = document.getElementById('tk-count');
 
@@ -439,4 +409,4 @@
   }
 })();
 </script>
-{% endblock %}
+</div>
