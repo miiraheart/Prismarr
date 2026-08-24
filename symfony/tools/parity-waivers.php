@@ -51,9 +51,9 @@ return [
     'tmdb' => ['templates', 'health_cache'],
 
     // trakt: templates is EXEMPT since the discover rework, which moved the trakt
-    // page under templates/discover/. health_widget, setup, route_guard and smoke
-    // are BACKLOG and are the current work's real gap list.
-    'trakt' => ['templates', 'health_cache', 'health_widget', 'setup', 'route_guard', 'smoke'],
+    // page under templates/discover/. setup, route_guard and smoke are BACKLOG
+    // and are the current work's real gap list.
+    'trakt' => ['templates', 'health_cache', 'setup', 'route_guard', 'smoke'],
 
     // transmission: health_widget is BACKLOG.
     'transmission' => ['health_cache', 'health_widget'],
