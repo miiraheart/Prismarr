@@ -1,0 +1,13 @@
+src/Controller/AdminSettingsController.php
+src/Controller/HealthController.php
+src/Controller/SetupController.php
+src/EventSubscriber/ServiceRouteGuardSubscriber.php
+src/Service/HealthService.php
+src/Service/Media/ServiceHealthCache.php
+src/Twig/ConfigExtension.php
+templates/admin/settings.html.twig
+templates/base.html.twig
+templates/dashboard/_health.html.twig
+tests/Controller/ControllersSmokeTest.php
+translations/messages+intl-icu.en.yaml
+translations/messages+intl-icu.fr.yaml

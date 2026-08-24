@@ -1,0 +1,77 @@
+name: Parity
+
+on:
+  pull_request:
+  push:
+    branches: [audibox]
+  workflow_dispatch:
+
+concurrency:
+  group: parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  registration:
+    name: cross-cutting registration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Every module registered in every site
+        working-directory: symfony
+        run: php tools/parity-check.php --matrix
+
+  check:
+    name: make check (lint + Twig + parity + PHPUnit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # docker-compose.yml expects a local env file even when it is empty.
+      - name: Create empty local env file
+        run: touch symfony/.env.local
+
+      # Use the production compose (image with vendor/ + assets baked in).
+      # The dev compose overlay bind-mounts ./symfony over the image, which
+      # hides the baked vendor/ and breaks the init script (which runs
+      # `bin/console doctrine:migrations:migrate` before frankenphp starts).
+      - name: Build and start the Prismarr container
+        run: |
+          docker compose \
+            --env-file symfony/.env.local \
+            -f docker-compose.yml \
+            up -d --build
+
+      - name: Wait for /api/health
+        run: |
+          for i in $(seq 1 60); do
+            if docker exec prismarr curl -fsS http://localhost:7070/api/health >/dev/null 2>&1; then
+              echo "Container is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Container did not become healthy in time"
+          docker logs prismarr
+          exit 1
+
+      # The baked image was built with `composer install --no-dev`, which
+      # excludes PHPUnit and the other test dependencies. Add them now so
+      # `make check` can run the test suite.
+      - name: Install dev dependencies (PHPUnit + test deps)
+        run: docker exec prismarr composer install --no-interaction --prefer-dist
+
+      - name: Run make check
+        run: make check
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs prismarr

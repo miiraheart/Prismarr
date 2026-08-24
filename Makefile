@@ -58,11 +58,19 @@ lint-container:
 	docker exec prismarr php bin/console lint:container
 	docker exec prismarr php bin/console lint:yaml config
 
-# Full pre-commit check — run this before every `git commit`.
-# Required by CONTRIBUTING.md Definition of Done.
-check: lint lint-twig test
+# Cross-cutting registration parity. Discovers the module set from the
+# registries themselves and asserts each module is registered in every site.
+# Pure PHP: runs on the host, so it works with the container stopped.
+parity:
+	@php symfony/tools/parity-check.php
+
+parity-matrix:
+	@php symfony/tools/parity-check.php --matrix
+
+# Full pre-commit check. Required by CONTRIBUTING.md Definition of Done.
+check: lint lint-twig parity test
 	@echo ""
-	@echo "✓ make check passed — ready to commit"
+	@echo "make check passed, ready to commit"
 
 # Generate a new Doctrine migration from current entities
 migrations-diff:

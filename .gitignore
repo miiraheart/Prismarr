@@ -28,12 +28,30 @@ docker-compose.override.yml
 # JWT keys
 symfony/config/jwt/
 
-# Claude Code artefacts
-.claude/
-
 # Internal/private docs (not for the public repo)
 PROGRESSION.md
 CLAUDE.md
 AGENTS.md
 REDDIT_POST.md
 REDDIT_POSTS.md
+
+# --- agent tooling (committed on purpose, contains no secrets) ---
+# Only the repository root .claude/ is committed. A nested one is always a tool
+# writing relative to its working directory, and it carries session state.
+**/.claude/
+!/.claude/
+
+# A trailing slash would stop git descending, so the negations below could
+# never fire. CLAUDE.md above is not root anchored, which is why the negation
+# for .claude/CLAUDE.md has to come after it.
+/.claude/*
+!/.claude/hooks/
+!/.claude/rules/
+!/.claude/skills/
+!/.claude/agents/
+!/.claude/settings.json
+!/.claude/CLAUDE.md
+
+# Session state and personal permission answers. Never commit.
+/.claude/state/
+/.claude/settings.local.json
