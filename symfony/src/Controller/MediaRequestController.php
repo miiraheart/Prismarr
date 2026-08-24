@@ -34,6 +34,13 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 #[IsGranted('ROLE_USER')]
 class MediaRequestController extends AbstractController
 {
+    /**
+     * How many recent requests to index for the card badges. Seerr's own
+     * request list is the source; this bounds one call rather than paging the
+     * whole history on every page view.
+     */
+    private const STATE_PAGE = 100;
+
     public function __construct(
         private readonly JellyseerrClient $jellyseerr,
         private readonly ConfigService    $config,
@@ -98,6 +105,61 @@ class MediaRequestController extends AbstractController
             'ok'     => true,
             'status' => $created['status'] ?? null,
         ]);
+    }
+
+    /**
+     * Existing Seerr requests, keyed "{type}:{tmdb_id}", so a card can show
+     * that a title was already asked for, by whom and when.
+     *
+     * ONE call, indexed here. Asking Seerr per card would be one request per
+     * poster on a grid of sixty, which is the trap the Trakt poster hydration
+     * already fell into.
+     */
+    #[Route('/media-request/states', name: 'media_request_states', methods: ['GET'])]
+    public function states(): JsonResponse
+    {
+        if (!$this->seerrConfigured()) {
+            return $this->json([]);
+        }
+
+        try {
+            $data = $this->jellyseerr->getRequests(self::STATE_PAGE, 0, 'all');
+        } catch (\Throwable $e) {
+            $this->logger->warning('Seerr request states failed', [
+                'exception' => $e::class,
+                'message'   => $e->getMessage(),
+            ]);
+
+            return $this->json([]);
+        }
+
+        $out = [];
+        foreach (($data['results'] ?? []) as $req) {
+            $tmdbId = $req['media']['tmdbId'] ?? null;
+            $type   = $req['media']['mediaType'] ?? $req['type'] ?? null;
+            if (!$tmdbId || !in_array($type, ['movie', 'tv'], true)) {
+                continue;
+            }
+
+            $key = $type . ':' . (int) $tmdbId;
+
+            // Keep the newest request for a title: Seerr allows several, and
+            // the latest is the one whose state the card should reflect.
+            $createdAt = (string) ($req['createdAt'] ?? '');
+            if (isset($out[$key]) && $createdAt < $out[$key]['requested_at']) {
+                continue;
+            }
+
+            $out[$key] = [
+                'status'       => (int) ($req['status'] ?? 0),
+                'requested_by' => (string) ($req['requestedBy']['displayName']
+                    ?? $req['requestedBy']['username']
+                    ?? ''),
+                'requested_at' => $createdAt,
+            ];
+        }
+
+        return $this->json($out);
     }
 
     private function seerrConfigured(): bool

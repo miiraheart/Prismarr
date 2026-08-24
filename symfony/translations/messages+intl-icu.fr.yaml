@@ -5760,6 +5760,13 @@ request:
     sent: Demandé dans Seerr
     duplicate: Déjà demandé
     done: Demandé
+  state:
+    pending: Demandé
+    approved: Approuvé
+    declined: Refusé
+    failed: Échec
+    completed: Disponible
+    by: par __WHO__
   error:
     invalid: Paramètres de demande invalides
     failed: Seerr n'a pas pu créer cette demande

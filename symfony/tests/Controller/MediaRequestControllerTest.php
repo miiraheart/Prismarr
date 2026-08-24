@@ -87,6 +87,28 @@ class MediaRequestControllerTest extends AbstractWebTestCase
         $this->assertNotSame('', (string) ($payload['error'] ?? ''));
     }
 
+    public function testStatesIsEmptyWithoutSeerrRatherThanErroring(): void
+    {
+        $this->client->request('GET', '/media-request/states');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSame([], json_decode($this->client->getResponse()->getContent(), true));
+    }
+
+    /**
+     * Seerr being unreachable must degrade to no badges, never to a broken
+     * page: this map is fetched on every browse page load.
+     */
+    public function testStatesDegradesToEmptyWhenSeerrIsUnreachable(): void
+    {
+        $this->configureSeerr();
+
+        $this->client->request('GET', '/media-request/states');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSame([], json_decode($this->client->getResponse()->getContent(), true));
+    }
+
     private function configureSeerr(): void
     {
         $em = $this->em();

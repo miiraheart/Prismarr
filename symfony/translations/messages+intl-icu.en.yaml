@@ -5762,6 +5762,13 @@ request:
     sent: Requested in Seerr
     duplicate: Already requested
     done: Requested
+  state:
+    pending: Requested
+    approved: Approved
+    declined: Declined
+    failed: Failed
+    completed: Available
+    by: by __WHO__
   error:
     invalid: Invalid request parameters
     failed: Seerr could not create that request

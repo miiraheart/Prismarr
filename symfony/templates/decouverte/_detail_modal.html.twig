@@ -29,6 +29,15 @@
     transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.3);
     z-index: 2;
   }
+  /* Seerr request state. Bottom-left, so it clears the quality badge (top
+     left), the vote badge (top right) and the kebab. */
+  .media-card[data-tmdb-id] .request-badge {
+    position: absolute; left: .3rem; bottom: .3rem; z-index: 6;
+    font-size: .58rem; font-weight: 700; letter-spacing: .02em;
+    color: #fff; padding: .1rem .32rem; border-radius: .25rem;
+    text-transform: uppercase; pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
   .media-card[data-tmdb-id] img {
     width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block;
   }
@@ -1618,6 +1627,7 @@
   var playback = null;
   var watched  = null;
   var ratings  = null;
+  var requests = null;
   var fetchInFlight = false;
   var observedBody = null;
 
@@ -1634,14 +1644,61 @@
     callbacks.forEach(function (cb) { try { cb(); } catch (e) {} });
   }
 
+  // Seerr request state, so a title already asked for is obvious before
+  // asking again. Statuses are Overseerr's MediaRequestStatus:
+  // 1 pending, 2 approved, 3 declined, 4 failed, 5 completed.
+  var REQUEST_LABELS = {
+    1: {{ 'request.state.pending'|trans|json_encode|raw }},
+    2: {{ 'request.state.approved'|trans|json_encode|raw }},
+    3: {{ 'request.state.declined'|trans|json_encode|raw }},
+    4: {{ 'request.state.failed'|trans|json_encode|raw }},
+    5: {{ 'request.state.completed'|trans|json_encode|raw }}
+  };
+  var REQUEST_COLORS = { 1: '#f59e0b', 2: '#3b82f6', 3: '#6b7280', 4: '#ef4444', 5: '#22c55e' };
+  var REQUESTED_BY   = {{ 'request.state.by'|trans|json_encode|raw }};
+
+  function stampRequest(card, key) {
+    var req = requests && requests[key];
+    if (!req || card.querySelector('.request-badge')) return;
+
+    // A declined request should not stop the title being asked for again.
+    if (req.status === 3) return;
+
+    var badge = document.createElement('span');
+    badge.className = 'request-badge';
+    badge.textContent = REQUEST_LABELS[req.status] || REQUEST_LABELS[1];
+    badge.style.background = REQUEST_COLORS[req.status] || REQUEST_COLORS[1];
+
+    var title = badge.textContent;
+    if (req.requested_by) title += ' · ' + REQUESTED_BY.replace('__WHO__', req.requested_by);
+    if (req.requested_at) title += ' · ' + String(req.requested_at).slice(0, 10);
+    badge.title = title;
+
+    card.appendChild(badge);
+
+    // The card already says it was requested; a second Add would only make a
+    // duplicate. Completed titles keep the button, since they may have been
+    // removed from the library since.
+    if (req.status === 1 || req.status === 2) {
+      var add = card.querySelector('.tmdb-add-btn');
+      if (add) {
+        add.classList.add('disabled');
+        add.setAttribute('disabled', 'disabled');
+        add.textContent = REQUEST_LABELS[req.status];
+      }
+    }
+  }
+
   function stampCard(card) {
-    if ((!playback && !watched) || card.dataset[STAMP_ATTR]) return;
+    if ((!playback && !watched && !requests) || card.dataset[STAMP_ATTR]) return;
     card.dataset[STAMP_ATTR] = '1';
 
     var type = card.dataset.tmdbType;
     var id   = card.dataset.tmdbId;
     if (!type || !id) return;
     var key = type + ':' + id;
+
+    stampRequest(card, key);
 
     var inProgress = playback && playback[key];
     var badge = document.createElement('span');
@@ -1722,10 +1779,14 @@
 
     Promise.all([
       fetchMap('/trakt/playback'),
-      fetchMap('/trakt/marks')
+      fetchMap('/trakt/marks'),
+      // Seerr request state, indexed by tmdb id server-side so a grid of
+      // sixty cards costs one call rather than sixty.
+      fetchMap({{ path('media_request_states')|json_encode|raw }})
     ]).then(function (results) {
       fetchInFlight = false;
       playback = (results[0] && typeof results[0] === 'object') ? results[0] : {};
+      requests = (results[2] && typeof results[2] === 'object') ? results[2] : {};
       // /trakt/marks answers {ratings, watched} in one call; the detail
       // modal's rating chip and this script's watched badge both read out
       // of the same response instead of fetching it twice.
@@ -1733,7 +1794,9 @@
       watched = (marks.watched && typeof marks.watched === 'object') ? marks.watched : {};
       ratings = (marks.ratings && typeof marks.ratings === 'object') ? marks.ratings : {};
       notifyReady();
-      if (Object.keys(playback).length === 0 && Object.keys(watched).length === 0) return;
+      if (Object.keys(playback).length === 0
+          && Object.keys(watched).length === 0
+          && Object.keys(requests).length === 0) return;
       stampAll();
       watchForNewCards();
     }).catch(function () { fetchInFlight = false; notifyReady(); /* no badge, no noise */ });
