@@ -23,9 +23,9 @@ declare(strict_types=1);
  */
 
 return [
-    // deluge: health_api and health_widget are BACKLOG. Deluge is health-checkable
-    // but is absent from HealthController::FLAT_SERVICES, so it shows green while down.
-    'deluge' => ['health_api', 'health_cache', 'health_widget'],
+    // deluge: health_widget is BACKLOG. The dashboard widget's chip list does
+    // not include deluge at all, so this is a widget gap, not a color gap.
+    'deluge' => ['health_cache', 'health_widget'],
 
     // gluetun: EXEMPT across the board. A VPN status probe with no page, no route
     // and no sidebar entry. Only 'health' is BACKLOG: with no arm in
@@ -43,8 +43,8 @@ return [
     'nzbget' => ['controller', 'client', 'templates', 'health_cache', 'health_widget', 'route_guard'],
     'sabnzbd' => ['controller', 'client', 'templates', 'health_cache', 'health_widget', 'route_guard'],
 
-    // tautulli: health_api, setup and smoke are all BACKLOG.
-    'tautulli' => ['health_api', 'health_cache', 'setup', 'smoke'],
+    // tautulli: setup and smoke are BACKLOG.
+    'tautulli' => ['health_cache', 'setup', 'smoke'],
 
     // tmdb: templates is EXEMPT. TMDB is a metadata source rendered inside other
     // modules' pages and owns no template directory.
