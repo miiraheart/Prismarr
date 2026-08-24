@@ -23,25 +23,27 @@ declare(strict_types=1);
  */
 
 return [
-    // deluge: health_widget is BACKLOG. The dashboard widget's chip list does
-    // not include deluge at all, so this is a widget gap, not a color gap.
-    'deluge' => ['health_cache', 'health_widget'],
+    // deluge: only the no-signal health_cache column remains.
+    'deluge' => ['health_cache'],
 
     // gluetun: EXEMPT across the board. A VPN status probe with no page, no route
     // and no sidebar entry. Only 'health' is BACKLOG: with no arm in
     // HealthService::pingFor it falls through to a default that always reports healthy.
     'gluetun' => ['controller', 'templates', 'health', 'health_api', 'health_cache', 'health_widget', 'route_guard', 'sidebar', 'smoke'],
 
-    // mdblist: controller and templates are EXEMPT. It is a list source behind the
-    // discover page, served by DiscoverController, so it owns no page of its own.
-    // health_widget, setup, route_guard and smoke are BACKLOG.
-    'mdblist' => ['controller', 'templates', 'health_cache', 'health_widget', 'setup', 'route_guard', 'smoke'],
+    // mdblist: controller, templates, route_guard and smoke are EXEMPT. It is a
+    // list source behind the discover page with no routes and no page of its
+    // own, so there is no route prefix to guard and no route to smoke-test
+    // (DiscoverPageControllerTest covers the page it feeds). setup is BACKLOG.
+    'mdblist' => ['controller', 'templates', 'health_cache', 'setup', 'route_guard', 'smoke'],
 
-    // nzbget and sabnzbd: controller, client and templates are EXEMPT. Both are
-    // served by UsenetController from templates/usenet/ and
-    // src/Service/Media/Usenet/. health_widget and route_guard are BACKLOG.
-    'nzbget' => ['controller', 'client', 'templates', 'health_cache', 'health_widget', 'route_guard'],
-    'sabnzbd' => ['controller', 'client', 'templates', 'health_cache', 'health_widget', 'route_guard'],
+    // nzbget and sabnzbd: controller, client, templates and route_guard are all
+    // EXEMPT. Both are served by UsenetController from templates/usenet/ and
+    // src/Service/Media/Usenet/, and they share the single app_usenet_ route
+    // prefix with a {client} parameter, which the guard's one-prefix-one-service
+    // rule shape cannot express.
+    'nzbget' => ['controller', 'client', 'templates', 'health_cache', 'route_guard'],
+    'sabnzbd' => ['controller', 'client', 'templates', 'health_cache', 'route_guard'],
 
     // tautulli: setup and smoke are BACKLOG.
     'tautulli' => ['health_cache', 'setup', 'smoke'],
@@ -55,6 +57,6 @@ return [
     // current work's real gap list.
     'trakt' => ['templates', 'health_cache', 'setup', 'smoke'],
 
-    // transmission: health_widget is BACKLOG.
-    'transmission' => ['health_cache', 'health_widget'],
+    // transmission: only the no-signal health_cache column remains.
+    'transmission' => ['health_cache'],
 ];
