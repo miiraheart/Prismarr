@@ -49,6 +49,7 @@ class ServiceRouteGuardSubscriber implements EventSubscriberInterface
         'app_transmission'  => ['service' => 'Transmission', 'service_id' => 'transmission', 'keys' => ['transmission_url'],                   'wizard' => 'app_setup_downloads', 'index' => 'app_transmission_index'],
         'tmdb_'             => ['service' => 'TMDb',        'service_id' => 'tmdb',        'keys' => ['tmdb_api_key'],                         'wizard' => 'app_setup_tmdb',      'index' => 'tmdb_index'],
         'app_tautulli_index' => ['service' => 'Tautulli',   'service_id' => 'tautulli',    'keys' => ['tautulli_url', 'tautulli_api_key'],      'wizard' => 'admin_settings_index', 'index' => 'app_tautulli_index'],
+        'trakt_'            => ['service' => 'Trakt',       'service_id' => 'trakt',       'keys' => ['trakt_client_id', 'trakt_username'],     'wizard' => 'admin_settings_index', 'index' => 'trakt_index'],
     ];
 
     public function __construct(
