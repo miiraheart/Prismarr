@@ -44,17 +44,16 @@ return [
     'nzbget' => ['controller', 'client', 'templates', 'health_cache', 'route_guard'],
     'sabnzbd' => ['controller', 'client', 'templates', 'health_cache', 'route_guard'],
 
-    // tautulli: setup and smoke are BACKLOG.
-    'tautulli' => ['health_cache', 'setup', 'smoke'],
+    // tautulli: setup is BACKLOG.
+    'tautulli' => ['health_cache', 'setup'],
 
     // tmdb: templates is EXEMPT. TMDB is a metadata source rendered inside other
     // modules' pages and owns no template directory.
     'tmdb' => ['templates', 'health_cache'],
 
     // trakt: templates is EXEMPT since the discover rework, which moved the trakt
-    // page under templates/discover/. setup and smoke are BACKLOG and are the
-    // current work's real gap list.
-    'trakt' => ['templates', 'health_cache', 'setup', 'smoke'],
+    // page under templates/discover/. setup is BACKLOG.
+    'trakt' => ['templates', 'health_cache', 'setup'],
 
     // transmission: only the no-signal health_cache column remains.
     'transmission' => ['health_cache'],

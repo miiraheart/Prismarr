@@ -49,6 +49,11 @@ class ControllersSmokeTest extends AbstractWebTestCase
             // redirect home with a flash rather than crash.
             'usenet sabnzbd'      => ['/usenet/sabnzbd', 'UsenetController::index'],
             'usenet nzbget'       => ['/usenet/nzbget', 'UsenetController::index'],
+            'tautulli index'      => ['/tautulli', 'TautulliController::index'],
+            // Unconfigured trakt redirects to settings via the route guard;
+            // configured it redirects on to the discover page. Either way the
+            // route must not 500.
+            'trakt index'         => ['/trakt', 'TraktController::index'],
         ];
     }
 
