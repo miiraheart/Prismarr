@@ -777,14 +777,29 @@ class TraktClient implements ResetInterface
             $bucket => [['ids' => ['tmdb' => $tmdbId], 'watched_at' => 'released']],
         ], $token);
 
-        $added = (int) ($res['data']['added']['movies'] ?? 0) + (int) ($res['data']['added']['episodes'] ?? 0);
         if ($res['code'] !== 201 && $res['code'] !== 200) {
             $this->logger->warning('Trakt history add failed', ['http' => $res['code'], 'tmdb_id' => $tmdbId]);
 
             return false;
         }
+
+        // Trakt answers 201 even when it could not resolve the title, putting
+        // it in not_found and adding nothing. Measured 2026-08-24: a bogus
+        // tmdb id returns 201 with added.movies=0 and one not_found entry.
+        // Reporting that as success is what made "mark as watched" look like
+        // it worked while Trakt never recorded anything.
+        $notFound = $res['data']['not_found'][$bucket] ?? [];
+        if (is_array($notFound) && $notFound !== []) {
+            $this->logger->warning('Trakt history add: title not found on Trakt', [
+                'tmdb_id' => $tmdbId, 'bucket' => $bucket,
+            ]);
+
+            return false;
+        }
+
+        $added = (int) ($res['data']['added']['movies'] ?? 0) + (int) ($res['data']['added']['episodes'] ?? 0);
         if ($added < 1) {
-            // Already in the history counts as success: the end state is right.
+            // Resolved but nothing new to add: the end state is still right.
             $this->logger->info('Trakt history add matched nothing new', ['tmdb_id' => $tmdbId]);
         }
 
@@ -901,7 +916,6 @@ class TraktClient implements ResetInterface
             $bucket => [['ids' => ['tmdb' => $tmdbId]]],
         ], $token);
 
-        $added = (int) ($res['data']['added']['movies'] ?? 0) + (int) ($res['data']['added']['shows'] ?? 0);
         if ($res['code'] !== 201 && $res['code'] !== 200) {
             $this->logger->warning('Trakt list item add failed', [
                 'http' => $res['code'], 'list_id' => $listId, 'tmdb_id' => $tmdbId,
@@ -909,9 +923,22 @@ class TraktClient implements ResetInterface
 
             return false;
         }
+
+        // Same trap as markWatched(): a title Trakt cannot resolve comes back
+        // 201 with a not_found entry and nothing added, which must not be
+        // reported as success.
+        $notFound = $res['data']['not_found'][$bucket] ?? [];
+        if (is_array($notFound) && $notFound !== []) {
+            $this->logger->warning('Trakt list item add: title not found on Trakt', [
+                'list_id' => $listId, 'tmdb_id' => $tmdbId, 'bucket' => $bucket,
+            ]);
+
+            return false;
+        }
+
+        $added = (int) ($res['data']['added']['movies'] ?? 0) + (int) ($res['data']['added']['shows'] ?? 0);
         if ($added < 1) {
-            // Already on the list counts as success: the end state is
-            // right, same convention markWatched()/markDropped() use above.
+            // Resolved but already on the list: the end state is right.
             $this->logger->info('Trakt list item add matched nothing new', ['list_id' => $listId, 'tmdb_id' => $tmdbId]);
         }
 
