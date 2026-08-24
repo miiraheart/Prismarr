@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Service\ConfigService;
 use App\Service\Media\Discover\ListsTabContext;
 use App\Service\Media\LibraryIndex;
+use App\Service\Media\MdblistClient;
 use App\Service\Media\TmdbClient;
 use App\Repository\Media\WatchlistItemRepository;
 use App\Service\Media\TraktClient;
@@ -58,8 +59,14 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 #[IsGranted('ROLE_USER')]
 class DiscoverPageController extends AbstractController
 {
+    /**
+     * How far ahead the Calendar tab looks. MDBList caps the range at 120
+     * days; 45 keeps the payload small while still covering a season.
+     */
+    private const CALENDAR_DAYS = 45;
+
     /** Tab ids, in display order. Also the allowed values of ?tab= and {tab}. */
-    public const TABS = ['discover', 'lists', 'watchlists'];
+    public const TABS = ['discover', 'lists', 'watchlists', 'calendar'];
 
     /**
      * Tab ids that used to exist, mapped to their replacement.
@@ -80,6 +87,7 @@ class DiscoverPageController extends AbstractController
         private readonly TraktClient     $trakt,
         private readonly WatchlistItemRepository $watchlistRepo,
         private readonly TranslatorInterface $translator,
+        private readonly MdblistClient   $mdblist,
     ) {}
 
     #[Route('/decouverte', name: 'discover_page', priority: 10)]
@@ -112,7 +120,7 @@ class DiscoverPageController extends AbstractController
      * section, filter, genres, resolve, detail, search, explorer, collection,
      * person, watchlist and mes-recommandations. `tab` is free.
      */
-    #[Route('/decouverte/tab/{tab}', name: 'discover_page_tab', requirements: ['tab' => 'discover|lists|watchlists|trakt'], priority: 10)]
+    #[Route('/decouverte/tab/{tab}', name: 'discover_page_tab', requirements: ['tab' => 'discover|lists|watchlists|calendar|trakt'], priority: 10)]
     public function tab(string $tab): Response
     {
         return $this->renderTab(self::TAB_ALIASES[$tab] ?? $tab);
@@ -124,6 +132,7 @@ class DiscoverPageController extends AbstractController
             'discover' => $this->renderDiscoverTab(),
             'lists'    => $this->renderListsTab(),
             'watchlists' => $this->renderWatchlistsTab(),
+            'calendar'   => $this->renderCalendarTab(),
             default    => new Response('', Response::HTTP_NOT_FOUND),
         };
     }
@@ -265,6 +274,65 @@ class DiscoverPageController extends AbstractController
         usort($rows, static fn (array $a, array $b): int => ($b['listed_at'] ?? '') <=> ($a['listed_at'] ?? ''));
 
         return $rows;
+    }
+
+    /**
+     * The Calendar tab: what is coming for everything the account follows.
+     *
+     * Deliberately NOT an addition to the upstream CalendrierController. That
+     * file is upstream owned and an edit there is re-paid at every nightly
+     * sync, and the two answer different questions anyway: Calendrier is fed
+     * by Radarr and Sonarr so it only shows what is already in the library,
+     * while this shows what is coming for everything followed.
+     */
+    private function renderCalendarTab(): Response
+    {
+        $error  = false;
+        $events = [];
+
+        if ($this->config->has('mdblist_api_key')) {
+            try {
+                $events = $this->mdblist->getCalendar(
+                    (new \DateTimeImmutable('today'))->format('Y-m-d'),
+                    (new \DateTimeImmutable('today'))->modify('+' . self::CALENDAR_DAYS . ' days')->format('Y-m-d'),
+                );
+            } catch (\Throwable $e) {
+                $this->logger->warning('Calendar tab failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+                $error = true;
+            }
+        }
+
+        try {
+            $library = $this->libraryIndex->build();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Calendar library index failed', ['message' => $e->getMessage()]);
+            $library = ['movie' => [], 'tv' => []];
+        }
+
+        // Group by date so the tab reads as a calendar rather than a flat
+        // grid. The API already returns events in date order.
+        $days = [];
+        foreach ($events as $event) {
+            $info = $event['type'] === 'movie'
+                ? ($library['movie'][(int) $event['id']] ?? null)
+                : ($library['tv']['tmdb_' . (int) $event['id']] ?? null);
+
+            $event += [
+                'in_library' => $info !== null,
+                'lib_status' => $info['status'] ?? null,
+                'lib_id'     => $info['id'] ?? null,
+            ];
+
+            $days[$event['date']][] = $event;
+        }
+
+        return $this->render('discover/_tab_calendar.html.twig', [
+            'days'       => $days,
+            'error'      => $error,
+            'configured' => $this->config->has('mdblist_api_key'),
+            'total'      => count($events),
+            'windowDays' => self::CALENDAR_DAYS,
+        ]);
     }
 
     /**

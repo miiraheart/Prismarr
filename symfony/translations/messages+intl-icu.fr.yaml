@@ -5696,6 +5696,7 @@ discover:
     discover: Découverte
     lists: Listes
     watchlists: Listes de suivi
+    calendar: Calendrier
     loading: Chargement...
     failed: Cet onglet n'a pas pu être chargé.
   add:
@@ -5705,6 +5706,19 @@ discover:
     added: Liste ajoutée
     unsupported: Cette URL n'est pas une liste prise en charge
     failed: Impossible d'ajouter cette liste
+  calendar:
+    window: 'Prochains {days} jours, {count} sorties'
+    count: '{count} sorties'
+    search:
+      placeholder: Rechercher dans le calendrier
+    source:
+      episode: Liste de suivi
+      watched: Suivi
+    empty:
+      title: Rien de prévu
+      subtitle: Aucune sortie prévue pour ce que vous suivez sur cette période.
+    error:
+      failed: Le calendrier n'a pas pu être chargé.
   filters:
     button: Filtres
     type: Type

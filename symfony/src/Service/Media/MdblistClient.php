@@ -96,6 +96,104 @@ class MdblistClient implements ResetInterface
         });
     }
 
+    /**
+     * Upcoming releases for everything the account follows.
+     *
+     * Personalised: Mira's MDBList account is Trakt-linked, so this inherits
+     * her watchlist and the shows she follows with no extra setup. It
+     * complements the existing Calendrier page, which is fed by Radarr and
+     * Sonarr and therefore only ever shows what is already in the library.
+     *
+     * The endpoint is UNDOCUMENTED in MDBList's OpenAPI: the response shape
+     * below was measured, re-measured on 2026-08-24, and is recorded in
+     * docs/discover-spec.md. Do not infer fields that were not observed.
+     *
+     * @param  string $start YYYY-MM-DD
+     * @param  string $end   YYYY-MM-DD, at most 120 days after start
+     * @return list<array<string, mixed>>
+     */
+    public function getCalendar(string $start, string $end, int $limit = 200): array
+    {
+        return $this->cachedGet('calendar_' . $start . '_' . $end . '_' . $limit, function () use ($start, $end, $limit): array {
+            $res = $this->request('/calendar/events', [
+                'start'              => $start,
+                'end'                => $end,
+                'limit'              => $limit,
+                'append_to_response' => 'description',
+            ]);
+
+            $events = $res['data']['events'] ?? null;
+
+            return is_array($events) ? $this->mapCalendarEvents($events) : [];
+        });
+    }
+
+    /**
+     * Calendar events to the shared card shape, so the tab can render through
+     * the same renderCardHTML as every other grid.
+     *
+     * An episode's CARD is its show: the detail modal and the library index
+     * are both keyed on a show's tmdb id, and an episode id would join to
+     * nothing. The episode itself rides along as a label.
+     *
+     * @param  array<int, mixed> $events
+     * @return list<array<string, mixed>>
+     */
+    private function mapCalendarEvents(array $events): array
+    {
+        $out = [];
+
+        foreach ($events as $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+
+            $isEpisode = ($event['type'] ?? null) === 'episode';
+
+            // Only the episode shape was ever observed (a 30 day window
+            // returned 18 events, all episodes), so the movie branch reads
+            // every id field MDBList might plausibly use rather than assuming
+            // one, and skips the event when none of them is present.
+            $tmdbId = $isEpisode
+                ? (int) ($event['show_tmdb'] ?? 0)
+                : (int) ($event['movie_tmdb'] ?? $event['tmdb'] ?? $event['show_tmdb'] ?? 0);
+
+            if ($tmdbId <= 0) {
+                continue;
+            }
+
+            $poster = (string) ($event['poster'] ?? '');
+            // Posters arrive absolute at w200; the card grid renders w342.
+            if ($poster !== '') {
+                $poster = str_replace('/w200/', '/w342/', $poster);
+            }
+
+            $out[] = [
+                'id'      => $tmdbId,
+                'type'    => $isEpisode ? 'tv' : 'movie',
+                'title'   => (string) ($event['title'] ?? ''),
+                'poster'  => $poster !== '' ? $poster : null,
+                'year'    => null,
+                'vote'    => null,
+                'date'    => (string) ($event['start'] ?? ''),
+                'episode_title'  => $event['episode_title'] ?? null,
+                'season_number'  => isset($event['season_number']) ? (int) $event['season_number'] : null,
+                'episode_number' => isset($event['episode_number']) ? (int) $event['episode_number'] : null,
+                // Observed values: "episode" and "watched". Both carry FUTURE
+                // dates, so this reads as where the event came from (watchlist
+                // versus a show being followed) rather than as watch history.
+                // Surfaced rather than filtered on, because that reading is
+                // inference and hiding two thirds of the calendar on an
+                // inference would be wrong.
+                'release_type' => (string) ($event['release_type'] ?? ''),
+                'is_watchlist' => (bool) ($event['is_watchlist'] ?? false),
+                'is_watched'   => (bool) ($event['is_watched'] ?? false),
+            ];
+        }
+
+        return $out;
+    }
+
     /** @return list<array{id:int, name:string, slug:string, user:string, items:int, likes:int, mediatype:string, url:string}> */
     public function searchLists(string $query, int $limit = 60): array
     {

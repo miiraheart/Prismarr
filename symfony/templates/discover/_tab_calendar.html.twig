@@ -1,0 +1,149 @@
+{# The Calendar tab.
+
+   MDBList's /calendar/events, which is personalised because the account is
+   Trakt-linked. Complements the upstream Calendrier page rather than
+   replacing it: that one is fed by Radarr and Sonarr and only shows titles
+   already in the library, this one shows what is coming for everything
+   followed.
+
+   Cards render through the shared renderCardHTML, so they carry the star, the
+   Available badge, the watch badges and the kebab. An episode's card is its
+   SHOW, because the detail modal and the library index are both keyed on a
+   show's tmdb id. The modal is NOT included here: the shell includes it once. #}
+{% import '_icons.html.twig' as ico %}
+
+<div data-dsc-pane="calendar">
+<style>
+  .cal-day { margin-bottom: 1.5rem; }
+  .cal-day-header {
+    display: flex; align-items: baseline; gap: .5rem;
+    margin-bottom: .5rem; padding: 0 .25rem;
+    border-bottom: 1px solid var(--tblr-border-color); padding-bottom: .35rem;
+  }
+  .cal-day-header h3 { margin: 0; font-size: .95rem; font-weight: 600; }
+  .cal-day-header .cal-rel { font-size: .75rem; color: var(--tblr-secondary); }
+  .cal-row { display: flex; gap: .75rem; flex-wrap: wrap; padding: .25rem; }
+  /* The episode label sits under its card rather than on it: a card is a
+     fixed 150px and SxxExx plus an episode title does not fit as a badge. */
+  .cal-item { width: 150px; }
+  .cal-ep {
+    font-size: .68rem; color: var(--tblr-secondary);
+    margin-top: .25rem; line-height: 1.25;
+  }
+  .cal-ep .cal-num { color: var(--tblr-body-color); font-weight: 600; }
+  .cal-source {
+    display: inline-block; font-size: .58rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .02em;
+    padding: .05rem .3rem; border-radius: .25rem; margin-top: .2rem;
+    border: 1px solid var(--tblr-border-color); color: var(--tblr-secondary);
+  }
+</style>
+
+<div class="container-xl">
+  {% if not configured %}
+    <div class="alert alert-warning">{{ 'discover.error.not_configured'|trans }}</div>
+  {% elseif error %}
+    <div class="alert alert-warning">{{ 'discover.calendar.error.failed'|trans }}</div>
+  {% endif %}
+
+  <div class="tmdb-searchbar">
+    <div class="tmdb-search-wrap">
+      <svg class="tmdb-search-ico" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/>
+      </svg>
+      <input id="cal-search" type="search" class="tmdb-search-input"
+             placeholder="{{ 'discover.calendar.search.placeholder'|trans }}" autocomplete="off">
+      <kbd class="tmdb-search-kbd d-none d-md-inline">MDBList</kbd>
+    </div>
+    <div class="tmdb-action-btns">
+      <span class="text-secondary small">{{ 'discover.calendar.window'|trans({days: windowDays, count: total}) }}</span>
+    </div>
+  </div>
+
+  {% if days is empty and configured and not error %}
+    <div class="empty">
+      <p class="empty-title">{{ 'discover.calendar.empty.title'|trans }}</p>
+      <p class="empty-subtitle text-secondary">{{ 'discover.calendar.empty.subtitle'|trans }}</p>
+    </div>
+  {% endif %}
+
+  <div id="cal-days">
+    {% for date, events in days %}
+      <div class="cal-day" data-cal-day="{{ date }}">
+        <div class="cal-day-header">
+          <h3>{{ date|date('D d M') }}</h3>
+          <span class="cal-rel">{{ 'discover.calendar.count'|trans({count: events|length}) }}</span>
+        </div>
+        <div class="cal-row">
+          {% for e in events %}
+            <div class="cal-item" data-cal-item
+                 data-cal-title="{{ e.title|e('html_attr') }}"
+                 data-cal-ep="{{ (e.episode_title ?: '')|e('html_attr') }}">
+              <div data-cal-card
+                   data-item="{{ e|json_encode|e('html_attr') }}"></div>
+              {% if e.season_number is not null and e.episode_number is not null %}
+                <div class="cal-ep">
+                  <span class="cal-num">S{{ '%02d'|format(e.season_number) }}E{{ '%02d'|format(e.episode_number) }}</span>
+                  {% if e.episode_title %} {{ e.episode_title }}{% endif %}
+                </div>
+              {% endif %}
+              {# release_type was measured as "episode" or "watched", both with
+                 future dates, so it reads as where the event came from rather
+                 than as watch history. Shown, not filtered on. #}
+              {% if e.release_type %}
+                <span class="cal-source">{{ ('discover.calendar.source.' ~ e.release_type)|trans }}</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.querySelector('[data-dsc-pane="calendar"]');
+  if (!root) return;
+
+  // Cards are rendered client-side through the shared renderer so the
+  // calendar cannot drift from how every other grid draws a card.
+  root.querySelectorAll('[data-cal-card]').forEach(function (slot) {
+    try {
+      var item = JSON.parse(slot.dataset.item);
+      slot.outerHTML = window.renderCardHTML(item);
+    } catch (e) {
+      slot.remove();
+    }
+  });
+
+  // Search filters by show title or episode title, and hides a day whose
+  // every entry is filtered out rather than leaving a bare date heading.
+  var search = document.getElementById('cal-search');
+  var items  = Array.prototype.slice.call(root.querySelectorAll('[data-cal-item]'));
+
+  function apply() {
+    var q = (search.value || '').trim().toLowerCase();
+
+    items.forEach(function (el) {
+      var hit = !q
+        || (el.dataset.calTitle || '').toLowerCase().indexOf(q) !== -1
+        || (el.dataset.calEp || '').toLowerCase().indexOf(q) !== -1;
+      el.style.display = hit ? '' : 'none';
+    });
+
+    root.querySelectorAll('[data-cal-day]').forEach(function (day) {
+      var any = Array.prototype.slice.call(day.querySelectorAll('[data-cal-item]'))
+        .some(function (el) { return el.style.display !== 'none'; });
+      day.style.display = any ? '' : 'none';
+    });
+  }
+
+  var timer = null;
+  search.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(apply, 150);
+  });
+}());
+</script>
+</div>

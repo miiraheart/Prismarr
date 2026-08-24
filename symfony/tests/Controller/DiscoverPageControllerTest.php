@@ -296,6 +296,36 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->assertSelectorExists('#dv-filter-progress');
     }
 
+    public function testTheCalendarTabFragmentRendersOnItsOwn(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/calendar');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('[data-dsc-pane="calendar"]');
+    }
+
+    public function testTheCalendarTabCanBeRequestedAsTheActiveTab(): void
+    {
+        $this->client->request('GET', '/decouverte', ['tab' => 'calendar']);
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#dsc-tabs');
+        $this->assertSelectorExists('[data-dsc-pane="calendar"]');
+    }
+
+    /**
+     * MDBList unreachable in the test environment must leave the tab
+     * renderable with a banner, never a stack trace: this is the same
+     * guarantee every other service page in the app gives.
+     */
+    public function testTheCalendarTabStillRendersWhenMdblistIsUnreachable(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/calendar');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#cal-search');
+    }
+
     public function testTheSidebarHasOneDiscoverEntryNotThree(): void
     {
         $crawler = $this->client->request('GET', '/decouverte');

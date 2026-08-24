@@ -5698,6 +5698,7 @@ discover:
     discover: Discover
     lists: Lists
     watchlists: Watchlists
+    calendar: Calendar
     loading: Loading...
     failed: This tab could not be loaded.
   add:
@@ -5707,6 +5708,19 @@ discover:
     added: List added
     unsupported: That URL is not a supported list
     failed: Could not add that list
+  calendar:
+    window: 'Next {days} days, {count} releases'
+    count: '{count} releases'
+    search:
+      placeholder: Search the calendar
+    source:
+      episode: Watchlist
+      watched: Following
+    empty:
+      title: Nothing scheduled
+      subtitle: Nothing you follow has a release in this window.
+    error:
+      failed: The calendar could not be loaded.
   filters:
     button: Filters
     type: Type
