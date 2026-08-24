@@ -159,6 +159,55 @@
       ? items.map(window.renderCardHTML).join('')
       : '<div class="wl-empty">' + EMPTY_LABEL + '</div>';
     container.dataset.wlLoaded = '1';
+    hydrate(container);
+  }
+
+  // Trakt payloads carry no poster, so cards built from them arrive with the
+  // placeholder icon. One batched request per row fills them in, rather than
+  // the one-request-per-card pump this page used to run.
+  var META_BATCH = {{ path('trakt_meta_batch')|json_encode|raw }};
+  var STAR_ICON  = {{ ico.icon('star-filled', '', 12)|json_encode|raw }};
+
+  function hydrate(container) {
+    var cards = Array.prototype.slice.call(container.querySelectorAll('.media-card[data-tmdb-id]'))
+      .filter(function (c) { return !c.querySelector('img'); });
+    if (!cards.length) return;
+
+    var want = cards.map(function (c) {
+      return { type: c.dataset.tmdbType, id: parseInt(c.dataset.tmdbId, 10) };
+    });
+
+    fetch(META_BATCH, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ items: want })
+    })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (meta) {
+        cards.forEach(function (card) {
+          var d = meta[card.dataset.tmdbType + ':' + card.dataset.tmdbId];
+          if (!d) return;
+
+          if (d.poster) {
+            var img = document.createElement('img');
+            img.src = d.poster;
+            img.alt = '';
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            var ph = card.querySelector('.no-poster');
+            if (ph) { ph.replaceWith(img); } else { card.insertBefore(img, card.firstChild); }
+          }
+
+          if (d.vote && !card.querySelector('.vote-badge')) {
+            var b = document.createElement('span');
+            b.className = 'vote-badge ' + (d.vote >= 7 ? 'good' : (d.vote >= 5 ? 'mid' : 'bad'));
+            b.innerHTML = STAR_ICON + ' ' + d.vote;
+            card.appendChild(b);
+          }
+        });
+      })
+      .catch(function () { /* placeholders stay: a missing poster is not fatal */ });
   }
 
   // ── The two seeded rows ──────────────────────────────────────────────

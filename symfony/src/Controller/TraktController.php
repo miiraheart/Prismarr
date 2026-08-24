@@ -33,6 +33,9 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 #[Route('/trakt', name: 'trakt_')]
 class TraktController extends AbstractController
 {
+    /** Upper bound on one batch, so a page cannot ask for unlimited lookups. */
+    private const META_BATCH_MAX = 120;
+
     public function __construct(
         private readonly TraktClient              $trakt,
         private readonly TmdbClient               $tmdb,
@@ -64,6 +67,65 @@ class TraktController extends AbstractController
     public function listItems(string $ref): JsonResponse
     {
         return $this->json(['items' => $this->trakt->getListItems($ref)]);
+    }
+
+    /**
+     * Posters and scores for many titles in ONE round trip.
+     *
+     * Trakt payloads carry no poster, so cards built from them need TMDb.
+     * Doing that per card meant one request per title, 6 at a time, roughly 57
+     * on a real watchlist, and the Watchlists tab multiplied that by every row.
+     * The TMDb calls still happen server-side but they are cached there, and
+     * the browser pays a single request instead of dozens.
+     *
+     * @see TraktController::meta() for the single-title version, still used by
+     *      callers that genuinely need one.
+     */
+    // No CSRF token: internal app, protected by the class-level IsGranted.
+    #[Route('/meta/batch', name: 'meta_batch', methods: ['POST'])]
+    public function metaBatch(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $items   = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+
+        // Bounded so one page cannot ask for an unlimited number of TMDb
+        // lookups in a single request.
+        $items = array_slice($items, 0, self::META_BATCH_MAX);
+
+        $out = [];
+        foreach ($items as $item) {
+            $type   = (string) ($item['type'] ?? '');
+            $tmdbId = (int) ($item['id'] ?? 0);
+            if ($tmdbId <= 0 || !in_array($type, ['movie', 'tv'], true)) {
+                continue;
+            }
+
+            $key = $type . ':' . $tmdbId;
+            if (isset($out[$key])) {
+                continue;
+            }
+
+            try {
+                $detail = $type === 'movie' ? $this->tmdb->getMovie($tmdbId) : $this->tmdb->getTv($tmdbId);
+            } catch (\Throwable $e) {
+                $this->logger->warning('Trakt meta batch lookup failed', [
+                    'tmdb_id' => $tmdbId,
+                    'message' => $e->getMessage(),
+                ]);
+                continue;
+            }
+
+            if ($detail === null) {
+                continue;
+            }
+
+            $out[$key] = [
+                'poster' => TmdbClient::posterUrl($detail['poster_path'] ?? null, 'w342'),
+                'vote'   => isset($detail['vote_average']) ? round((float) $detail['vote_average'], 1) : null,
+            ];
+        }
+
+        return $this->json($out);
     }
 
     /**

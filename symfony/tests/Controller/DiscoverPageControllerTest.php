@@ -228,6 +228,23 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->assertStringContainsString('.tmdb-action-btn', $html);
     }
 
+    /**
+     * Trakt payloads carry no poster, so Watchlists cards need TMDb. Doing
+     * that one card at a time meant roughly 57 requests on a real watchlist,
+     * multiplied by every row on this tab.
+     */
+    public function testTheWatchlistsTabHydratesPostersInOneBatch(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/watchlists');
+
+        $html = (string) $this->client->getResponse()->getContent();
+        // json_encode escapes forward slashes, so the embedded route reads
+        // \/trakt\/meta\/batch in the rendered source.
+        $this->assertStringContainsString('trakt\/meta\/batch', $html);
+        // The old one-request-per-card pump must be gone, not merely unused.
+        $this->assertStringNotContainsString("BASE + '/meta/'", $html);
+    }
+
     public function testTheSidebarHasOneDiscoverEntryNotThree(): void
     {
         $crawler = $this->client->request('GET', '/decouverte');
