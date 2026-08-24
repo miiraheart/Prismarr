@@ -67,8 +67,15 @@ parity:
 parity-matrix:
 	@php symfony/tools/parity-check.php --matrix
 
+# Syntax-check the inline JavaScript inside fork-owned Twig templates.
+# lint:twig validates Twig and PHPUnit never runs a browser, so a JS syntax
+# error otherwise ships green with every scripted feature silently dead.
+# Pure node, no dependencies, runs on the host like the parity gate.
+js-check:
+	@node symfony/tools/twig-js-check.mjs symfony
+
 # Full pre-commit check. Required by CONTRIBUTING.md Definition of Done.
-check: lint lint-twig parity test
+check: lint lint-twig parity js-check test
 	@echo ""
 	@echo "make check passed, ready to commit"
 
