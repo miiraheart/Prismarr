@@ -28,6 +28,14 @@
   {% endfor %}
 </div>
 
+{# Included ONCE here rather than once per tab, and BEFORE the panes.
+
+   The order matters: the modal partial is what defines window.renderCardHTML,
+   and a server-rendered tab's own inline script runs as the document is
+   parsed. Including the modal after the panes left the Trakt tab calling
+   renderCardHTML before it existed, which threw and rendered zero cards. #}
+{% include 'decouverte/_detail_modal.html.twig' %}
+
 {# Only the active pane is server rendered. The others are fetched once, on
    first click, and then kept in the DOM so every later switch is instant. #}
 <div id="dsc-panes">
@@ -37,10 +45,6 @@
     </div>
   {% endfor %}
 </div>
-
-{# Included ONCE here rather than once per tab. Including it inside each pane
-   would re-run its bindings every time a lazy pane is injected. #}
-{% include 'decouverte/_detail_modal.html.twig' %}
 
 <script>
 (function () {
@@ -94,9 +98,23 @@
         // The injected markup carries its own <script> blocks, which the
         // browser does not execute on innerHTML assignment. Re-create each
         // one so the tab's own behaviour actually starts.
+        //
+        // Only EXECUTABLE scripts. A tab may also ship a data island such as
+        // the Trakt tab's <script type="application/json" id="tk-items">, and
+        // innerHTML already placed that in the DOM intact. Re-creating it
+        // dropped its type and id, so the tab read an empty seed and rendered
+        // nothing. Attributes are copied for the same reason.
         pane.querySelectorAll('script').forEach(function (old) {
+          var type = (old.getAttribute('type') || '').toLowerCase();
+          var executable = type === '' || type === 'module'
+            || type === 'text/javascript' || type === 'application/javascript';
+          if (!executable) return;
+
           var s = document.createElement('script');
-          if (old.src) { s.src = old.src; } else { s.textContent = old.textContent; }
+          for (var i = 0; i < old.attributes.length; i++) {
+            s.setAttribute(old.attributes[i].name, old.attributes[i].value);
+          }
+          if (!old.src) { s.textContent = old.textContent; }
           old.replaceWith(s);
         });
       })
