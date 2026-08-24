@@ -3,6 +3,13 @@
 <html lang="{{ app.request.locale|default('fr') }}" data-bs-theme="{{ theme().active ? (theme().light ? 'light' : 'dark') : 'dark' }}">
 <head>
   <meta charset="utf-8"/>
+
+  {# Card posters all come from image.tmdb.org. Without this, the first image
+     request on a page pays DNS, TCP and TLS setup before a single byte
+     arrives, which is what made rows look blank for about a second while
+     scrolling the Discover tab: it ships around 200 lazy images. #}
+  <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
+  <link rel="dns-prefetch" href="https://image.tmdb.org">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
   <title>{% block title %}Prismarr{% endblock %} - Prismarr</title>

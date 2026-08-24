@@ -1401,7 +1401,7 @@
     var vc = item.vote >= 7 ? 'good' : (item.vote >= 5 ? 'mid' : 'bad');
     var safeTitle = escHtml(item.title || '');
     var poster = item.poster
-      ? '<img src="' + item.poster + '" alt="" loading="lazy">'
+      ? '<img src="' + item.poster + '" alt="" loading="lazy" decoding="async">'
       : '<div class="no-poster">' + {{ ico.icon('movie', '', 32)|json_encode|raw }} + '</div>';
     var statusColors = { downloaded: '#22c55e', missing: '#f59e0b', announced: '#6366f1', inCinemas: '#6366f1', partial: '#3b82f6', unmonitored: '#6b7280' };
     // Short labels (for card badges) — reuse the card.status_short keys
