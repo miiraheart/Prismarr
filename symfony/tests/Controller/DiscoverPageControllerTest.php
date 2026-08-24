@@ -314,16 +314,47 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
     }
 
     /**
-     * MDBList unreachable in the test environment must leave the tab
-     * renderable with a banner, never a stack trace: this is the same
-     * guarantee every other service page in the app gives.
+     * Every source unreachable in the test environment must still leave the
+     * tab renderable, never a stack trace: the same guarantee every other
+     * service page in the app gives.
      */
-    public function testTheCalendarTabStillRendersWhenMdblistIsUnreachable(): void
+    public function testTheCalendarTabStillRendersWhenEverySourceIsUnreachable(): void
     {
         $this->client->request('GET', '/decouverte/tab/calendar');
 
         $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('#cal-search');
+        $this->assertSelectorExists('#main-grid');
+    }
+
+    /**
+     * The tab carries the Calendrier UI, copied because that page is
+     * byte-identical to upstream and cannot be shared. If these disappear the
+     * copy has drifted into something else.
+     */
+    public function testTheCalendarTabCarriesTheCalendrierChrome(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/calendar');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#main-title');
+        $this->assertSelectorExists('#main-prev');
+        $this->assertSelectorExists('#main-next');
+        $this->assertSelectorExists('.cal-view-switch');
+        $this->assertSelectorExists('#fc-all');
+    }
+
+    /**
+     * The one deliberate divergence from the copied page: the day view draws
+     * shared media cards rather than text rows, which is the whole reason the
+     * copy exists.
+     */
+    public function testTheCalendarDayViewUsesTheSharedCardRenderer(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/calendar');
+
+        $html = (string) $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('window.renderCardHTML({', $html);
+        $this->assertStringContainsString('cal-day-cards', $html);
     }
 
     public function testTheSidebarHasOneDiscoverEntryNotThree(): void

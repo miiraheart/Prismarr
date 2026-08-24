@@ -1,149 +1,1100 @@
-{# The Calendar tab.
+{# The Calendar tab: one merged calendar.
 
-   MDBList's /calendar/events, which is personalised because the account is
-   Trakt-linked. Complements the upstream Calendrier page rather than
-   replacing it: that one is fed by Radarr and Sonarr and only shows titles
-   already in the library, this one shows what is coming for everything
-   followed.
+   The upstream Calendrier page is fed by Radarr and Sonarr alone, so it only
+   shows what is already in the library. This adds MDBList, which is
+   Trakt-linked and therefore knows about everything followed, including
+   titles never added to Radarr or Sonarr.
 
-   Cards render through the shared renderCardHTML, so they carry the star, the
-   Available badge, the watch badges and the kebab. An episode's card is its
-   SHOW, because the detail modal and the library index are both keyed on a
-   show's tmdb id. The modal is NOT included here: the shell includes it once. #}
+   The CSS, markup and view logic below are a DELIBERATE COPY of
+   templates/calendrier/index.html.twig, which is byte-identical to upstream
+   and must stay that way. The copy exists so the item renderer can be
+   swapped: the day view draws the shared media card, with star, Available
+   badge, watch badges and kebab, instead of a text row.
+
+   Keep the two visually in step. If the upstream page gains a view or a
+   filter, this copy does not inherit it.
+
+   The detail modal is NOT included here: the shell includes it once. #}
 {% import '_icons.html.twig' as ico %}
 
 <div data-dsc-pane="calendar">
 <style>
-  .cal-day { margin-bottom: 1.5rem; }
-  .cal-day-header {
-    display: flex; align-items: baseline; gap: .5rem;
-    margin-bottom: .5rem; padding: 0 .25rem;
-    border-bottom: 1px solid var(--tblr-border-color); padding-bottom: .35rem;
-  }
-  .cal-day-header h3 { margin: 0; font-size: .95rem; font-weight: 600; }
-  .cal-day-header .cal-rel { font-size: .75rem; color: var(--tblr-secondary); }
-  .cal-row { display: flex; gap: .75rem; flex-wrap: wrap; padding: .25rem; }
-  /* The episode label sits under its card rather than on it: a card is a
-     fixed 150px and SxxExx plus an episode title does not fit as a badge. */
-  .cal-item { width: 150px; }
-  .cal-ep {
+/* ── Layout principal — pleine largeur ── */
+
+/* ── Barre filtres horizontale ── */
+.cal-toolbar { display:flex; flex-wrap:wrap; gap:.75rem; align-items:center; margin-bottom:1rem; padding:.6rem .85rem; background:var(--tblr-bg-surface); border:1px solid var(--tblr-border-color); border-radius:.75rem; }
+.cal-toolbar-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--tblr-secondary); }
+.cal-filter-pill { display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .6rem; border:1px solid var(--tblr-border-color); background:none; border-radius:2rem; font-size:.72rem; color:var(--tblr-body-color); cursor:pointer; transition:all .15s; white-space:nowrap; }
+.cal-filter-pill:hover { background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.15); }
+.cal-filter-pill.active { background:rgba(var(--tblr-primary-rgb),.15); border-color:var(--tblr-primary); color:#a5b4fc; font-weight:600; }
+.cal-filter-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.cal-filter-count { font-size:.6rem; color:var(--tblr-secondary); }
+.cal-toolbar-sep { width:1px; height:1.5rem; background:var(--tblr-border-color); margin:0 .25rem; }
+
+/* ── Header navigation ── */
+.cal-main-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; flex-wrap:wrap; gap:.5rem; }
+.cal-main-title { font-size:1.15rem; font-weight:700; }
+
+/* Toggle Mois / Semaine / Jour */
+.cal-view-switch {
+  display: inline-flex;
+  background: var(--tblr-bg-surface);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 1px;
+}
+.cal-view-btn {
+  border: 0;
+  background: transparent;
+  color: var(--tblr-body-color);
+  padding: .28rem .75rem;
+  font-size: .75rem; font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.cal-view-btn:hover { background: rgba(var(--tblr-primary-rgb), .08); }
+.cal-view-btn.is-active {
+  background: var(--tblr-primary);
+  color: #fff;
+}
+
+/* Vue Semaine : 7 col × 1 row. Sur mobile, scroll horizontal pour ne pas
+   écraser les cellules à moins de 100px. */
+.cal-week-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.cal-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: .75rem;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,.2);
+}
+@media (max-width: 768px) {
+  .cal-week-grid { grid-template-columns: repeat(7, minmax(140px, 1fr)); min-width: 1000px; }
+}
+.cal-week-cell {
+  background: var(--tblr-bg-surface);
+  min-height: 340px;
+  padding: .6rem .5rem .7rem;
+  display: flex; flex-direction: column;
+}
+.cal-week-cell.is-today { background: rgba(var(--tblr-primary-rgb), .08); }
+.cal-week-cell.is-past { background: rgba(0,0,0,.15); }
+.cal-week-cell.is-past .cal-block { opacity: .55; text-decoration: line-through; filter: grayscale(.3); }
+.cal-week-head {
+  text-align: center;
+  padding-bottom: .45rem;
+  margin-bottom: .45rem;
+  border-bottom: 1px dashed var(--tblr-border-color);
+}
+.cal-week-dow { font-size: .65rem; font-weight: 700; color: var(--tblr-secondary); text-transform: uppercase; letter-spacing: .08em; }
+.cal-week-dom {
+  font-size: 1.2rem; font-weight: 700; line-height: 1;
+  margin-top: .2rem;
+}
+.cal-week-cell.is-today .cal-week-dow,
+.cal-week-cell.is-today .cal-week-dom { color: var(--tblr-primary); }
+.cal-week-events { display: flex; flex-direction: column; gap: 3px; flex: 1; overflow-y: auto; }
+.cal-week-empty { text-align: center; font-size: .7rem; color: var(--tblr-secondary); opacity: .5; margin: auto 0; font-style: italic; }
+
+/* Vue Jour : timeline verticale avec events */
+.cal-day-wrap {
+  background: var(--tblr-bg-surface);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: .75rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,.2);
+}
+.cal-day-header {
+  display: flex; align-items: baseline; gap: .75rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--tblr-border-color);
+}
+.cal-day-date-big { font-size: 2.2rem; font-weight: 800; line-height: 1; color: var(--tblr-primary); }
+.cal-day-date-lbl { font-size: 1rem; font-weight: 600; color: var(--tblr-body-color); text-transform: capitalize; }
+.cal-day-count { margin-left: auto; font-size: .78rem; color: var(--tblr-secondary); }
+.cal-day-list { display: flex; flex-direction: column; gap: .5rem; }
+.cal-day-row {
+  display: flex; align-items: center; gap: .85rem;
+  padding: .7rem .9rem;
+  background: var(--tblr-bg-surface-secondary);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 8px;
+  transition: border-color .15s ease;
+}
+.cal-day-row:hover { border-color: rgba(var(--tblr-primary-rgb), .45); }
+.cal-day-row-poster {
+  width: 48px; height: 72px; border-radius: 5px;
+  object-fit: cover; flex-shrink: 0;
+  background: var(--tblr-bg-surface-secondary);
+}
+.cal-day-row-placeholder {
+  width: 48px; height: 72px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--tblr-bg-surface-secondary);
+  font-size: 1.5rem; flex-shrink: 0;
+}
+.cal-day-row-body { flex: 1; min-width: 0; }
+.cal-day-row-type {
+  display: inline-block;
+  font-size: .62rem; font-weight: 700;
+  padding: .1rem .4rem; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: .3rem;
+}
+.cal-day-row-title { font-weight: 600; font-size: .92rem; line-height: 1.2; }
+.cal-day-row-sub { font-size: .75rem; color: var(--tblr-secondary); margin-top: .2rem; }
+.cal-day-empty {
+  padding: 3rem 1rem; text-align: center; color: var(--tblr-secondary);
+  font-size: .9rem;
+}
+
+/* Grille mois — scroll horizontal forcé sur petit écran pour que les cellules restent lisibles au lieu de s'écraser à 40px de large. */
+.cal-grid-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:1px; background:rgba(255,255,255,.04); border:1px solid var(--tblr-border-color); border-radius:.75rem; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.2); }
+@media (max-width: 768px) {
+  .cal-grid { grid-template-columns:repeat(7, minmax(92px, 1fr)); min-width:680px; }
+}
+.cal-grid-dow { background:rgba(var(--tblr-primary-rgb),.08); padding:.5rem .35rem; text-align:center; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#818cf8; }
+.cal-grid-dow.is-weekend { color:#f59e0b; }
+.cal-cell { background:var(--tblr-bg-surface); min-height:110px; padding:.3rem .35rem; position:relative; transition:background .15s; }
+.cal-cell:hover { background:rgba(255,255,255,.02); }
+.cal-cell.other-month { background:rgba(0,0,0,.12); }
+.cal-cell.other-month .cal-cell-num { opacity:.25; }
+.cal-cell.is-today { background:rgba(var(--tblr-primary-rgb),.07); }
+/* Dates passées : grisaille + events atténués + rayé — séparation visuelle claire entre ce qui est déjà sorti et ce qui arrive. */
+.cal-cell.is-past { background:rgba(0,0,0,.18); }
+.cal-cell.is-past .cal-cell-num { opacity:.5; }
+.cal-cell.is-past .cal-block { opacity:.55; text-decoration:line-through; filter:grayscale(.3); }
+.cal-cell.is-past .cal-block:hover { opacity:.85; filter:grayscale(0); }
+.cal-cell.is-selected { box-shadow:inset 0 0 0 2px var(--tblr-primary); }
+.cal-cell.is-weekend { background:rgba(255,255,255,.01); }
+.cal-cell-num { font-size:.75rem; font-weight:700; color:rgba(255,255,255,.45); padding:.15rem .3rem; display:inline-block; border-radius:.25rem; cursor:pointer; }
+.cal-cell.is-today .cal-cell-num { background:var(--tblr-primary); color:#fff; border-radius:50%; width:1.5rem; height:1.5rem; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+.cal-cell-events { display:flex; flex-direction:column; gap:2px; margin-top:3px; }
+
+/* ── Blocs événements ── */
+.cal-block { padding:3px 5px; border-radius:3px; font-size:.62rem; font-weight:600; cursor:pointer; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; transition:filter .15s, transform .1s; line-height:1.35; border-left:3px solid transparent; }
+.cal-block:hover { filter:brightness(1.25); transform:scale(1.03); z-index:5; box-shadow:0 2px 8px rgba(0,0,0,.4); }
+.cal-block.is-available { opacity:.35; text-decoration:line-through; }
+
+/* Types de sortie films (comme Jellyfin) */
+.cal-block-cinema { background:rgba(185,28,28,.75); border-left-color:#dc2626; color:#fecaca; }
+.cal-block-digital { background:rgba(126,34,206,.75); border-left-color:#a855f7; color:#e9d5ff; }
+.cal-block-physical { background:rgba(21,128,61,.7); border-left-color:#22c55e; color:#bbf7d0; }
+.cal-block-unknown { background:rgba(107,114,128,.6); border-left-color:#9ca3af; color:#e5e7eb; }
+
+/* Épisodes — couleurs par série */
+.cal-block-episode { background:rgba(14,165,233,.7); border-left-color:#38bdf8; color:#e0f2fe; }
+.cal-block-ep-v1 { background:rgba(139,92,246,.7); border-left-color:#a78bfa; color:#ede9fe; }
+.cal-block-ep-v2 { background:rgba(219,39,119,.65); border-left-color:#ec4899; color:#fce7f3; }
+.cal-block-ep-v3 { background:rgba(22,163,74,.7); border-left-color:#4ade80; color:#dcfce7; }
+.cal-block-ep-v4 { background:rgba(234,88,12,.7); border-left-color:#fb923c; color:#ffedd5; }
+.cal-block-ep-v5 { background:rgba(6,182,212,.7); border-left-color:#22d3ee; color:#cffafe; }
+
+.cal-block-more { font-size:.58rem; color:#818cf8; font-weight:700; padding:1px 5px; cursor:pointer; }
+.cal-block-more:hover { text-decoration:underline; }
+
+/* ── Bloc infos dans grille (2 lignes) ── */
+.cal-block-line2 { font-size:.55rem; font-weight:400; opacity:.8; overflow:hidden; text-overflow:ellipsis; }
+
+/* ── Hover tooltip ── */
+.cal-tooltip { position:fixed; z-index:9999; width:320px; background:#1e1e2e; border:1px solid rgba(255,255,255,.12); border-radius:.75rem; box-shadow:0 8px 32px rgba(0,0,0,.5); overflow:hidden; pointer-events:none; opacity:0; transition:opacity .15s; }
+.cal-tooltip.show { opacity:1; }
+.cal-tooltip-fanart { width:100%; height:100px; object-fit:cover; display:block; }
+.cal-tooltip-fanart-ph { width:100%; height:60px; background:linear-gradient(135deg,#1e1e2e,#2a2a3e); }
+.cal-tooltip-body { padding:.6rem .75rem; }
+.cal-tooltip-type { font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin-bottom:.2rem; }
+.cal-tooltip-title { font-size:.9rem; font-weight:700; margin-bottom:.15rem; color:#fff; }
+.cal-tooltip-epname { font-size:.75rem; color:rgba(255,255,255,.6); margin-bottom:.3rem; }
+.cal-tooltip-meta { display:flex; flex-wrap:wrap; gap:.4rem; font-size:.65rem; color:rgba(255,255,255,.5); margin-bottom:.35rem; }
+.cal-tooltip-meta span { display:flex; align-items:center; gap:.2rem; }
+.cal-tooltip-desc { font-size:.7rem; color:rgba(255,255,255,.55); line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.cal-tooltip-badges { display:flex; gap:.35rem; margin-top:.4rem; }
+.cal-tooltip-badge { font-size:.55rem; font-weight:600; padding:.15em .4em; border-radius:.2rem; }
+
+/* ── Day detail popup ── */
+.cal-day-popup { position:fixed; z-index:9998; width:360px; max-height:500px; overflow-y:auto; background:#1e1e2e; border:1px solid rgba(255,255,255,.12); border-radius:.75rem; box-shadow:0 8px 32px rgba(0,0,0,.5); padding:.75rem; display:none; }
+.cal-day-popup.show { display:block; }
+.cal-day-popup-title { font-size:.9rem; font-weight:700; margin-bottom:.6rem; display:flex; align-items:center; justify-content:space-between; }
+.cal-day-popup-close { background:none; border:none; color:var(--tblr-secondary); cursor:pointer; padding:2px; }
+.cal-day-popup-close:hover { color:#fff; }
+.cal-day-popup-event { display:flex; align-items:center; gap:.5rem; padding:.45rem .5rem; border-radius:.4rem; margin-bottom:.35rem; border-left:3px solid transparent; transition:background .1s; }
+.cal-day-popup-event:hover { background:rgba(255,255,255,.04); }
+.cal-day-popup-event.rel-cinema { border-left-color:#dc2626; }
+.cal-day-popup-event.rel-digital { border-left-color:#a855f7; }
+.cal-day-popup-event.rel-physical { border-left-color:#22c55e; }
+.cal-day-popup-event.rel-episode { border-left-color:#38bdf8; }
+.cal-day-popup-poster { width:32px; height:48px; object-fit:cover; border-radius:4px; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,.3); }
+.cal-day-popup-poster-ph { width:32px; height:48px; border-radius:4px; flex-shrink:0; background:rgba(255,255,255,.04); }
+.cal-day-popup-ev-title { font-size:.78rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cal-day-popup-ev-sub { font-size:.65rem; color:var(--tblr-secondary); }
+.cal-day-popup-ev-meta { font-size:.6rem; color:rgba(255,255,255,.4); }
+
+/* ── Mini calendrier inline ── */
+.cal-mini-inline { display:inline-flex; align-items:center; gap:.15rem; background:var(--tblr-bg-surface); border:1px solid var(--tblr-border-color); border-radius:.5rem; padding:.25rem .4rem; position:relative; }
+.cal-mini-inline button { background:none; border:none; color:var(--tblr-secondary); cursor:pointer; padding:1px; line-height:1; font-size:.75rem; }
+.cal-mini-inline button:hover { color:var(--tblr-primary); }
+.cal-mini-dropdown { position:absolute; top:100%; right:0; margin-top:.35rem; background:#1e1e2e; border:1px solid rgba(255,255,255,.12); border-radius:.75rem; box-shadow:0 8px 24px rgba(0,0,0,.4); padding:.6rem; width:240px; z-index:100; display:none; }
+.cal-mini-dropdown.show { display:block; }
+.cal-mini-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; text-align:center; }
+.cal-mini-dow { font-size:.55rem; font-weight:600; color:var(--tblr-secondary); padding:.15rem 0; }
+.cal-mini-day { font-size:.65rem; padding:.25rem .1rem; border-radius:.2rem; cursor:pointer; color:rgba(255,255,255,.5); transition:background .1s; }
+.cal-mini-day:hover { background:rgba(var(--tblr-primary-rgb),.15); }
+.cal-mini-day.is-today { background:var(--tblr-primary); color:#fff; font-weight:700; border-radius:50%; }
+.cal-mini-day.other-month { opacity:.2; }
+.cal-mini-day.has-events { font-weight:700; color:#fff; }
+.cal-mini-day.has-events::after { content:''; display:block; width:3px; height:3px; border-radius:50%; background:var(--tblr-primary); margin:0 auto; }
+
+/* ── Stats bottom ── */
+.cal-bottom-stats { display:flex; gap:1.5rem; margin-top:.75rem; font-size:.75rem; color:var(--tblr-secondary); }
+.cal-bottom-stat { display:flex; align-items:center; gap:.35rem; }
+.cal-bottom-dot { width:8px; height:8px; border-radius:2px; }
+
+/* Merged calendar: the day view renders media cards rather than text rows. */
+.cal-day-cards { display: flex; flex-wrap: wrap; gap: .75rem; padding: .25rem; }
+.cal-card-wrap { width: 150px; }
+.cal-card-meta {
     font-size: .68rem; color: var(--tblr-secondary);
     margin-top: .25rem; line-height: 1.25;
-  }
-  .cal-ep .cal-num { color: var(--tblr-body-color); font-weight: 600; }
-  .cal-source {
-    display: inline-block; font-size: .58rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .02em;
-    padding: .05rem .3rem; border-radius: .25rem; margin-top: .2rem;
-    border: 1px solid var(--tblr-border-color); color: var(--tblr-secondary);
-  }
+}
+.cal-card-meta .cal-card-kind { color: var(--tblr-body-color); font-weight: 600; }
+
 </style>
 
 <div class="container-xl">
-  {% if not configured %}
-    <div class="alert alert-warning">{{ 'discover.error.not_configured'|trans }}</div>
-  {% elseif error %}
-    <div class="alert alert-warning">{{ 'discover.calendar.error.failed'|trans }}</div>
-  {% endif %}
 
-  <div class="tmdb-searchbar">
-    <div class="tmdb-search-wrap">
-      <svg class="tmdb-search-ico" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/>
-      </svg>
-      <input id="cal-search" type="search" class="tmdb-search-input"
-             placeholder="{{ 'discover.calendar.search.placeholder'|trans }}" autocomplete="off">
-      <kbd class="tmdb-search-kbd d-none d-md-inline">MDBList</kbd>
-    </div>
-    <div class="tmdb-action-btns">
-      <span class="text-secondary small">{{ 'discover.calendar.window'|trans({days: windowDays, count: total}) }}</span>
-    </div>
-  </div>
-
-  {% if days is empty and configured and not error %}
-    <div class="empty">
-      <p class="empty-title">{{ 'discover.calendar.empty.title'|trans }}</p>
-      <p class="empty-subtitle text-secondary">{{ 'discover.calendar.empty.subtitle'|trans }}</p>
-    </div>
-  {% endif %}
-
-  <div id="cal-days">
-    {% for date, events in days %}
-      <div class="cal-day" data-cal-day="{{ date }}">
-        <div class="cal-day-header">
-          <h3>{{ date|date('D d M') }}</h3>
-          <span class="cal-rel">{{ 'discover.calendar.count'|trans({count: events|length}) }}</span>
-        </div>
-        <div class="cal-row">
-          {% for e in events %}
-            <div class="cal-item" data-cal-item
-                 data-cal-title="{{ e.title|e('html_attr') }}"
-                 data-cal-ep="{{ (e.episode_title ?: '')|e('html_attr') }}">
-              <div data-cal-card
-                   data-item="{{ e|json_encode|e('html_attr') }}"></div>
-              {% if e.season_number is not null and e.episode_number is not null %}
-                <div class="cal-ep">
-                  <span class="cal-num">S{{ '%02d'|format(e.season_number) }}E{{ '%02d'|format(e.episode_number) }}</span>
-                  {% if e.episode_title %} {{ e.episode_title }}{% endif %}
-                </div>
-              {% endif %}
-              {# release_type was measured as "episode" or "watched", both with
-                 future dates, so it reads as where the event came from rather
-                 than as watch history. Shown, not filtered on. #}
-              {% if e.release_type %}
-                <span class="cal-source">{{ ('discover.calendar.source.' ~ e.release_type)|trans }}</span>
-              {% endif %}
+    {# ── Service-unreachable banner (warning) ──────────────────────────
+       Shown only when the upstream fetch failed (exception or silent
+       getLastError()) AND the service is configured. An empty calendar
+       on a healthy service stays banner-free (legitimate "nothing
+       upcoming"). A service deliberately left unconfigured uses the
+       softer info banner below instead of this warning. #}
+    {% if radarrFailed or sonarrFailed %}
+        <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" role="alert">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 mt-1">
+                <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M3.5 21h17a1.7 1.7 0 0 0 1.5-2.5L13.5 4a1.7 1.7 0 0 0 -3 0L2 18.5a1.7 1.7 0 0 0 1.5 2.5"/>
+            </svg>
+            <div>
+                {% if radarrFailed and sonarrFailed %}
+                    <strong>{{ 'calendar.error.both_unreachable_title'|trans }}</strong>
+                    <div class="small">{{ 'calendar.error.both_unreachable_body'|trans|raw }}</div>
+                {% elseif radarrFailed %}
+                    <strong>{{ 'calendar.error.radarr_unreachable_title'|trans }}</strong>
+                    <div class="small">{{ 'calendar.error.radarr_unreachable_body'|trans|raw }}</div>
+                {% else %}
+                    <strong>{{ 'calendar.error.sonarr_unreachable_title'|trans }}</strong>
+                    <div class="small">{{ 'calendar.error.sonarr_unreachable_body'|trans|raw }}</div>
+                {% endif %}
             </div>
-          {% endfor %}
         </div>
-      </div>
-    {% endfor %}
-  </div>
+    {% endif %}
+
+    {# ── Service-not-configured banner (info) ──────────────────────────
+       Softer message for users who skipped a service in the wizard. We
+       only show it when BOTH services are unconfigured (otherwise we'd
+       hassle every Radarr-only / Sonarr-only user with a redundant
+       reminder every time they open the calendar). #}
+    {% if not radarrConfigured and not sonarrConfigured %}
+        <div class="alert alert-info d-flex align-items-start gap-2 mb-3" role="status">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 mt-1">
+                <circle cx="12" cy="12" r="9"/><path d="M12 8v.01"/><path d="M11 12h1v4h1"/>
+            </svg>
+            <div>
+                <strong>{{ 'calendar.info.none_configured_title'|trans }}</strong>
+                <div class="small">{{ 'calendar.info.none_configured_body'|trans|raw }}</div>
+            </div>
+        </div>
+    {% endif %}
+
+    {# ── Filters — cards split by category ── #}
+    <div class="d-flex gap-3 mb-3 flex-wrap">
+
+        {# Card : Tout #}
+        <div class="cal-toolbar" style="flex:0 0 auto;">
+            <button class="cal-filter-pill active" data-filter="all"><div class="cal-filter-dot" style="background:var(--tblr-primary);"></div> {{ 'calendar.filter.all'|trans }} <span class="cal-filter-count" id="fc-all"></span></button>
+        </div>
+
+        {# Card: Media #}
+        <div class="cal-toolbar" style="flex:0 1 auto;">
+            <span class="cal-toolbar-label">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFC230" stroke-width="2" class="me-1"><path d="M7 4v16l13 -8z"/></svg>
+                {{ 'calendar.filter.media'|trans }}
+            </span>
+            <button class="cal-filter-pill" data-filter="cinema"><div class="cal-filter-dot" style="background:#dc2626;"></div> {{ 'calendar.filter.cinema'|trans }} <span class="cal-filter-count" id="fc-cinema"></span></button>
+            <button class="cal-filter-pill" data-filter="digital"><div class="cal-filter-dot" style="background:#a855f7;"></div> {{ 'calendar.filter.digital'|trans }} <span class="cal-filter-count" id="fc-digital"></span></button>
+            <button class="cal-filter-pill" data-filter="physical"><div class="cal-filter-dot" style="background:#22c55e;"></div> {{ 'calendar.filter.physical'|trans }} <span class="cal-filter-count" id="fc-physical"></span></button>
+            <button class="cal-filter-pill" data-filter="episode"><div class="cal-filter-dot" style="background:#38bdf8;"></div> {{ 'calendar.filter.episode'|trans }} <span class="cal-filter-count" id="fc-episode"></span></button>
+        </div>
+
+        {# Card : Statut #}
+        <div class="cal-toolbar" style="flex:0 1 auto;">
+            <span class="cal-toolbar-label">{{ 'calendar.filter.status'|trans }}</span>
+            <button class="cal-filter-pill active" data-status="all"><div class="cal-filter-dot" style="background:var(--tblr-primary);"></div> {{ 'calendar.filter.status_all'|trans }}</button>
+            <button class="cal-filter-pill" data-status="monitored"><div class="cal-filter-dot" style="background:#818cf8;"></div> {{ 'calendar.filter.status_monitored'|trans }}</button>
+            <button class="cal-filter-pill" data-status="missing"><div class="cal-filter-dot" style="background:#f59e0b;"></div> {{ 'calendar.filter.status_missing'|trans }}</button>
+            <button class="cal-filter-pill" data-status="available"><div class="cal-filter-dot" style="background:#22c55e;"></div> {{ 'calendar.filter.status_available'|trans }}</button>
+        </div>
+
+    </div>
+
+    {# ── Navigation ── #}
+    <div class="cal-main-header">
+        <div class="cal-main-title" id="main-title"></div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            {# View toggles #}
+            <div class="cal-view-switch" role="tablist" aria-label="{{ 'calendar.view.aria_label'|trans }}">
+                <button type="button" class="cal-view-btn is-active" data-view="month" role="tab" aria-selected="true">{{ 'calendar.view.month'|trans }}</button>
+                <button type="button" class="cal-view-btn" data-view="week" role="tab" aria-selected="false">{{ 'calendar.view.week'|trans }}</button>
+                <button type="button" class="cal-view-btn" data-view="day" role="tab" aria-selected="false">{{ 'calendar.view.day'|trans }}</button>
+            </div>
+            <a href="{{ path('app_calendrier_ical') }}" class="btn btn-sm btn-ghost-secondary" title="{{ 'calendar.nav.ical_title'|trans }}" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:.3rem;"><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg>
+                {{ 'calendar.nav.ical'|trans }}
+            </a>
+            <button id="main-today" class="btn btn-sm btn-outline-indigo">{{ 'calendar.nav.today'|trans }}</button>
+            <button id="main-prev" class="btn btn-sm btn-ghost-secondary btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <button id="main-next" class="btn btn-sm btn-ghost-secondary btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+
+            {# Mini calendrier dropdown #}
+            <div class="cal-mini-inline" id="mini-wrap">
+                <button id="mini-toggle">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </button>
+                <div class="cal-mini-dropdown" id="mini-dropdown">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <button id="mini-prev" style="font-size:.7rem;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+                        <span id="mini-title" style="font-size:.75rem;font-weight:700;"></span>
+                        <button id="mini-next" style="font-size:.7rem;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+                    </div>
+                    <div class="cal-mini-grid" id="mini-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Grille pleine largeur ── #}
+    <div id="main-grid"></div>
+
+{# Tooltip hover #}
+<div class="cal-tooltip" id="cal-tooltip"></div>
+{# Day detail popup #}
+<div class="cal-day-popup" id="cal-day-popup"></div>
+
 </div>
 
 <script>
 (function () {
-  var root = document.querySelector('[data-dsc-pane="calendar"]');
-  if (!root) return;
-
-  // Cards are rendered client-side through the shared renderer so the
-  // calendar cannot drift from how every other grid draws a card.
-  root.querySelectorAll('[data-cal-card]').forEach(function (slot) {
-    try {
-      var item = JSON.parse(slot.dataset.item);
-      slot.outerHTML = window.renderCardHTML(item);
-    } catch (e) {
-      slot.remove();
+    var srcFilter = 'all';
+    var allEvents = {{ eventsJson|json_encode|raw }};
+    // Calendar-scoped i18n (strings the JS renders on the fly).
+    var CAL_I18N = {
+        event_film:    {{ 'calendar.event.film'|trans|json_encode|raw }},
+        event_series:  {{ 'calendar.event.series'|trans|json_encode|raw }},
+        event_episode: {{ 'calendar.event.episode'|trans|json_encode|raw }},
+        event_none:    {{ 'calendar.event.none'|trans|json_encode|raw }},
+        today:         {{ 'calendar.nav.today'|trans|json_encode|raw }},
+        today_suffix:  {{ 'calendar.day.today_suffix'|trans|json_encode|raw }},
+        week_same:     {{ 'calendar.week.same_month'|trans|json_encode|raw }},
+        week_cross:    {{ 'calendar.week.cross_month'|trans|json_encode|raw }},
+        status_available:  {{ 'calendar.status.available'|trans|json_encode|raw }},
+        status_monitored:  {{ 'calendar.status.monitored'|trans|json_encode|raw }},
+        status_unmonitored:{{ 'calendar.status.unmonitored'|trans|json_encode|raw }},
+        day_empty:     {{ 'calendar.day.empty'|trans|json_encode|raw }},
+        day_overflow:  {{ 'calendar.day.overflow'|trans({count: '__N__'})|json_encode|raw }},
+    };
+    // ICU plural templates rendered at load — swap in the actual count at
+    // runtime using Intl.PluralRules so we stay locale-aware.
+    var _plural = new Intl.PluralRules({{ app.request.locale|default('fr')|json_encode|raw }});
+    var _eventTpl = {
+        one:   {{ 'calendar.event.count'|trans({count: 1})|json_encode|raw }},
+        other: {{ 'calendar.event.count'|trans({count: 9})|json_encode|raw }},
+    };
+    function countLabel(n) {
+        var rule = _plural.select(n);
+        var tpl  = _eventTpl[rule] || _eventTpl.other;
+        return tpl.replace(/^\d+/, n);
     }
-  });
+    var today = new Date();
+    var curYear = today.getFullYear(), curMonth = today.getMonth(), curDay = today.getDate();
+    var currentView = 'month'; // 'month' | 'week' | 'day'
+    try {
+        var storedView = localStorage.getItem('prismarrCalendarView');
+        if (storedView === 'month' || storedView === 'week' || storedView === 'day') currentView = storedView;
+    } catch (e) {}
 
-  // Search filters by show title or episode title, and hides a day whose
-  // every entry is filtered out rather than leaving a bare date heading.
-  var search = document.getElementById('cal-search');
-  var items  = Array.prototype.slice.call(root.querySelectorAll('[data-cal-item]'));
+    // URL params override localStorage — `/calendrier?view=day&date=2026-04-23`
+    // lands straight on the requested day (used by dashboard "+N autres" link).
+    try {
+        var urlParams = new URLSearchParams(window.location.search);
+        var urlView   = urlParams.get('view');
+        var urlDate   = urlParams.get('date');
+        if (urlView === 'month' || urlView === 'week' || urlView === 'day') currentView = urlView;
+        if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
+            var parts = urlDate.split('-');
+            curYear  = parseInt(parts[0], 10);
+            curMonth = parseInt(parts[1], 10) - 1;
+            curDay   = parseInt(parts[2], 10);
+        }
+    } catch (e) {}
+    var selDate = null;
+    var filterType = 'all', filterStatus = 'all';
 
-  function apply() {
-    var q = (search.value || '').trim().toLowerCase();
+    var MN     = {{ [
+        'calendar.months.full.0','calendar.months.full.1','calendar.months.full.2',
+        'calendar.months.full.3','calendar.months.full.4','calendar.months.full.5',
+        'calendar.months.full.6','calendar.months.full.7','calendar.months.full.8',
+        'calendar.months.full.9','calendar.months.full.10','calendar.months.full.11'
+    ]|map(k => k|trans)|json_encode|raw }};
+    var DN     = {{ [
+        'calendar.weekdays.short.0','calendar.weekdays.short.1','calendar.weekdays.short.2',
+        'calendar.weekdays.short.3','calendar.weekdays.short.4','calendar.weekdays.short.5',
+        'calendar.weekdays.short.6'
+    ]|map(k => k|trans)|json_encode|raw }};
+    var DNfull = {{ [
+        'calendar.weekdays.full.0','calendar.weekdays.full.1','calendar.weekdays.full.2',
+        'calendar.weekdays.full.3','calendar.weekdays.full.4','calendar.weekdays.full.5',
+        'calendar.weekdays.full.6'
+    ]|map(k => k|trans)|json_encode|raw }};
+    var todayStr = fmt(today);
 
-    items.forEach(function (el) {
-      var hit = !q
-        || (el.dataset.calTitle || '').toLowerCase().indexOf(q) !== -1
-        || (el.dataset.calEp || '').toLowerCase().indexOf(q) !== -1;
-      el.style.display = hit ? '' : 'none';
+    // Per-series colors (hash → index)
+    var seriesColors = {};
+    var colorVariants = ['', 'cal-block-ep-v1','cal-block-ep-v2','cal-block-ep-v3','cal-block-ep-v4'];
+    var colorIdx = 0;
+    function seriesColor(name) {
+        if (!seriesColors[name]) { seriesColors[name] = colorVariants[colorIdx % colorVariants.length]; colorIdx++; }
+        return seriesColors[name];
+    }
+
+    function fmt(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+    function match(ev) {
+        // Source filter, added with the merge: library means Radarr/Sonarr,
+        // followed means MDBList knows about it but it is in neither.
+        if (srcFilter !== 'all' && (ev.source || 'library') !== srcFilter) { return false; }
+        if (filterType !== 'all') {
+            if (filterType === 'episode' && ev.type !== 'episode') return false;
+            if (filterType === 'cinema' && ev.releaseType !== 'cinema') return false;
+            if (filterType === 'digital' && ev.releaseType !== 'digital') return false;
+            if (filterType === 'physical' && ev.releaseType !== 'physical') return false;
+        }
+        if (filterStatus === 'monitored' && !ev.monitored) return false;
+        if (filterStatus === 'missing' && (ev.hasFile || ev.monitored)) return false;
+        if (filterStatus === 'available' && !ev.hasFile) return false;
+        return true;
+    }
+
+    function byDate() {
+        var m = {};
+        allEvents.forEach(function(ev) {
+            if (!match(ev)) return;
+            var d = ev.dateStr || ev.sortDate;
+            if (!d || d.startsWith('9999')) return;
+            if (!m[d]) m[d] = [];
+            m[d].push(ev);
+        });
+        return m;
+    }
+
+    function evTitle(ev) { return ev.type === 'film' ? ev.title : (ev.seriesTitle||'') + ' S' + String(ev.season||0).padStart(2,'0') + 'E' + String(ev.episode||0).padStart(2,'0'); }
+
+    var releaseLabels = {
+        cinema:   {{ 'calendar.event.release_cinema'|trans|json_encode|raw }},
+        digital:  {{ 'calendar.event.release_digital'|trans|json_encode|raw }},
+        physical: {{ 'calendar.event.release_physical'|trans|json_encode|raw }},
+        episode:  {{ 'calendar.event.release_episode'|trans|json_encode|raw }},
+        unknown:  {{ 'calendar.event.release_unknown'|trans|json_encode|raw }},
+    };
+
+    // Counts
+    var cAll = allEvents.length, cCinema = 0, cDigital = 0, cPhysical = 0, cEp = 0;
+    allEvents.forEach(function(ev) {
+        if (ev.releaseType === 'cinema') cCinema++;
+        else if (ev.releaseType === 'digital') cDigital++;
+        else if (ev.releaseType === 'physical') cPhysical++;
+        else if (ev.type === 'episode') cEp++;
+    });
+    document.getElementById('fc-all').textContent = cAll;
+    document.getElementById('fc-cinema').textContent = cCinema;
+    document.getElementById('fc-digital').textContent = cDigital;
+    document.getElementById('fc-physical').textContent = cPhysical;
+    document.getElementById('fc-episode').textContent = cEp;
+
+    // ── Grille principale ──
+    function renderMain() {
+        var container = document.getElementById('main-grid');
+        document.getElementById('main-title').textContent = MN[curMonth] + ' ' + curYear;
+        var bd = byDate();
+        var first = new Date(curYear, curMonth, 1);
+        var last = new Date(curYear, curMonth+1, 0);
+        var startDow = (first.getDay()+6) % 7;
+
+        var h = '<div class="cal-grid-wrap"><div class="cal-grid">';
+        DNfull.forEach(function(d, i) { h += '<div class="cal-grid-dow' + (i>=5?' is-weekend':'') + '">' + d + '</div>'; });
+
+        var prev = new Date(curYear, curMonth, 0);
+        for (var p = startDow-1; p >= 0; p--) {
+            var pd = prev.getDate()-p;
+            var pds = fmt(new Date(curYear, curMonth-1, pd));
+            h += cell(pd, pds, bd, true);
+        }
+        for (var d = 1; d <= last.getDate(); d++) {
+            var ds = fmt(new Date(curYear, curMonth, d));
+            h += cell(d, ds, bd, false);
+        }
+        var total = startDow + last.getDate();
+        var rem = (7 - total%7) % 7;
+        for (var n = 1; n <= rem; n++) {
+            var nds = fmt(new Date(curYear, curMonth+1, n));
+            h += cell(n, nds, bd, true);
+        }
+        h += '</div></div>';    // close .cal-grid + .cal-grid-wrap
+        container.innerHTML = h;
+
+        // Click on cell → selection + popup
+        container.querySelectorAll('.cal-cell[data-date]').forEach(function(c) {
+            c.addEventListener('click', function(e) {
+                if (e.target.closest('.cal-block') || e.target.closest('.cal-block-more')) return;
+                selDate = c.dataset.date;
+                // Re-highlight without re-rendering everything
+                container.querySelectorAll('.cal-cell').forEach(function(cl) { cl.classList.remove('is-selected'); });
+                c.classList.add('is-selected');
+                var bd2 = byDate();
+                if (bd2[selDate] && bd2[selDate].length) openDayPopup(selDate, c.getBoundingClientRect());
+            });
+        });
+    }
+
+    function cell(num, ds, bd, isOther) {
+        var isToday = ds === todayStr;
+        var isPast  = ds < todayStr;
+        var isSel = ds === selDate;
+        var dow = (new Date(ds+'T12:00:00').getDay()+6) % 7;
+        var cls = 'cal-cell' + (isOther?' other-month':'') + (isToday?' is-today':'') + (isPast && !isToday?' is-past':'') + (isSel?' is-selected':'') + (dow>=5?' is-weekend':'');
+        var evs = bd[ds] || [];
+        var h = '<div class="' + cls + '" data-date="' + ds + '">';
+        h += '<div class="cal-cell-num">' + num + '</div>';
+        h += '<div class="cal-cell-events">';
+        var max = 3;
+        evs.slice(0, max).forEach(function(ev) {
+            var title = evTitle(ev);
+            var blockCls = 'cal-block';
+            if (ev.type === 'film') {
+                blockCls += ' cal-block-' + (ev.releaseType || 'unknown');
+            } else {
+                var sc = seriesColor(ev.seriesTitle || 'default');
+                blockCls += sc ? ' ' + sc : ' cal-block-episode';
+            }
+            if (ev.hasFile) blockCls += ' is-available';
+            var line2 = '';
+            if (ev.type === 'film' && ev.releaseType && ev.releaseType !== 'unknown') {
+                line2 = '<div class="cal-block-line2">' + (releaseLabels[ev.releaseType] || '') + (ev.runtime ? ' · ' + ev.runtime + 'min' : '') + '</div>';
+            } else if (ev.type === 'episode' && ev.title) {
+                line2 = '<div class="cal-block-line2">' + ev.title + '</div>';
+            }
+            // data-ev-idx pour tooltip hover
+            var evIdx = allEvents.indexOf(ev);
+            h += '<div class="' + blockCls + '" data-ev-idx="' + evIdx + '">' + title + line2 + '</div>';
+        });
+        if (evs.length > max) h += '<div class="cal-block-more" data-date-detail="' + ds + '">' + CAL_I18N.day_overflow.replace('__N__', evs.length-max) + '</div>';
+        h += '</div></div>';
+        return h;
+    }
+
+    // ── Vue Semaine ──
+    // Calcule le lundi de la semaine contenant `date` (ISO week), puis build
+    // une grille 7 colonnes (Lun → Dim) avec les events de chaque jour.
+    function startOfWeek(d) {
+        var day = (d.getDay() + 6) % 7;   // 0 = Lundi
+        var wm = new Date(d);
+        wm.setDate(d.getDate() - day);
+        wm.setHours(0,0,0,0);
+        return wm;
+    }
+
+    function renderWeek() {
+        var container = document.getElementById('main-grid');
+        var cursor = new Date(curYear, curMonth, curDay);
+        var monday = startOfWeek(cursor);
+        var sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+
+        var title;
+        if (monday.getMonth() === sunday.getMonth()) {
+            title = CAL_I18N.week_same
+                .replace('{start}', monday.getDate())
+                .replace('{end}',   sunday.getDate())
+                .replace('{month}', MN[sunday.getMonth()])
+                .replace('{year}',  sunday.getFullYear());
+        } else {
+            title = CAL_I18N.week_cross
+                .replace('{start_day}',   monday.getDate())
+                .replace('{start_month}', MN[monday.getMonth()])
+                .replace('{end_day}',     sunday.getDate())
+                .replace('{end_month}',   MN[sunday.getMonth()])
+                .replace('{year}',        sunday.getFullYear());
+        }
+        document.getElementById('main-title').textContent = title;
+
+        var bd = byDate();
+        var h = '<div class="cal-week-wrap"><div class="cal-week-grid">';
+        for (var i = 0; i < 7; i++) {
+            var day = new Date(monday);
+            day.setDate(monday.getDate() + i);
+            var ds = fmt(day);
+            var isToday = ds === todayStr;
+            var isPast  = ds < todayStr;
+            var cls = 'cal-week-cell' + (isToday?' is-today':'') + (isPast && !isToday?' is-past':'');
+
+            h += '<div class="' + cls + '" data-date="' + ds + '">';
+            h += '<div class="cal-week-head">';
+            h += '<div class="cal-week-dow">' + DNfull[i] + '</div>';
+            h += '<div class="cal-week-dom">' + day.getDate() + '</div>';
+            h += '</div>';
+            h += '<div class="cal-week-events">';
+            var evs = bd[ds] || [];
+            if (!evs.length) {
+                h += '<div class="cal-week-empty">—</div>';
+            } else {
+                evs.forEach(function(ev) {
+                    var blockCls = 'cal-block';
+                    if (ev.type === 'film') {
+                        blockCls += ' cal-block-' + (ev.releaseType || 'unknown');
+                    } else {
+                        var sc = seriesColor(ev.seriesTitle || 'default');
+                        blockCls += sc ? ' ' + sc : ' cal-block-episode';
+                    }
+                    if (ev.hasFile) blockCls += ' is-available';
+                    var evIdx = allEvents.indexOf(ev);
+                    var line2 = '';
+                    if (ev.type === 'film' && ev.releaseType && ev.releaseType !== 'unknown') {
+                        line2 = '<div class="cal-block-line2">' + (releaseLabels[ev.releaseType] || '') + '</div>';
+                    } else if (ev.type === 'episode' && ev.title) {
+                        line2 = '<div class="cal-block-line2">' + ev.title + '</div>';
+                    }
+                    h += '<div class="' + blockCls + '" data-ev-idx="' + evIdx + '">' + evTitle(ev) + line2 + '</div>';
+                });
+            }
+            h += '</div></div>';
+        }
+        h += '</div></div>';    // close .cal-week-grid + .cal-week-wrap
+        container.innerHTML = h;
+    }
+
+    // ── Vue Jour ──
+    // Line under a calendar card: what kind of release, and for an episode
+    // which one. Mirrors the sub-title the copied text row used to show.
+    function calMeta(ev) {
+        var esc = window.escHtml || function (s) { return s == null ? '' : String(s); };
+        if (ev.type === 'film') {
+            return '<span class="cal-card-kind">'
+                 + esc(releaseLabels[ev.releaseType] || CAL_I18N.event_film) + '</span>';
+        }
+        var sxe = 'S' + String(ev.season || 0).padStart(2, '0')
+                + 'E' + String(ev.episode || 0).padStart(2, '0');
+        var extra = ev.episodeTitle || ev.title || '';
+        return '<span class="cal-card-kind">' + esc(sxe) + '</span>'
+             + (extra ? ' ' + esc(extra) : '');
+    }
+
+    function renderDay() {
+        var container = document.getElementById('main-grid');
+        var cursor = new Date(curYear, curMonth, curDay);
+        cursor.setHours(0,0,0,0);
+        var ds = fmt(cursor);
+        var isToday = ds === todayStr;
+        var isPast  = ds < todayStr;
+        var weekday = DNfull[(cursor.getDay()+6) % 7];
+        var dateLabel = weekday + ' ' + cursor.getDate() + ' ' + MN[cursor.getMonth()] + ' ' + cursor.getFullYear();
+        document.getElementById('main-title').textContent = dateLabel;
+
+        var bd = byDate();
+        var evs = bd[ds] || [];
+
+        var h = '<div class="cal-day-wrap' + (isPast?' cal-day-wrap-past':'') + '">';
+        h += '<div class="cal-day-header">';
+        h += '<div class="cal-day-date-big">' + cursor.getDate() + '</div>';
+        h += '<div class="cal-day-date-lbl">' + weekday + '</div>';
+        h += '<div class="cal-day-count">' + (evs.length ? countLabel(evs.length) : CAL_I18N.event_none) + (isToday ? ' · ' + CAL_I18N.today : '') + '</div>';
+        h += '</div>';
+
+        if (!evs.length) {
+            h += '<div class="cal-day-empty">' + CAL_I18N.day_empty + '</div>';
+        } else {
+            // The one deliberate divergence from the page this was copied
+            // from: the day view renders the shared media card instead of a
+            // text row, so a calendar entry carries the same star, Available
+            // badge, watch badges and kebab as every other grid in the app.
+            // Month and week cells keep the compact chips: a 150px card does
+            // not fit a seven column grid.
+            h += '<div class="tmdb-results-grid cal-day-cards">';
+            evs.forEach(function (ev) {
+                if (!ev.tmdbId) { return; }
+                h += '<div class="cal-card-wrap">'
+                   + window.renderCardHTML({
+                       id:         ev.tmdbId,
+                       type:       ev.cardType,
+                       title:      ev.type === 'film' ? ev.title : (ev.seriesTitle || ev.title),
+                       year:       ev.year || null,
+                       poster:     ev.poster || null,
+                       vote:       null,
+                       in_library: !!ev.in_library,
+                       lib_status: ev.lib_status || null,
+                       lib_id:     ev.lib_id || null
+                     })
+                   + '<div class="cal-card-meta">' + calMeta(ev) + '</div>'
+                   + '</div>';
+            });
+            h += '</div>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+        h += '</div>';
+        container.innerHTML = h;
+    }
+
+    function renderAll() {
+        if (currentView === 'week')      renderWeek();
+        else if (currentView === 'day')  renderDay();
+        else                             renderMain();
+    }
+
+    // ── Navigation ──
+    // Navigation prev/next — dispatche selon la vue :
+    //   - month : -/+ 1 mois
+    //   - week  : -/+ 7 jours
+    //   - day   : -/+ 1 jour
+    function shiftCursor(delta) {
+        if (currentView === 'month') {
+            curMonth += delta;
+            if (curMonth < 0)   { curMonth = 11; curYear--; }
+            if (curMonth > 11)  { curMonth = 0;  curYear++; }
+        } else {
+            var step = currentView === 'week' ? 7 : 1;
+            var d = new Date(curYear, curMonth, curDay);
+            d.setDate(d.getDate() + delta * step);
+            curYear = d.getFullYear(); curMonth = d.getMonth(); curDay = d.getDate();
+        }
+        renderAll();
+    }
+    document.getElementById('main-prev').addEventListener('click', function() { shiftCursor(-1); });
+    document.getElementById('main-next').addEventListener('click', function() { shiftCursor(1); });
+    document.getElementById('main-today').addEventListener('click', function() {
+        curYear = today.getFullYear(); curMonth = today.getMonth(); curDay = today.getDate();
+        selDate = todayStr;
+        renderAll();
     });
 
-    root.querySelectorAll('[data-cal-day]').forEach(function (day) {
-      var any = Array.prototype.slice.call(day.querySelectorAll('[data-cal-item]'))
-        .some(function (el) { return el.style.display !== 'none'; });
-      day.style.display = any ? '' : 'none';
+    // Toggle de vues Mois / Semaine / Jour
+    document.querySelectorAll('.cal-view-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            currentView = btn.dataset.view;
+            try { localStorage.setItem('prismarrCalendarView', currentView); } catch (e) {}
+            document.querySelectorAll('.cal-view-btn').forEach(function(b) {
+                b.classList.toggle('is-active', b === btn);
+                b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+            });
+            renderAll();
+        });
     });
-  }
+    // Sync initial active button with persisted view
+    document.querySelectorAll('.cal-view-btn').forEach(function(b) {
+        b.classList.toggle('is-active', b.dataset.view === currentView);
+        b.setAttribute('aria-selected', b.dataset.view === currentView ? 'true' : 'false');
+    });
 
-  var timer = null;
-  search.addEventListener('input', function () {
-    clearTimeout(timer);
-    timer = setTimeout(apply, 150);
-  });
-}());
+    // ── Filtres ──
+    document.querySelectorAll('.cal-filter-pill[data-filter]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.cal-filter-pill[data-filter]').forEach(function(b){b.classList.remove('active');});
+            btn.classList.add('active');
+            filterType = btn.dataset.filter;
+            renderAll();
+        });
+    });
+    document.querySelectorAll('.cal-filter-pill[data-status]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.cal-filter-pill[data-status]').forEach(function(b){b.classList.remove('active');});
+            btn.classList.add('active');
+            filterStatus = btn.dataset.status;
+            renderAll();
+        });
+    });
+
+    // ── Tooltip hover ──
+    var tooltip = document.getElementById('cal-tooltip');
+    var tooltipTimer = null;
+
+    function showTooltip(ev, rect) {
+        var relColors = { cinema:'#dc2626', digital:'#a855f7', physical:'#22c55e', episode:'#38bdf8', unknown:'#6b7280' };
+        var relColor = relColors[ev.releaseType] || '#6b7280';
+
+        // ev fields (title, seriesTitle, network, studio, certification,
+        // genres, overview, fanart URL) ultimately come from Radarr/Sonarr/TMDb
+        // metadata. Even though the writers are admin-trusted today, splicing
+        // them raw into innerHTML risks XSS the day a guest role is added.
+        // window.escHtml is hoisted in base.html.twig.
+        var esc = window.escHtml || function (s) { return s == null ? '' : String(s); };
+        var fanartHtml = ev.fanart ? '<img src="' + esc(ev.fanart) + '" class="cal-tooltip-fanart">' : '<div class="cal-tooltip-fanart-ph"></div>';
+
+        var typeLabel = ev.type === 'film' ? (releaseLabels[ev.releaseType] || CAL_I18N.event_film) : CAL_I18N.event_episode;
+        var titleText = ev.type === 'film' ? (ev.title || '') : (ev.seriesTitle || '');
+        var epName = ev.type === 'episode' ? 'S' + String(ev.season||0).padStart(2,'0') + 'E' + String(ev.episode||0).padStart(2,'0') + (ev.title ? ' — ' + ev.title : '') : '';
+
+        // Meta infos
+        var metas = [];
+        var dateStr = ev.dateStr || ev.sortDate || '';
+        if (dateStr && !dateStr.startsWith('9999')) {
+            var dt = new Date(dateStr + 'T12:00:00');
+            metas.push(String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0') + '/' + dt.getFullYear());
+        }
+        if (ev.runtime) metas.push(ev.runtime + ' min');
+        if (ev.studio) metas.push(ev.studio);
+        if (ev.network) metas.push(ev.network);
+        if (ev.year && ev.type === 'film') metas.push(String(ev.year));
+        if (ev.certification) metas.push(ev.certification);
+
+        var metaHtml = metas.length ? '<div class="cal-tooltip-meta">' + metas.map(function(m) { return '<span>' + esc(m) + '</span>'; }).join('<span style="opacity:.3;">·</span>') + '</div>' : '';
+
+        var genresHtml = '';
+        if (ev.genres && ev.genres.length) {
+            genresHtml = '<div class="cal-tooltip-badges">' + ev.genres.slice(0,4).map(function(g) { return '<span class="cal-tooltip-badge" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);">' + esc(g) + '</span>'; }).join('') + '</div>';
+        }
+
+        var descHtml = ev.overview ? '<div class="cal-tooltip-desc">' + esc(ev.overview) + '</div>' : '';
+
+        // Badges statut
+        var statusBadge = '';
+        if (ev.hasFile) statusBadge = '<span class="cal-tooltip-badge" style="background:#22c55e;color:#fff;">' + CAL_I18N.status_available + '</span>';
+        else if (ev.monitored) statusBadge = '<span class="cal-tooltip-badge" style="background:var(--tblr-primary);color:#fff;">' + CAL_I18N.status_monitored + '</span>';
+        else statusBadge = '<span class="cal-tooltip-badge" style="background:#f59e0b;color:#000;">' + CAL_I18N.status_unmonitored + '</span>';
+
+        tooltip.innerHTML = fanartHtml
+            + '<div class="cal-tooltip-body">'
+            + '<div class="cal-tooltip-type" style="color:' + relColor + ';">' + typeLabel + ' ' + statusBadge + '</div>'
+            + '<div class="cal-tooltip-title">' + esc(titleText) + '</div>'
+            + (epName ? '<div class="cal-tooltip-epname">' + esc(epName) + '</div>' : '')
+            + metaHtml
+            + descHtml
+            + genresHtml
+            + '</div>';
+
+        // Position
+        var x = rect.right + 8;
+        var y = rect.top;
+        if (x + 330 > window.innerWidth) x = rect.left - 330;
+        if (y + 300 > window.innerHeight) y = window.innerHeight - 310;
+        if (y < 10) y = 10;
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+        tooltip.classList.add('show');
+    }
+
+    function hideTooltip() {
+        tooltip.classList.remove('show');
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        var block = e.target.closest('[data-ev-idx]');
+        if (!block) { clearTimeout(tooltipTimer); hideTooltip(); return; }
+        var idx = parseInt(block.dataset.evIdx);
+        if (isNaN(idx) || !allEvents[idx]) return;
+        clearTimeout(tooltipTimer);
+        tooltipTimer = setTimeout(function() {
+            showTooltip(allEvents[idx], block.getBoundingClientRect());
+        }, 200);
+    });
+    document.addEventListener('mouseout', function(e) {
+        var block = e.target.closest('[data-ev-idx]');
+        if (block) { clearTimeout(tooltipTimer); hideTooltip(); }
+    });
+
+    // Click on an event → opens the entry on Movies/Series via `?open=`
+    // (the poster-card tile reuses this contract elsewhere in the app).
+    document.addEventListener('click', function(e) {
+        var block = e.target.closest('[data-ev-idx]');
+        if (!block) return;
+        if (!block.closest('#main-grid')) return;       // ignore tooltips / popup etc.
+        var idx = parseInt(block.dataset.evIdx);
+        if (isNaN(idx) || !allEvents[idx]) return;
+        var ev = allEvents[idx];
+        var target = null;
+        // Phase D — each event carries _instanceSlug from the controller so
+        // the click navigates to the page of the instance that owns it.
+        // Default fallback if for some reason the slug is missing (older
+        // cached JSON or edge case with empty libraries).
+        if (ev.type === 'film' && ev.id) {
+            var radarrSlug = ev._instanceSlug || DEFAULT_RADARR_SLUG;
+            target = '/medias/' + radarrSlug + '/films?open=' + ev.id;
+        } else if (ev.type === 'episode' && ev.seriesId) {
+            var sonarrSlug = ev._instanceSlug || DEFAULT_SONARR_SLUG;
+            target = '/medias/' + sonarrSlug + '/series?open=' + ev.seriesId;
+        }
+        if (target) {
+            e.preventDefault();
+            hideTooltip();
+            window.location.href = target;
+        }
+    });
+
+    // ── Mini calendrier dropdown ──
+    var miniOpen = false;
+    document.getElementById('mini-toggle').addEventListener('click', function(e) {
+        e.stopPropagation();
+        miniOpen = !miniOpen;
+        document.getElementById('mini-dropdown').classList.toggle('show', miniOpen);
+        if (miniOpen) renderMini();
+    });
+    document.addEventListener('click', function(e) {
+        if (miniOpen && !document.getElementById('mini-wrap').contains(e.target)) {
+            miniOpen = false;
+            document.getElementById('mini-dropdown').classList.remove('show');
+        }
+    });
+    document.getElementById('mini-prev').addEventListener('click', function(e) { e.stopPropagation(); curMonth--; if(curMonth<0){curMonth=11;curYear--;} renderAll(); if(miniOpen) renderMini(); });
+    document.getElementById('mini-next').addEventListener('click', function(e) { e.stopPropagation(); curMonth++; if(curMonth>11){curMonth=0;curYear++;} renderAll(); if(miniOpen) renderMini(); });
+
+    function renderMini() {
+        var grid = document.getElementById('mini-grid');
+        document.getElementById('mini-title').textContent = MN[curMonth] + ' ' + curYear;
+        var bd = byDate();
+        var first = new Date(curYear, curMonth, 1);
+        var last = new Date(curYear, curMonth+1, 0);
+        var startDow = (first.getDay()+6) % 7;
+        var h = '';
+        DN.forEach(function(d) { h += '<div class="cal-mini-dow">' + d[0] + d[1] + '</div>'; });
+        var prev = new Date(curYear, curMonth, 0);
+        for (var p = startDow-1; p >= 0; p--) h += '<div class="cal-mini-day other-month">' + (prev.getDate()-p) + '</div>';
+        for (var d = 1; d <= last.getDate(); d++) {
+            var ds = fmt(new Date(curYear, curMonth, d));
+            var cls = 'cal-mini-day';
+            if (ds === todayStr) cls += ' is-today';
+            if (bd[ds]) cls += ' has-events';
+            h += '<div class="' + cls + '" data-minidate="' + ds + '">' + d + '</div>';
+        }
+        var total = startDow + last.getDate();
+        for (var n = 1; n <= (7-total%7)%7; n++) h += '<div class="cal-mini-day other-month">' + n + '</div>';
+        grid.innerHTML = h;
+        grid.querySelectorAll('[data-minidate]').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var ds = el.dataset.minidate;
+                var d = new Date(ds + 'T12:00:00');
+                curYear = d.getFullYear(); curMonth = d.getMonth();
+                selDate = ds;
+                miniOpen = false;
+                document.getElementById('mini-dropdown').classList.remove('show');
+                renderAll();
+                // Ouvrir le popup du jour si des events
+                setTimeout(function() {
+                    var cellEl = document.querySelector('.cal-cell[data-date="' + ds + '"]');
+                    if (cellEl) {
+                        var bd2 = byDate();
+                        if (bd2[ds] && bd2[ds].length) openDayPopup(ds, cellEl.getBoundingClientRect());
+                    }
+                }, 50);
+            });
+        });
+    }
+
+    // ── Day detail popup ──
+    var dayPopup = document.getElementById('cal-day-popup');
+
+    function openDayPopup(ds, anchorRect) {
+        var bd = byDate();
+        var evs = bd[ds] || [];
+        if (!evs.length) return;
+
+        var dt = new Date(ds + 'T12:00:00');
+        var dow = (dt.getDay()+6) % 7;
+        var dateLabel = DNfull[dow] + ' ' + dt.getDate() + ' ' + MN[dt.getMonth()] + ' ' + dt.getFullYear();
+        if (ds === todayStr) dateLabel += ' ' + CAL_I18N.today_suffix;
+
+        var relColors = { cinema:'#dc2626', digital:'#a855f7', physical:'#22c55e', episode:'#38bdf8', unknown:'#6b7280' };
+
+        var h = '<div class="cal-day-popup-title">';
+        h += '<span>' + dateLabel + ' <span class="badge bg-secondary-lt" style="font-size:.6rem;">' + evs.length + '</span></span>';
+        h += '<button class="cal-day-popup-close" id="day-popup-close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>';
+        h += '</div>';
+
+        evs.forEach(function(ev) {
+            var poster = ev.poster ? '<img src="' + ev.poster + '" class="cal-day-popup-poster" loading="lazy">' : '<div class="cal-day-popup-poster-ph"></div>';
+            var title = evTitle(ev);
+            var relCls = 'rel-' + (ev.releaseType || 'unknown');
+
+            var statusBadge = '';
+            if (ev.hasFile) statusBadge = '<span class="badge" style="background:#22c55e;font-size:.5rem;">' + CAL_I18N.status_available + '</span>';
+            else if (ev.monitored) statusBadge = '<span class="badge" style="background:var(--tblr-primary);font-size:.5rem;">' + CAL_I18N.status_monitored + '</span>';
+            else statusBadge = '<span class="badge" style="background:#f59e0b;color:#000;font-size:.5rem;">' + CAL_I18N.status_unmonitored + '</span>';
+
+            var relLabel = '<span style="color:' + (relColors[ev.releaseType]||'#6b7280') + ';font-size:.58rem;font-weight:600;">' + (releaseLabels[ev.releaseType]||'') + '</span>';
+
+            var metas = [];
+            if (ev.studio) metas.push(ev.studio);
+            if (ev.network) metas.push(ev.network);
+            if (ev.runtime) metas.push(ev.runtime + ' min');
+            if (ev.genres && ev.genres.length) metas.push(ev.genres.slice(0,2).join(', '));
+
+            var sub = ev.type === 'episode' && ev.title ? '<div class="cal-day-popup-ev-sub" style="color:rgba(255,255,255,.6);">' + ev.title + '</div>' : '';
+            var meta = metas.length ? '<div class="cal-day-popup-ev-meta">' + metas.join(' · ') + '</div>' : '';
+
+            h += '<div class="cal-day-popup-event ' + relCls + '">' + poster + '<div class="overflow-hidden flex-grow-1">'
+              + '<div class="d-flex align-items-center gap-1 mb-1">' + relLabel + ' ' + statusBadge + '</div>'
+              + '<div class="cal-day-popup-ev-title">' + title + '</div>'
+              + sub + meta
+              + '</div></div>';
+        });
+
+        dayPopup.innerHTML = h;
+
+        // Position
+        var x = anchorRect.left;
+        var y = anchorRect.bottom + 4;
+        if (x + 370 > window.innerWidth) x = window.innerWidth - 375;
+        if (y + 400 > window.innerHeight) y = anchorRect.top - 410;
+        if (x < 5) x = 5;
+        if (y < 5) y = 5;
+        dayPopup.style.left = x + 'px';
+        dayPopup.style.top = y + 'px';
+        dayPopup.classList.add('show');
+
+        document.getElementById('day-popup-close').addEventListener('click', closeDayPopup);
+    }
+
+    function closeDayPopup() { dayPopup.classList.remove('show'); }
+
+    // Clic sur "+X de plus" → ouvre popup
+    document.addEventListener('click', function(e) {
+        var more = e.target.closest('[data-date-detail]');
+        if (more) {
+            e.stopPropagation();
+            openDayPopup(more.dataset.dateDetail, more.getBoundingClientRect());
+            return;
+        }
+        // Clic sur une cellule du calendrier → ouvre popup si des events
+        var cell = e.target.closest('.cal-cell[data-date]');
+        if (cell && !e.target.closest('.cal-block') && !e.target.closest('.cal-cell-num')) {
+            var ds = cell.dataset.date;
+            var bd2 = byDate();
+            if (bd2[ds] && bd2[ds].length) {
+                openDayPopup(ds, cell.getBoundingClientRect());
+                return;
+            }
+        }
+        // Clic ailleurs → fermer popup
+        if (!dayPopup.contains(e.target)) closeDayPopup();
+    });
+
+    // Init — select today
+    selDate = todayStr;
+    renderAll();
+})();
 </script>
 </div>

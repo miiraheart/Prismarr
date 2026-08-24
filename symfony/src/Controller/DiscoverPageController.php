@@ -2,10 +2,12 @@
 
 namespace App\Controller;
 
+use App\Entity\ServiceInstance;
 use App\Service\ConfigService;
+use App\Service\ServiceInstanceProvider;
+use App\Service\Media\Discover\CalendarFeed;
 use App\Service\Media\Discover\ListsTabContext;
 use App\Service\Media\LibraryIndex;
-use App\Service\Media\MdblistClient;
 use App\Service\Media\TmdbClient;
 use App\Repository\Media\WatchlistItemRepository;
 use App\Service\Media\TraktClient;
@@ -59,12 +61,6 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 #[IsGranted('ROLE_USER')]
 class DiscoverPageController extends AbstractController
 {
-    /**
-     * How far ahead the Calendar tab looks. MDBList caps the range at 120
-     * days; 45 keeps the payload small while still covering a season.
-     */
-    private const CALENDAR_DAYS = 45;
-
     /** Tab ids, in display order. Also the allowed values of ?tab= and {tab}. */
     public const TABS = ['discover', 'lists', 'watchlists', 'calendar'];
 
@@ -87,7 +83,8 @@ class DiscoverPageController extends AbstractController
         private readonly TraktClient     $trakt,
         private readonly WatchlistItemRepository $watchlistRepo,
         private readonly TranslatorInterface $translator,
-        private readonly MdblistClient   $mdblist,
+        private readonly CalendarFeed    $calendarFeed,
+        private readonly ServiceInstanceProvider $instances,
     ) {}
 
     #[Route('/decouverte', name: 'discover_page', priority: 10)]
@@ -277,61 +274,35 @@ class DiscoverPageController extends AbstractController
     }
 
     /**
-     * The Calendar tab: what is coming for everything the account follows.
+     * The Calendar tab: one merged calendar.
      *
-     * Deliberately NOT an addition to the upstream CalendrierController. That
-     * file is upstream owned and an edit there is re-paid at every nightly
-     * sync, and the two answer different questions anyway: Calendrier is fed
-     * by Radarr and Sonarr so it only shows what is already in the library,
-     * while this shows what is coming for everything followed.
+     * The upstream Calendrier page is fed by Radarr and Sonarr alone, so it
+     * only ever shows what is already in the library. This merges that with
+     * MDBList, which is Trakt-linked and therefore knows about everything
+     * followed, including titles never added to Radarr or Sonarr. Measured on
+     * real data over 45 days: 9 of MDBList's 10 shows were invisible to
+     * Calendrier, and 4 of Calendrier's 5 were invisible to MDBList, so
+     * neither source subsumes the other.
+     *
+     * The upstream page stays exactly as it is. Its UI is copied into this
+     * tab's template rather than shared, because CalendrierController and its
+     * template are byte-identical to upstream and must stay that way.
      */
     private function renderCalendarTab(): Response
     {
-        $error  = false;
-        $events = [];
-
-        if ($this->config->has('mdblist_api_key')) {
-            try {
-                $events = $this->mdblist->getCalendar(
-                    (new \DateTimeImmutable('today'))->format('Y-m-d'),
-                    (new \DateTimeImmutable('today'))->modify('+' . self::CALENDAR_DAYS . ' days')->format('Y-m-d'),
-                );
-            } catch (\Throwable $e) {
-                $this->logger->warning('Calendar tab failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
-                $error = true;
-            }
-        }
-
-        try {
-            $library = $this->libraryIndex->build();
-        } catch (\Throwable $e) {
-            $this->logger->warning('Calendar library index failed', ['message' => $e->getMessage()]);
-            $library = ['movie' => [], 'tv' => []];
-        }
-
-        // Group by date so the tab reads as a calendar rather than a flat
-        // grid. The API already returns events in date order.
-        $days = [];
-        foreach ($events as $event) {
-            $info = $event['type'] === 'movie'
-                ? ($library['movie'][(int) $event['id']] ?? null)
-                : ($library['tv']['tmdb_' . (int) $event['id']] ?? null);
-
-            $event += [
-                'in_library' => $info !== null,
-                'lib_status' => $info['status'] ?? null,
-                'lib_id'     => $info['id'] ?? null,
-            ];
-
-            $days[$event['date']][] = $event;
-        }
+        $feed = $this->calendarFeed->build();
 
         return $this->render('discover/_tab_calendar.html.twig', [
-            'days'       => $days,
-            'error'      => $error,
-            'configured' => $this->config->has('mdblist_api_key'),
-            'total'      => count($events),
-            'windowDays' => self::CALENDAR_DAYS,
+            'eventsJson'    => $feed['events'],
+            'counts'        => $feed['counts'],
+            'radarrFailed'  => $feed['radarrFailed'],
+            'sonarrFailed'  => $feed['sonarrFailed'],
+            'mdblistFailed' => $feed['mdblistFailed'],
+            'mdblistOn'     => $this->config->has('mdblist_api_key'),
+            // The copied Calendrier markup reads these two to decide between
+            // its "unreachable" warning and its softer "not configured" note.
+            'radarrConfigured' => $this->instances->hasAnyEnabled(ServiceInstance::TYPE_RADARR),
+            'sonarrConfigured' => $this->instances->hasAnyEnabled(ServiceInstance::TYPE_SONARR),
         ]);
     }
 
