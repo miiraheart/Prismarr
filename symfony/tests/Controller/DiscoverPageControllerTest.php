@@ -28,6 +28,12 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
 
         $em = $this->em();
         $em->persist(new Setting('tmdb_api_key', 'test-key'));
+        // Trakt and MDBList are configured too, so their sidebar entries WOULD
+        // render. Without this, testTheSidebarHasOneDiscoverEntryNotThree
+        // passes for the wrong reason: the entries are simply absent because
+        // the services are unconfigured, not because they were collapsed.
+        $em->persist(new Setting('trakt_client_id', 'test-client-id'));
+        $em->persist(new Setting('mdblist_api_key', 'test-key'));
         $em->flush();
     }
 
@@ -124,6 +130,20 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         // what distinguishes the reworked tab from the old server-rendered
         // bespoke cards, which emitted .media-card directly in Twig.
         $this->assertSelectorExists('#tk-grid[data-tk-shared="1"]');
+    }
+
+    public function testTheSidebarHasOneDiscoverEntryNotThree(): void
+    {
+        $crawler = $this->client->request('GET', '/decouverte');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertCount(
+            1,
+            $crawler->filter('.navbar-nav a.nav-link[href="/decouverte"]'),
+            'Discover, Lists and Trakt should be one sidebar entry after the merge.',
+        );
+        $this->assertCount(0, $crawler->filter('.navbar-nav a.nav-link[href="/lists"]'));
+        $this->assertCount(0, $crawler->filter('.navbar-nav a.nav-link[href="/trakt"]'));
     }
 
     /**

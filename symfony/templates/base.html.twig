@@ -779,47 +779,24 @@
               </a>
             </li>
 
-            {# Discover TMDb - Prismarr home page #}
+            {# Discover, Lists and Trakt are one tabbed page since the merge.
+               The entry stays highlighted on the JSON-backed subpages of all
+               three, which is why several route prefixes are checked.
+
+               Gated on tmdb alone: TMDb is the only one of the three the page
+               cannot render without, and the Lists and Trakt tabs each show
+               their own "configure me" state inside the tab. #}
             {% if service_visible_in_sidebar('tmdb') %}
             <li class="nav-item">
-              <a class="nav-link {{ app.request.attributes.get('_route') starts with 'tmdb_' ? 'active' }}"
-                 href="{{ path('tmdb_index') }}">
+              {% set _dsc_route = app.request.attributes.get('_route') %}
+              <a class="nav-link {{ (_dsc_route starts with 'discover_page' or _dsc_route starts with 'tmdb_' or _dsc_route starts with 'lists_' or _dsc_route starts with 'trakt_') ? 'active' }}"
+                 href="{{ path('discover_page') }}">
                 <span class="nav-link-icon d-md-none d-lg-inline-block">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
                     <path d="M12 2l2.4 7.4h7.6l-6.2 4.5l2.4 7.4l-6.2 -4.6l-6.2 4.6l2.4 -7.4l-6.2 -4.5h7.6z"/>
                   </svg>
                 </span>
                 <span class="nav-link-title">{{ 'sidebar.nav.discovery'|trans }}</span>
-              </a>
-            </li>
-            {% endif %}
-
-            {% if service_visible_in_sidebar('trakt') %}
-            <li class="nav-item">
-              <a class="nav-link {{ app.request.attributes.get('_route') starts with 'trakt_' ? 'active' }}"
-                 href="{{ path('trakt_index') }}">
-                <span class="nav-link-icon d-md-none d-lg-inline-block">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ed1c24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                    <circle cx="12" cy="12" r="9"/><path d="M8.5 15.5l5-5"/><path d="M15.5 15.5l-3.5 -3.5"/>
-                  </svg>
-                </span>
-                <span class="nav-link-title">{{ 'sidebar.nav.trakt'|trans }}</span>
-              </a>
-            </li>
-            {% endif %}
-
-            {% if service_visible_in_sidebar('mdblist') %}
-            <li class="nav-item">
-              <a class="nav-link {{ app.request.attributes.get('_route') starts with 'lists_' ? 'active' }}"
-                 href="{{ path('lists_index') }}">
-                <span class="nav-link-icon d-md-none d-lg-inline-block">
-                  {# currentColor, not Trakt's brand red: this is a different service. #}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                    <path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/>
-                    <path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/>
-                  </svg>
-                </span>
-                <span class="nav-link-title">{{ 'sidebar.nav.lists'|trans }}</span>
               </a>
             </li>
             {% endif %}
