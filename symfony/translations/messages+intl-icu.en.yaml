@@ -5700,6 +5700,12 @@ discover:
     trakt: Trakt
     loading: Loading...
     failed: This tab could not be loaded.
+  add:
+    placeholder: Paste a list URL
+    button: Add
+    added: List added
+    unsupported: That URL is not a supported list
+    failed: Could not add that list
   search:
     placeholder: Search lists
     count: '{count} lists'

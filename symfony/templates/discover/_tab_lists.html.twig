@@ -77,6 +77,18 @@
     </div>
     <input type="search" class="form-control form-control-sm w-auto" id="dv-search"
            placeholder="{{ 'discover.search.placeholder'|trans }}">
+
+    {# Pin any list by URL. Until now the only way to pin was to first find a
+       list in the MDBList directory and open it, so a list that the directory
+       does not surface could not be added at all. The /lists/pin endpoint
+       already parses, canonicalises and labels the URL, so this only has to
+       hand it over. #}
+    <div class="input-group input-group-sm w-auto">
+      <input type="url" class="form-control form-control-sm" id="dv-add-url"
+             placeholder="{{ 'discover.add.placeholder'|trans }}" style="min-width:15rem;">
+      <button type="button" class="btn btn-outline-primary" id="dv-add-btn">{{ 'discover.add.button'|trans }}</button>
+    </div>
+    <span class="small text-danger d-none" id="dv-add-msg"></span>
     <span class="text-secondary" id="dv-count">{% if totalRows > 0 %}{{ 'discover.search.count'|trans({count: totalRows}) }}{% endif %}</span>
     <span class="dv-cap-note{% if totalRows <= rowCap %} d-none{% endif %}" id="dv-cap-note">{% if totalRows > rowCap %}{{ 'discover.rows.capped'|trans({count: rowCap, total: totalRows}) }}{% endif %}</span>
   </div>
@@ -539,6 +551,52 @@
   search.addEventListener('input', function () {
     clearTimeout(timer);
     timer = setTimeout(function () { loadDirectory(search.value.trim()); }, 300);
+  });
+
+  // ── Pin a list by URL ────────────────────────────────────────────────
+  var addUrl = document.getElementById('dv-add-url');
+  var addBtn = document.getElementById('dv-add-btn');
+  var addMsg = document.getElementById('dv-add-msg');
+
+  function showAddMsg(text, isError) {
+    addMsg.textContent = text;
+    addMsg.classList.remove('d-none', 'text-danger', 'text-success');
+    addMsg.classList.add(isError ? 'text-danger' : 'text-success');
+  }
+
+  function submitAdd() {
+    var url = addUrl.value.trim();
+    if (!url) return;
+
+    addBtn.disabled = true;
+    addMsg.classList.add('d-none');
+
+    fetch(ROUTES.pin, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ url: url })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.body.ok) {
+          showAddMsg({{ 'discover.add.unsupported'|trans|json_encode|raw }}, true);
+          return;
+        }
+        pinned = res.body.pinned || [];
+        addUrl.value = '';
+        showAddMsg({{ 'discover.add.added'|trans|json_encode|raw }}, false);
+        // Redraw so the new pinned row appears without a page reload.
+        loadDirectory(search.value.trim());
+      })
+      .catch(function () {
+        showAddMsg({{ 'discover.add.failed'|trans|json_encode|raw }}, true);
+      })
+      .finally(function () { addBtn.disabled = false; });
+  }
+
+  addBtn.addEventListener('click', submitAdd);
+  addUrl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); submitAdd(); }
   });
 
   window.PrismarrDiscover = { routes: ROUTES, openList: openList, current: current };

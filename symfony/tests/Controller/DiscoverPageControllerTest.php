@@ -132,6 +132,58 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->assertSelectorExists('#tk-grid[data-tk-shared="1"]');
     }
 
+    /**
+     * The modal partial defines window.renderCardHTML, and a server-rendered
+     * tab's inline script runs while the document is parsed. With the modal
+     * included AFTER the panes, the Trakt tab called renderCardHTML before it
+     * existed, threw, and rendered zero cards while its counts still showed
+     * 26 movies and 28 shows.
+     */
+    public function testTheSharedCardRendererIsDefinedBeforeAnyTabPane(): void
+    {
+        $this->client->request('GET', '/decouverte', ['tab' => 'trakt']);
+
+        $html     = (string) $this->client->getResponse()->getContent();
+        $renderer = strpos($html, 'function renderCardHTML');
+        $panes    = strpos($html, 'id="dsc-panes"');
+
+        $this->assertNotFalse($renderer, 'renderCardHTML must be on the page.');
+        $this->assertNotFalse($panes, 'The pane container must be on the page.');
+        $this->assertLessThan(
+            $panes,
+            $renderer,
+            'The modal partial must be included before the panes, or a tab script runs before renderCardHTML exists.',
+        );
+    }
+
+    /**
+     * A tab may ship a JSON data island next to its executable script. The
+     * lazy-load path re-creates scripts so they run, and dropping the type or
+     * id of a non-executable one leaves the tab reading an empty seed.
+     */
+    public function testTheTraktTabSeedKeepsItsTypeAndId(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/trakt');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('script#tk-items[type="application/json"]');
+    }
+
+    /**
+     * Until this was added the only way to pin a list was to find it in the
+     * MDBList directory and open it, so a list the directory does not surface
+     * could not be added at all, even though /lists/pin accepts any supported
+     * URL.
+     */
+    public function testTheListsTabCanPinAListByUrl(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/lists');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#dv-add-url');
+        $this->assertSelectorExists('#dv-add-btn');
+    }
+
     public function testTheSidebarHasOneDiscoverEntryNotThree(): void
     {
         $crawler = $this->client->request('GET', '/decouverte');

@@ -5698,6 +5698,12 @@ discover:
     trakt: Trakt
     loading: Chargement...
     failed: Cet onglet n'a pas pu être chargé.
+  add:
+    placeholder: Collez l'URL d'une liste
+    button: Ajouter
+    added: Liste ajoutée
+    unsupported: Cette URL n'est pas une liste prise en charge
+    failed: Impossible d'ajouter cette liste
   search:
     placeholder: Rechercher des listes
     count: '{count} listes'
