@@ -245,6 +245,22 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->assertStringNotContainsString("BASE + '/meta/'", $html);
     }
 
+    /**
+     * A filter has to see every list, not just the rows that happen to have
+     * been scrolled into view. Rows load lazily, so a DOM-only filter silently
+     * ignored everything below the fold; the filter now fans out across all
+     * lists and renders its matches into its own grid.
+     */
+    public function testTheListsTabHasAFilterResultsView(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/lists');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#dv-filter-view');
+        $this->assertSelectorExists('#dv-filter-grid');
+        $this->assertSelectorExists('#dv-filter-progress');
+    }
+
     public function testTheSidebarHasOneDiscoverEntryNotThree(): void
     {
         $crawler = $this->client->request('GET', '/decouverte');

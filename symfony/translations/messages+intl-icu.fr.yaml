@@ -5716,6 +5716,10 @@ discover:
     vote_min: 'Note min :'
     sort: Trier
     reset: Réinitialiser
+    results: Résultats du filtre
+    scanning: Analyse des listes __DONE__/__TOTAL__...
+    matches: __N__ résultats dans toutes les listes
+    none: Aucun titre de vos listes ne correspond à ces filtres.
     sort_options:
       default: Ordre de la liste
       rating: Note

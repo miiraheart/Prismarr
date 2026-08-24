@@ -211,6 +211,20 @@
     {% endfor %}
   </div>
 
+  {# Filter results. A filter has to see EVERY list, but rows load lazily, so
+     filtering only what is on screen would silently ignore the rows not
+     scrolled to yet. When a filter is on, every row is fetched (read-through
+     cached server-side, which is what makes the fan-out affordable) and the
+     matches are shown here as one grid instead of scattered across 24 rows. #}
+  <div id="dv-filter-view" class="d-none">
+    <div class="dv-toolbar">
+      <strong id="dv-filter-heading"></strong>
+      <span class="text-secondary small" id="dv-filter-progress"></span>
+    </div>
+    <div class="tmdb-results-grid" id="dv-filter-grid"></div>
+    <div class="wl-empty text-secondary d-none" id="dv-filter-empty"></div>
+  </div>
+
   <div id="dv-list-view" class="d-none">
     <div class="dv-toolbar">
       <button type="button" class="btn btn-sm btn-outline-secondary" id="dv-back">{{ 'discover.action.back'|trans }}</button>
@@ -741,7 +755,7 @@
     return isNaN(v) ? null : v;
   }
 
-  function matches(card, f) {
+  function cardMatches(card, f) {
     if (f.type && card.dataset.tmdbType !== f.type) return false;
     var y = cardYear(card);
     if (f.yearMin && (y === null || y < f.yearMin)) return false;
@@ -766,19 +780,152 @@
     cards.forEach(function (c) { container.appendChild(c); });
   }
 
+  var FILTER_HEADING = {{ 'discover.filters.results'|trans|json_encode|raw }};
+  var FILTER_LOADING = {{ 'discover.filters.scanning'|trans|json_encode|raw }};
+  var FILTER_COUNT   = {{ 'discover.filters.matches'|trans|json_encode|raw }};
+  var FILTER_EMPTY   = {{ 'discover.filters.none'|trans|json_encode|raw }};
+
+  var filterView   = document.getElementById('dv-filter-view');
+  var filterGrid   = document.getElementById('dv-filter-grid');
+  var filterEmpty  = document.getElementById('dv-filter-empty');
+  var filterProg   = document.getElementById('dv-filter-progress');
+  var filterHead   = document.getElementById('dv-filter-heading');
+  var fanoutToken  = 0;
+
+  function anyFilterActive(f) {
+    return !!(f.type || f.yearMin || f.yearMax || f.voteMin > 0);
+  }
+
+  function itemMatches(item, f) {
+    if (f.type && item.type !== f.type) return false;
+    var y = item.year ? parseInt(item.year, 10) : null;
+    if (f.yearMin && (!y || y < f.yearMin)) return false;
+    if (f.yearMax && (!y || y > f.yearMax)) return false;
+    if (f.voteMin > 0) {
+      var v = item.vote ? parseFloat(item.vote) : null;
+      if (!v || v < f.voteMin) return false;
+    }
+    return true;
+  }
+
+  function sortItems(items, sort) {
+    if (!sort) return items;
+    return items.slice().sort(function (a, b) {
+      if (sort === 'rating')    return (parseFloat(b.vote) || 0) - (parseFloat(a.vote) || 0);
+      if (sort === 'year_desc') return (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0);
+      if (sort === 'year_asc')  return (parseInt(a.year, 10) || 9999) - (parseInt(b.year, 10) || 9999);
+      if (sort === 'title')     return String(a.title || '').localeCompare(String(b.title || ''));
+      return 0;
+    });
+  }
+
+  // Every list the directory knows about, whether or not its row has been
+  // scrolled into view.
+  function allRowUrls() {
+    return Array.prototype.slice.call(
+      document.querySelectorAll('[data-dsc-pane="lists"] #dv-directory .tmdb-row[data-url]')
+    ).map(function (r) { return r.dataset.url; });
+  }
+
+  // Fetch with a small concurrency cap: 24 parallel requests would hammer
+  // MDBList, and the responses are cached server-side anyway so a repeat
+  // filter costs nothing.
+  function fetchAll(urls, token, onProgress) {
+    var out = [];
+    var idx = 0;
+    var done = 0;
+    var LANES = 4;
+
+    return new Promise(function (resolve) {
+      function next() {
+        if (token !== fanoutToken) return resolve(out);
+        if (idx >= urls.length) {
+          if (done >= urls.length) resolve(out);
+          return;
+        }
+        var url = urls[idx++];
+        fetch(ROUTES.list + '?src=' + encodeURIComponent(url), { headers: { Accept: 'application/json' } })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { (d.items || []).forEach(function (i) { out.push(i); }); })
+          .catch(function () { /* one dead list must not kill the filter */ })
+          .finally(function () {
+            done++;
+            onProgress(done, urls.length);
+            if (done >= urls.length && idx >= urls.length) { resolve(out); }
+            else { next(); }
+          });
+      }
+      for (var i = 0; i < Math.min(LANES, urls.length); i++) next();
+    });
+  }
+
+  function showDirectory() {
+    filterView.classList.add('d-none');
+    directory.classList.remove('d-none');
+  }
+
   function applyFilters() {
     var f = currentFilters();
     var n = activeCount(f);
     filtCount.textContent = n;
     filtCount.style.display = n ? '' : 'none';
-    filtToggle.classList.toggle('active', n > 0 || filtPanel.style.display !== 'none');
 
-    document.querySelectorAll('[data-dsc-pane="lists"] .media-card').forEach(function (card) {
-      card.style.display = matches(card, f) ? '' : 'none';
+    // An open single list keeps the old in-place behaviour: everything it
+    // holds is already in the DOM, so there is nothing to fan out to.
+    if (!listView.classList.contains('d-none')) {
+      document.querySelectorAll('#dv-grid .media-card').forEach(function (card) {
+        card.style.display = cardMatches(card, f) ? '' : 'none';
+      });
+      sortContainer(grid, f);
+      return;
+    }
+
+    if (!anyFilterActive(f)) {
+      fanoutToken++;
+      showDirectory();
+      // Sorting with no filter still applies, in place, to loaded rows.
+      document.querySelectorAll('[data-dsc-pane="lists"] .tmdb-row').forEach(function (c) {
+        Array.prototype.slice.call(c.querySelectorAll('.media-card'))
+          .forEach(function (card) { card.style.display = ''; });
+        sortContainer(c, f);
+      });
+      return;
+    }
+
+    var token = ++fanoutToken;
+    var urls  = allRowUrls();
+
+    directory.classList.add('d-none');
+    filterView.classList.remove('d-none');
+    filterEmpty.classList.add('d-none');
+    filterGrid.innerHTML = '';
+    filterHead.textContent = FILTER_HEADING;
+    filterProg.textContent = FILTER_LOADING.replace('__DONE__', 0).replace('__TOTAL__', urls.length);
+
+    fetchAll(urls, token, function (done, total) {
+      if (token !== fanoutToken) return;
+      filterProg.textContent = FILTER_LOADING.replace('__DONE__', done).replace('__TOTAL__', total);
+    }).then(function (items) {
+      if (token !== fanoutToken) return;
+
+      // One list can appear in several rows (a pinned list also shows in the
+      // directory), so the same title would otherwise render twice.
+      var seen = {};
+      var matches = [];
+      items.forEach(function (it) {
+        var key = it.type + ':' + it.id;
+        if (seen[key]) return;
+        seen[key] = 1;
+        if (itemMatches(it, f)) matches.push(it);
+      });
+
+      matches = sortItems(matches, f.sort);
+      filterProg.textContent = FILTER_COUNT.replace('__N__', matches.length);
+      filterGrid.innerHTML = matches.map(window.renderCardHTML).join('');
+      filterEmpty.textContent = FILTER_EMPTY;
+      filterEmpty.classList.toggle('d-none', matches.length > 0);
+      hydrate(matches, filterGrid);
     });
-
-    document.querySelectorAll('[data-dsc-pane="lists"] .tmdb-row, [data-dsc-pane="lists"] #dv-grid')
-      .forEach(function (c) { sortContainer(c, f); });
   }
 
   [yearMin, yearMax].forEach(function (el) { el.addEventListener('input', applyFilters); });
@@ -801,16 +948,10 @@
     applyFilters();
   });
 
-  // Rows arrive lazily, so newly injected cards must inherit the active
-  // filter rather than appearing unfiltered until the next interaction.
-  var pane = document.querySelector('[data-dsc-pane="lists"]');
-  if (pane && window.MutationObserver) {
-    var pending = null;
-    new MutationObserver(function () {
-      clearTimeout(pending);
-      pending = setTimeout(applyFilters, 50);
-    }).observe(pane, { childList: true, subtree: true });
-  }
+  // No MutationObserver here any more. It used to re-filter rows as they
+  // arrived, which was only needed because filtering read the DOM. The filter
+  // now fans out and renders its own grid, and an observer would re-trigger
+  // that fan-out every time the grid was written.
 
   window.PrismarrDiscover = { routes: ROUTES, openList: openList, current: current };
   wireDirectoryRows();

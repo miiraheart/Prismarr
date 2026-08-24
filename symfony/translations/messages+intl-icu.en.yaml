@@ -5718,6 +5718,10 @@ discover:
     vote_min: 'Min rating:'
     sort: Sort
     reset: Reset
+    results: Filter results
+    scanning: Scanning lists __DONE__/__TOTAL__...
+    matches: __N__ matches across all lists
+    none: Nothing in your lists matches these filters.
     sort_options:
       default: List order
       rating: Rating
