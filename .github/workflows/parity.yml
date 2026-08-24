@@ -84,6 +84,14 @@ jobs:
       - name: Run make check
         run: make check
 
+      # PHPStan needs the dev dependencies installed above and must run with
+      # a cold result cache: warm-cache runs misattribute trait errors and
+      # report phantom failures (known PHPStan wart, verified on 2.2.9).
+      - name: PHPStan
+        run: |
+          docker exec prismarr vendor/bin/phpstan clear-result-cache
+          docker exec prismarr vendor/bin/phpstan analyse --no-progress
+
       - name: Container logs on failure
         if: failure()
         run: docker logs prismarr
