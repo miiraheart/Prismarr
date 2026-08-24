@@ -28,6 +28,11 @@
   {% endfor %}
 </div>
 
+{# Toolbar styles shared by every tab. Must be in the shell, not in a pane:
+   only the active pane is server rendered, so a tab-local copy is missing
+   whenever a different tab is the one that loaded. #}
+{% include 'discover/_toolbar_styles.html.twig' %}
+
 {# Included ONCE here rather than once per tab, and BEFORE the panes.
 
    The order matters: the modal partial is what defines window.renderCardHTML,

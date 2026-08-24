@@ -1,0 +1,65 @@
+{# Toolbar styles: the search field, the pill action buttons and the filter
+   count badge.
+
+   Lifted out of the Discover tab so EVERY tab can use them. The shell renders
+   only the active pane, so while these lived inside _tab_discover.html.twig a
+   visitor who opened the Lists tab first got a page where .tmdb-searchbar and
+   .tmdb-action-btn were never defined, and the toolbar rendered unstyled.
+
+   Included once by discover/index.html.twig. #}
+<style>
+  /* ── Barre de recherche + actions ── */
+  .tmdb-searchbar {
+    display: flex; gap: .5rem; align-items: center;
+    margin-bottom: 1.25rem; flex-wrap: wrap;
+  }
+  .tmdb-search-wrap {
+    flex: 1; min-width: 200px; display: flex; align-items: center; gap: .5rem;
+    background: var(--tblr-bg-surface);
+    border: 1px solid var(--tblr-border-color);
+    border-radius: .5rem;
+    padding: .45rem .75rem;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .tmdb-search-wrap:focus-within {
+    border-color: var(--tblr-primary);
+    box-shadow: 0 0 0 3px rgba(var(--tblr-primary-rgb),.12);
+  }
+  .tmdb-search-ico { color: var(--tblr-muted); flex-shrink: 0; }
+  .tmdb-search-wrap:focus-within .tmdb-search-ico { color: var(--tblr-primary); }
+  .tmdb-search-input {
+    flex: 1; background: transparent; border: 0; outline: 0;
+    color: var(--tblr-body-color); font-size: .85rem;
+    min-width: 0;
+  }
+  .tmdb-search-input::placeholder { color: var(--tblr-muted); }
+  .tmdb-search-kbd {
+    background: var(--tblr-bg-surface-secondary);
+    color: var(--tblr-muted);
+    border: 1px solid var(--tblr-border-color);
+    border-radius: .25rem; font-size: .6rem;
+    padding: .1rem .35rem; font-weight: 600;
+    letter-spacing: .5px;
+  }
+  .tmdb-action-btns { display: flex; gap: .35rem; align-items: center; }
+  .tmdb-action-btn {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .4rem .7rem;
+    background: var(--tblr-bg-surface);
+    border: 1px solid var(--tblr-border-color);
+    border-radius: .5rem;
+    color: var(--tblr-body-color); font-weight: 500; font-size: .78rem;
+    cursor: pointer; transition: all .15s; text-decoration: none;
+    white-space: nowrap;
+  }
+  .tmdb-action-btn:hover { background: rgba(var(--tblr-primary-rgb),.08); border-color: var(--tblr-primary); color: var(--tblr-primary); }
+  .tmdb-action-btn.active { background: var(--tblr-primary); color: #fff; border-color: var(--tblr-primary); }
+  .tmdb-action-btn svg { flex-shrink: 0; }
+  .tmdb-filter-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #ef4444; color: #fff;
+    width: 16px; height: 16px; border-radius: 50%;
+    font-size: .6rem; font-weight: 700;
+    margin-left: .15rem;
+  }
+</style>

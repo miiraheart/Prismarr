@@ -5702,10 +5702,28 @@ discover:
     failed: This tab could not be loaded.
   add:
     placeholder: Paste a list URL
+    label: List URL
     button: Add
     added: List added
     unsupported: That URL is not a supported list
     failed: Could not add that list
+  filters:
+    button: Filters
+    type: Type
+    all: All
+    movies: Movies
+    series: TV
+    year_from: From
+    year_to: To
+    vote_min: 'Min rating:'
+    sort: Sort
+    reset: Reset
+    sort_options:
+      default: List order
+      rating: Rating
+      year_desc: Newest
+      year_asc: Oldest
+      title: Title
   search:
     placeholder: Search lists
     count: '{count} lists'

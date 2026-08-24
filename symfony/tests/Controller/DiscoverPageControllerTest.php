@@ -180,8 +180,52 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->client->request('GET', '/decouverte/tab/lists');
 
         $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#dv-add-toggle');
         $this->assertSelectorExists('#dv-add-url');
         $this->assertSelectorExists('#dv-add-btn');
+    }
+
+    /**
+     * The Lists toolbar must use the same language as the Discover tab: one
+     * search field, then pill action buttons that toggle panels.
+     */
+    public function testTheListsToolbarUsesTheSharedSearchbarDesign(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/lists');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#dv-tabs.tmdb-searchbar');
+        $this->assertSelectorExists('#dv-search.tmdb-search-input');
+        $this->assertSelectorExists('#dv-filters-toggle.tmdb-action-btn');
+        $this->assertSelectorExists('#dv-add-toggle.tmdb-action-btn');
+    }
+
+    public function testTheListsTabHasAFilterPanel(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/lists');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#dv-filters');
+        $this->assertSelectorExists('#dv-year-min');
+        $this->assertSelectorExists('#dv-year-max');
+        $this->assertSelectorExists('#dv-vote-min');
+        $this->assertSelectorExists('#dv-sort');
+        $this->assertSelectorExists('#dv-filter-reset');
+    }
+
+    /**
+     * The toolbar styles must come from the shell, not from a tab pane. Only
+     * the active pane is server rendered, so a copy living inside the Discover
+     * tab left the Lists toolbar unstyled whenever Lists was the tab that
+     * loaded.
+     */
+    public function testToolbarStylesArePresentEvenWhenDiscoverIsNotTheActiveTab(): void
+    {
+        $this->client->request('GET', '/decouverte', ['tab' => 'lists']);
+
+        $html = (string) $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('.tmdb-searchbar', $html);
+        $this->assertStringContainsString('.tmdb-action-btn', $html);
     }
 
     public function testTheSidebarHasOneDiscoverEntryNotThree(): void

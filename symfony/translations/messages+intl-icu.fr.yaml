@@ -5700,10 +5700,28 @@ discover:
     failed: Cet onglet n'a pas pu être chargé.
   add:
     placeholder: Collez l'URL d'une liste
+    label: URL de la liste
     button: Ajouter
     added: Liste ajoutée
     unsupported: Cette URL n'est pas une liste prise en charge
     failed: Impossible d'ajouter cette liste
+  filters:
+    button: Filtres
+    type: Type
+    all: Tous
+    movies: Films
+    series: Séries
+    year_from: De
+    year_to: À
+    vote_min: 'Note min :'
+    sort: Trier
+    reset: Réinitialiser
+    sort_options:
+      default: Ordre de la liste
+      rating: Note
+      year_desc: Plus récents
+      year_asc: Plus anciens
+      title: Titre
   search:
     placeholder: Rechercher des listes
     count: '{count} listes'

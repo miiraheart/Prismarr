@@ -71,26 +71,105 @@
     <div class="alert alert-warning">{{ 'discover.error.not_configured'|trans }}</div>
   {% endif %}
 
-  <div id="dv-tabs" class="dv-toolbar">
-    <div class="btn-group btn-group-sm" role="group">
-      <button type="button" class="btn btn-outline-secondary active" data-dv-tab="lists">{{ 'discover.tab.lists'|trans }}</button>
+  {# Same toolbar language as the Discover tab: one search field, then pill
+     action buttons that toggle panels. Styles come from the shell's
+     _toolbar_styles.html.twig, so they are present whichever tab loaded. #}
+  <div id="dv-tabs" class="tmdb-searchbar">
+    <div class="tmdb-search-wrap">
+      <svg class="tmdb-search-ico" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/>
+        <path d="M21 21l-6 -6"/>
+      </svg>
+      <input id="dv-search" type="search" class="tmdb-search-input"
+             placeholder="{{ 'discover.search.placeholder'|trans }}" autocomplete="off">
+      <kbd class="tmdb-search-kbd d-none d-md-inline">MDBList</kbd>
     </div>
-    <input type="search" class="form-control form-control-sm w-auto" id="dv-search"
-           placeholder="{{ 'discover.search.placeholder'|trans }}">
+    <div class="tmdb-action-btns">
+      <button type="button" class="tmdb-action-btn" id="dv-filters-toggle">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 4h18M7 12h10M11 20h2"/>
+        </svg>
+        {{ 'discover.filters.button'|trans }}
+        <span class="tmdb-filter-badge" id="dv-filter-count" style="display:none;">0</span>
+      </button>
+      <button type="button" class="tmdb-action-btn" id="dv-add-toggle">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+        {{ 'discover.add.button'|trans }}
+      </button>
+      <span class="text-secondary small" id="dv-count">{% if totalRows > 0 %}{{ 'discover.search.count'|trans({count: totalRows}) }}{% endif %}</span>
+      <span class="dv-cap-note small{% if totalRows <= rowCap %} d-none{% endif %}" id="dv-cap-note">{% if totalRows > rowCap %}{{ 'discover.rows.capped'|trans({count: rowCap, total: totalRows}) }}{% endif %}</span>
+    </div>
+  </div>
 
-    {# Pin any list by URL. Until now the only way to pin was to first find a
-       list in the MDBList directory and open it, so a list that the directory
-       does not surface could not be added at all. The /lists/pin endpoint
-       already parses, canonicalises and labels the URL, so this only has to
-       hand it over. #}
-    <div class="input-group input-group-sm w-auto">
-      <input type="url" class="form-control form-control-sm" id="dv-add-url"
-             placeholder="{{ 'discover.add.placeholder'|trans }}" style="min-width:15rem;">
-      <button type="button" class="btn btn-outline-primary" id="dv-add-btn">{{ 'discover.add.button'|trans }}</button>
+  {# Add a list by URL. Panel rather than an inline input group, so the toolbar
+     stays one clean row and matches the Filters affordance next to it. #}
+  <div id="dv-add-panel" class="card mb-3" style="display:none;">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6">
+          <label class="form-label small mb-1" for="dv-add-url">{{ 'discover.add.label'|trans }}</label>
+          <input type="url" class="form-control form-control-sm" id="dv-add-url"
+                 placeholder="{{ 'discover.add.placeholder'|trans }}">
+        </div>
+        <div class="col-auto">
+          <button type="button" class="btn btn-primary btn-sm" id="dv-add-btn">{{ 'discover.add.button'|trans }}</button>
+        </div>
+        <div class="col-auto">
+          <span class="small d-none" id="dv-add-msg"></span>
+        </div>
+      </div>
     </div>
-    <span class="small text-danger d-none" id="dv-add-msg"></span>
-    <span class="text-secondary" id="dv-count">{% if totalRows > 0 %}{{ 'discover.search.count'|trans({count: totalRows}) }}{% endif %}</span>
-    <span class="dv-cap-note{% if totalRows <= rowCap %} d-none{% endif %}" id="dv-cap-note">{% if totalRows > rowCap %}{{ 'discover.rows.capped'|trans({count: rowCap, total: totalRows}) }}{% endif %}</span>
+  </div>
+
+  {# Filter panel. Genre is deliberately absent: MDBList list items carry
+     id, type, title, year, poster and vote but no genres, so a genre control
+     would need one extra API call per row and the free plan allows 1000 a
+     day. Genre belongs with the server-side filtering in bead projects-o31. #}
+  <div id="dv-filters" class="card mb-3" style="display:none;">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label small mb-1">{{ 'discover.filters.type'|trans }}</label>
+          <div class="btn-group btn-group-sm" role="group">
+            <input type="radio" class="btn-check" name="dv-filter-type" id="dv-type-all" value="" checked>
+            <label class="btn btn-outline-primary btn-sm" for="dv-type-all">{{ 'discover.filters.all'|trans }}</label>
+            <input type="radio" class="btn-check" name="dv-filter-type" id="dv-type-movie" value="movie">
+            <label class="btn btn-outline-primary btn-sm" for="dv-type-movie">{{ 'discover.filters.movies'|trans }}</label>
+            <input type="radio" class="btn-check" name="dv-filter-type" id="dv-type-tv" value="tv">
+            <label class="btn btn-outline-primary btn-sm" for="dv-type-tv">{{ 'discover.filters.series'|trans }}</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-1" for="dv-year-min">{{ 'discover.filters.year_from'|trans }}</label>
+          <input type="number" class="form-control form-control-sm" id="dv-year-min" placeholder="1970" min="1900" max="2100" style="width:90px;">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-1" for="dv-year-max">{{ 'discover.filters.year_to'|trans }}</label>
+          <input type="number" class="form-control form-control-sm" id="dv-year-max" placeholder="2030" min="1900" max="2100" style="width:90px;">
+        </div>
+        <div class="col-auto" style="min-width:150px;">
+          <label class="form-label small mb-1" for="dv-vote-min">
+            {{ 'discover.filters.vote_min'|trans }} <span id="dv-vote-val" class="fw-medium">0</span>
+          </label>
+          <input type="range" class="form-range" id="dv-vote-min" min="0" max="10" step="0.5" value="0">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1" for="dv-sort">{{ 'discover.filters.sort'|trans }}</label>
+          <select class="form-select form-select-sm" id="dv-sort">
+            <option value="">{{ 'discover.filters.sort_options.default'|trans }}</option>
+            <option value="rating">{{ 'discover.filters.sort_options.rating'|trans }}</option>
+            <option value="year_desc">{{ 'discover.filters.sort_options.year_desc'|trans }}</option>
+            <option value="year_asc">{{ 'discover.filters.sort_options.year_asc'|trans }}</option>
+            <option value="title">{{ 'discover.filters.sort_options.title'|trans }}</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="button" class="btn btn-ghost-secondary btn-sm" id="dv-filter-reset">{{ 'discover.filters.reset'|trans }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   
@@ -553,6 +632,24 @@
     timer = setTimeout(function () { loadDirectory(search.value.trim()); }, 300);
   });
 
+  // ── Toolbar panels ───────────────────────────────────────────────────
+  var addPanel   = document.getElementById('dv-add-panel');
+  var addToggle  = document.getElementById('dv-add-toggle');
+  var filtPanel  = document.getElementById('dv-filters');
+  var filtToggle = document.getElementById('dv-filters-toggle');
+
+  function togglePanel(panel, btn) {
+    var open = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : '';
+    btn.classList.toggle('active', !open);
+  }
+
+  addToggle.addEventListener('click', function () {
+    togglePanel(addPanel, addToggle);
+    if (addPanel.style.display !== 'none') { addUrl.focus(); }
+  });
+  filtToggle.addEventListener('click', function () { togglePanel(filtPanel, filtToggle); });
+
   // ── Pin a list by URL ────────────────────────────────────────────────
   var addUrl = document.getElementById('dv-add-url');
   var addBtn = document.getElementById('dv-add-btn');
@@ -585,7 +682,6 @@
         pinned = res.body.pinned || [];
         addUrl.value = '';
         showAddMsg({{ 'discover.add.added'|trans|json_encode|raw }}, false);
-        // Redraw so the new pinned row appears without a page reload.
         loadDirectory(search.value.trim());
       })
       .catch(function () {
@@ -598,6 +694,123 @@
   addUrl.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); submitAdd(); }
   });
+
+  // ── Filters ──────────────────────────────────────────────────────────
+  // Applied to cards already in the DOM rather than refetched: every row is
+  // a separate MDBList call and the free plan allows 1000 a day, so filtering
+  // must never cost a request. Rows loaded later are filtered by the
+  // MutationObserver below, so a lazy row arrives already filtered.
+  var yearMin = document.getElementById('dv-year-min');
+  var yearMax = document.getElementById('dv-year-max');
+  var voteMin = document.getElementById('dv-vote-min');
+  var voteVal = document.getElementById('dv-vote-val');
+  var sortSel = document.getElementById('dv-sort');
+  var filtCount = document.getElementById('dv-filter-count');
+
+  function currentFilters() {
+    var typeEl = document.querySelector('input[name="dv-filter-type"]:checked');
+    return {
+      type: typeEl ? typeEl.value : '',
+      yearMin: parseInt(yearMin.value, 10) || null,
+      yearMax: parseInt(yearMax.value, 10) || null,
+      voteMin: parseFloat(voteMin.value) || 0,
+      sort: sortSel.value
+    };
+  }
+
+  function activeCount(f) {
+    var n = 0;
+    if (f.type) n++;
+    if (f.yearMin) n++;
+    if (f.yearMax) n++;
+    if (f.voteMin > 0) n++;
+    if (f.sort) n++;
+    return n;
+  }
+
+  function cardYear(card) {
+    var el = card.querySelector('.card-year');
+    var y = el ? parseInt(el.textContent, 10) : NaN;
+    return isNaN(y) ? null : y;
+  }
+
+  function cardVote(card) {
+    var el = card.querySelector('.vote-badge');
+    if (!el) return null;
+    var v = parseFloat((el.textContent || '').replace(/[^0-9.]/g, ''));
+    return isNaN(v) ? null : v;
+  }
+
+  function matches(card, f) {
+    if (f.type && card.dataset.tmdbType !== f.type) return false;
+    var y = cardYear(card);
+    if (f.yearMin && (y === null || y < f.yearMin)) return false;
+    if (f.yearMax && (y === null || y > f.yearMax)) return false;
+    if (f.voteMin > 0) {
+      var v = cardVote(card);
+      if (v === null || v < f.voteMin) return false;
+    }
+    return true;
+  }
+
+  function sortContainer(container, f) {
+    if (!f.sort) return;
+    var cards = Array.from(container.querySelectorAll('.media-card'));
+    cards.sort(function (a, b) {
+      if (f.sort === 'rating')    return (cardVote(b) || 0) - (cardVote(a) || 0);
+      if (f.sort === 'year_desc') return (cardYear(b) || 0) - (cardYear(a) || 0);
+      if (f.sort === 'year_asc')  return (cardYear(a) || 9999) - (cardYear(b) || 9999);
+      if (f.sort === 'title')     return (a.dataset.tmdbTitle || '').localeCompare(b.dataset.tmdbTitle || '');
+      return 0;
+    });
+    cards.forEach(function (c) { container.appendChild(c); });
+  }
+
+  function applyFilters() {
+    var f = currentFilters();
+    var n = activeCount(f);
+    filtCount.textContent = n;
+    filtCount.style.display = n ? '' : 'none';
+    filtToggle.classList.toggle('active', n > 0 || filtPanel.style.display !== 'none');
+
+    document.querySelectorAll('[data-dsc-pane="lists"] .media-card').forEach(function (card) {
+      card.style.display = matches(card, f) ? '' : 'none';
+    });
+
+    document.querySelectorAll('[data-dsc-pane="lists"] .tmdb-row, [data-dsc-pane="lists"] #dv-grid')
+      .forEach(function (c) { sortContainer(c, f); });
+  }
+
+  [yearMin, yearMax].forEach(function (el) { el.addEventListener('input', applyFilters); });
+  voteMin.addEventListener('input', function () {
+    voteVal.textContent = voteMin.value;
+    applyFilters();
+  });
+  sortSel.addEventListener('change', applyFilters);
+  document.querySelectorAll('input[name="dv-filter-type"]').forEach(function (el) {
+    el.addEventListener('change', applyFilters);
+  });
+
+  document.getElementById('dv-filter-reset').addEventListener('click', function () {
+    document.getElementById('dv-type-all').checked = true;
+    yearMin.value = '';
+    yearMax.value = '';
+    voteMin.value = 0;
+    voteVal.textContent = '0';
+    sortSel.value = '';
+    applyFilters();
+  });
+
+  // Rows arrive lazily, so newly injected cards must inherit the active
+  // filter rather than appearing unfiltered until the next interaction.
+  var pane = document.querySelector('[data-dsc-pane="lists"]');
+  if (pane && window.MutationObserver) {
+    var pending = null;
+    new MutationObserver(function () {
+      clearTimeout(pending);
+      pending = setTimeout(applyFilters, 50);
+    }).observe(pane, { childList: true, subtree: true });
+  }
 
   window.PrismarrDiscover = { routes: ROUTES, openList: openList, current: current };
   wireDirectoryRows();
