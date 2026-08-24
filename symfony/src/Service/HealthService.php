@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\ServiceInstance;
 use App\Service\Media\DelugeClient;
+use App\Service\Media\GluetunClient;
 use App\Service\Media\JellyseerrClient;
 use App\Service\Media\MdblistClient;
 use App\Service\Media\ProwlarrClient;
@@ -83,6 +84,9 @@ class HealthService
         // reason as the clients above.
         private readonly ?TraktClient      $trakt = null,
         private readonly ?MdblistClient    $mdblist = null,
+        // Gluetun: nullable + last for the same legacy-test-constructor
+        // reason as the clients above.
+        private readonly ?GluetunClient    $gluetun = null,
     ) {}
 
     /**
@@ -256,6 +260,7 @@ class HealthService
             'transmission' => $this->transmission?->ping() ?? false,
             'trakt'       => $this->trakt?->ping() ?? false,
             'mdblist'     => $this->mdblist?->ping() ?? false,
+            'gluetun'     => $this->gluetun?->ping() ?? false,
             default       => true,
         };
     }
@@ -334,6 +339,8 @@ class HealthService
             // MDBList needs only the API key: the endpoint is always
             // api.mdblist.com and the key is a query parameter.
             'mdblist' => $this->config->has('mdblist_api_key'),
+            // Gluetun is optional: only the control-server URL marks it in use.
+            'gluetun' => $this->config->has('gluetun_url'),
             default => true,
         };
     }

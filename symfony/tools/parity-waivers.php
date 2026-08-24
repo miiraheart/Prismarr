@@ -26,10 +26,9 @@ return [
     // deluge: only the no-signal health_cache column remains.
     'deluge' => ['health_cache'],
 
-    // gluetun: EXEMPT across the board. A VPN status probe with no page, no route
-    // and no sidebar entry. Only 'health' is BACKLOG: with no arm in
-    // HealthService::pingFor it falls through to a default that always reports healthy.
-    'gluetun' => ['controller', 'templates', 'health', 'health_api', 'health_cache', 'health_widget', 'route_guard', 'sidebar', 'smoke'],
+    // gluetun: EXEMPT across the board. A VPN status probe with no page, no
+    // route and no sidebar entry; its health surfaces on the qBittorrent page.
+    'gluetun' => ['controller', 'templates', 'health_api', 'health_cache', 'health_widget', 'route_guard', 'sidebar', 'smoke'],
 
     // mdblist: controller, templates, route_guard and smoke are EXEMPT. It is a
     // list source behind the discover page with no routes and no page of its

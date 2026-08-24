@@ -108,6 +108,16 @@ class GluetunClient implements ResetInterface
     }
 
     /**
+     * Health probe: the control server answered and the VPN tunnel is up.
+     * A reachable Gluetun with a stopped tunnel counts as down, because a
+     * stopped tunnel is exactly the state the kill switch exists to surface.
+     */
+    public function ping(): bool
+    {
+        return $this->getVpnStatus() === 'running';
+    }
+
+    /**
      * Port forwarded by the VPN provider (the one Gluetun should push to qBit via port-update).
      * Gluetun v3.40+ exposes the unified /v1/portforward (protected by default — HTTP_CONTROL_SERVER_AUTH_CONFIG_FILEPATH config required).
      * Falls back to the legacy /v1/openvpn/portforwarded endpoint.
