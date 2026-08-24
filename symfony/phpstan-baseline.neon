@@ -1,0 +1,745 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Offset ''type'' on array\{key\: ''deluge_password''\|''nzbget_password''\|''qbittorrent_password''\|''transmission…'', type\: ''password'', label\: ''admin\.field\.password'', clearable\: true\}\|array\{key\: ''deluge_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''gluetun_api_key'', type\: ''password'', label\: ''admin\.field\.api_key…''\}\|array\{key\: ''gluetun_url'', type\: ''text'', label\: ''admin\.field\.url''\}\|array\{key\: ''jellyseerr_api_key''\|''prowlarr_api_key''\|''radarr_api_key''\|''sabnzbd_api_key''\|''sonarr_api_key''\|''tautulli_api_key'', type\: ''password'', label\: ''admin\.field\.api_key''\}\|array\{key\: ''jellyseerr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''mdblist_api_key'', type\: ''password'', label\: ''admin\.field\.mdblist…''\}\|array\{key\: ''nzbget_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''nzbget_user''\|''qbittorrent_user''\|''transmission_user'', type\: ''text'', label\: ''admin\.field\.username'', clearable\: true\}\|array\{key\: ''prowlarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''qbittorrent_url''\|''sabnzbd_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''radarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''sonarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''tautulli_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''tmdb_api_key'', type\: ''password'', label\: ''admin\.field\.tmdb…'', placeholder\: ''7a2f4…''\}\|array\{key\: ''trakt_client_id'', type\: ''password'', label\: ''admin\.field\.trakt…''\}\|array\{key\: ''trakt_client_secret'', type\: ''password'', label\: ''admin\.field\.trakt…'', clearable\: true\}\|array\{key\: ''trakt_username'', type\: ''text'', label\: ''admin\.field\.trakt…'', placeholder\: ''your\-trakt\-slug''\}\|array\{key\: ''transmission_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/AdminSettingsController.php
+
+		-
+			message: '#^PHPDoc tag @var for constant App\\Controller\\AdminSettingsController\:\:DISPLAY_OPTIONS with type array\<string, array\{label\: string, type\: string, default\: string, options\?\: array\<string, string\>, help\?\: string\}\> is not subtype of value array\{display_home_page\: array\{label\: ''admin\.display\.home…'', type\: ''select'', default\: ''dashboard'', options\: array\{dashboard\: ''admin\.display\.home…'', discovery\: ''admin\.display\.home…'', films\: ''admin\.display\.home…'', series\: ''admin\.display\.home…'', qbittorrent\: ''admin\.display\.home…'', last\: ''admin\.display\.home…''\}, help\: ''admin\.display\.home…''\}, display_toasts\: array\{label\: ''admin\.display…'', type\: ''switch'', default\: ''1'', help\: ''admin\.display…''\}, display_timezone\: array\{label\: ''admin\.display…'', type\: ''timezone'', default\: '''', help\: ''admin\.display…''\}, display_date_format\: array\{label\: ''admin\.display\.date…'', type\: ''select'', default\: ''fr'', options\: array\{fr\: ''admin\.display\.date…'', us\: ''admin\.display\.date…'', iso\: ''admin\.display\.date…''\}\}, display_time_format\: array\{label\: ''admin\.display\.time…'', type\: ''select'', default\: ''24h'', options\: array\{''24h''\: ''admin\.display\.time…'', ''12h''\: ''admin\.display\.time…''\}\}, display_theme_color\: array\{label\: ''admin\.display\.theme…'', type\: ''color'', default\: ''theme_default'', options\: array\{theme_default\: ''auto'', indigo\: ''\#6366f1'', red\: ''\#ef4444'', green\: ''\#22c55e'', orange\: ''\#f59e0b'', pink\: ''\#ec4899'', blue\: ''\#3b82f6''\}\}, display_theme\: array\{label\: ''admin\.display\.theme…'', type\: ''select'', default\: ''classic'', options\: array\{classic\: ''admin\.display\.theme…'', midnight\: ''admin\.display\.theme…'', nord\: ''admin\.display\.theme…'', catppuccin_latte\: ''admin\.display\.theme…'', catppuccin_frappe\: ''admin\.display\.theme…'', catppuccin_macchiato\: ''admin\.display\.theme…'', catppuccin_mocha\: ''admin\.display\.theme…'', dracula\: ''admin\.display\.theme…'', \.\.\.\}, help\: ''admin\.display\.theme…''\}, display_qbit_refresh\: array\{label\: ''admin\.display\.qbit…'', type\: ''select'', default\: ''2'', options\: array\{1\: ''admin\.display\.qbit…'', 2\: ''admin\.display\.qbit…'', 5\: ''admin\.display\.qbit…'', 10\: ''admin\.display\.qbit…'', 0\: ''admin\.display\.qbit…''\}, help\: ''admin\.display\.qbit…''\}, \.\.\.\}\.$#'
+			identifier: classConstant.phpDocType
+			count: 1
+			path: src/Controller/AdminSettingsController.php
+
+		-
+			message: '#^Offset ''sortDate'' on array\{type\: ''episode'', seriesTitle\: mixed, title\: mixed, overview\: mixed, season\: mixed, episode\: mixed, date\: null, poster\: mixed, \.\.\.\}\|array\{type\: ''film'', title\: mixed, year\: mixed, poster\: mixed, fanart\: mixed, overview\: mixed, status\: mixed, hasFile\: bool, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/CalendrierController.php
+
+		-
+			message: '#^Property App\\Controller\\CalendrierController\:\:\$config is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/CalendrierController.php
+
+		-
+			message: '#^Offset ''streamCount'' on array\{enabled\: bool, configured\: bool, connected\: bool, error\: string\|null, streamCount\: int, directPlayCount\: int, directStreamCount\: int, transcodeCount\: int, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/DashboardController.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 2
+			path: src/Controller/DelugeController.php
+
+		-
+			message: '#^Offset ''code'' on \*NEVER\* on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/DelugeController.php
+
+		-
+			message: '#^Offset ''code'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/DelugeController.php
+
+		-
+			message: '#^Offset ''message'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/DelugeController.php
+
+		-
+			message: '#^Offset ''method'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/DelugeController.php
+
+		-
+			message: '#^Offset ''ok'' on array\{ok\: bool, error\?\: mixed, code\?\: int, data\?\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/DelugeController.php
+
+		-
+			message: '#^Offset ''path'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/DelugeController.php
+
+		-
+			message: '#^Offset ''id'' on array\{id\: string, url\: string, source\: string, label\: string, added_at\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/DiscoverController.php
+
+		-
+			message: '#^Parameter \#1 \$array \(non\-empty\-list\<array\{id\: string, url\: string, source\: string, label\: string, added_at\: string\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: src/Controller/DiscoverController.php
+
+		-
+			message: '#^Property App\\Controller\\DiscoverController\:\:\$libraryIndex is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/DiscoverController.php
+
+		-
+			message: '#^Offset ''item_count'' on array\{id\: int, name\: string, slug\: string, item_count\: int, privacy\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/DiscoverPageController.php
+
+		-
+			message: '#^Offset ''results'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/DiscoverPageController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/Controller/DiscoverPageController.php
+
+		-
+			message: '#^Call to preg_quote\(\) is missing delimiter / to be effective\.$#'
+			identifier: argument.invalidPregQuote
+			count: 1
+			path: src/Controller/JellyseerrController.php
+
+		-
+			message: '#^Offset ''sortTitle'' on array\{id\: mixed, title\: mixed, originalTitle\: mixed, sortTitle\: mixed, year\: mixed, hasFile\: bool, poster\: string\|null, instance\: array\{slug\: string, name\: string\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/MediaController.php
+
+		-
+			message: '#^Offset ''title'' on array\{id\: mixed, title\: mixed, originalTitle\: mixed, sortTitle\: mixed, year\: mixed, hasFile\: bool, poster\: string\|null, instance\: array\{slug\: string, name\: string\}, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/MediaController.php
+
+		-
+			message: '#^Offset ''title'' on array\{id\: mixed, title\: mixed, originalTitle\: mixed, sortTitle\: mixed, year\: mixed, hasFile\: bool, poster\: string\|null, instance\: array\{slug\: string, name\: string\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/MediaController.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_column expects array, Symfony\\Contracts\\Cache\\ItemInterface given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Controller/MediaController.php
+
+		-
+			message: '#^Property App\\Controller\\MediaController\:\:\$config is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/MediaController.php
+
+		-
+			message: '#^Property App\\Controller\\MediaController\:\:\$prowlarr is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/MediaController.php
+
+		-
+			message: '#^Property App\\Controller\\MediaController\:\:\$qbittorrent is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/MediaController.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 2
+			path: src/Controller/MediaController.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Controller/ProwlarrController.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 2
+			path: src/Controller/QBittorrentController.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: src/Controller/TmdbController.php
+
+		-
+			message: '#^Offset ''parts'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/TmdbController.php
+
+		-
+			message: '#^Offset ''results'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/TmdbController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/Controller/TmdbController.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 2
+			path: src/Controller/TransmissionController.php
+
+		-
+			message: '#^Property App\\Entity\\User\:\:\$email type mapping mismatch\: property can contain string\|null but database expects string\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Entity/User.php
+
+		-
+			message: '#^Property App\\Entity\\User\:\:\$password type mapping mismatch\: property can contain string\|null but database expects string\.$#'
+			identifier: doctrine.columnType
+			count: 1
+			path: src/Entity/User.php
+
+		-
+			message: '#^Offset ''message'' on array\{type\: int, message\: string, file\?\: string, line\?\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/EventSubscriber/FatalErrorHandlerSubscriber.php
+
+		-
+			message: '#^If condition is always false\.$#'
+			identifier: if.alwaysFalse
+			count: 1
+			path: src/Service/AppVersion.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: ''https\://api\.github…'', 19913\: true, 13\: 8, 78\: 4, 99\: 1, 10023\: array\{''Accept\: application…'', non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/AppVersion.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array\{\} and array\{\} will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: src/Service/AppVersion.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: src/Service/AppVersion.php
+
+		-
+			message: '#^Offset ''err'' on array\{http\: int\|null, body\: string\|null, err\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Service/HealthService.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 78\: int, 13\: int, 99\: bool, 47\: bool, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 78\: 4, 13\: 8, 99\: 1, 47\: true, 10015\: string, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/DelugeClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: string, 19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/JellyseerrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: string, 10015\: non\-empty\-string\|false, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/JellyseerrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10023\: array\<int, string\>\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: ''DELETE'', 10023\: array\{non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/JellyseerrClient.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Service/Media/MdblistClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 42\: bool, 13\: int, 78\: int, 99\: bool, 10018\: non\-empty\-string, 181\: int, \.\.\.\}, array\{10002\: string, 19913\: true, 42\: true, 13\: 15, 78\: 8, 99\: 1, 10018\: ''Prismarr/1\.0'', 181\: 3, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/MdblistClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/ProwlarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: ''DELETE'', 10015\: non\-empty\-string\|false, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/ProwlarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: string, 10015\: non\-empty\-string\|false, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/ProwlarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10023\: array\<int, string\>\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: ''DELETE'', 10023\: array\{non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/ProwlarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 78\: int, 13\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{19913\: true, 181\: 3, 182\: 3, 78\: 4, 13\: 8, 99\: 1, 10023\: array\{\}\|array\{non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/QBittorrentClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 78\: int, 13\: int, 99\: bool, 47\: bool, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 78\: 3, 13\: 15, 99\: 1, 47\: true, 10015\: array\<non\-falsy\-string, CURLFile\|string\>, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/QBittorrentClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 78\: int, 13\: int, 99\: bool, 47\: bool, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 78\: 4, 13\: 8, 99\: 1, 47\: true, 10015\: string, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Service/Media/QBittorrentClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: string, 19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Service/Media/RadarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 181\: int, 182\: int, 78\: int, 13\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: non\-falsy\-string, 19913\: true, 181\: 3, 182\: 3, 78\: 4, 13\: 90, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/RadarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: ''DELETE'', 10015\: non\-empty\-string\|false, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/RadarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: string, 10015\: non\-empty\-string\|false, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/RadarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10023\: array\<int, string\>\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: ''DELETE'', 10023\: array\{non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/RadarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: string, 19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/SonarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: string, 19913\: true, 181\: 3, 182\: 3, 13\: int, 78\: 4, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/SonarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: ''DELETE'', 10015\: non\-empty\-string\|false, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/SonarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: string, 10015\: non\-empty\-string\|false, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/SonarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10036\: non\-empty\-string\|null, 10023\: array\<int, string\>\}, array\{19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10036\: ''DELETE'', 10023\: array\{non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/SonarrClient.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 6
+			path: src/Service/Media/TautulliClient.php
+
+		-
+			message: '#^Parameter \#1 \$data of static method App\\Service\\Media\\TautulliClient\:\:normalizeHomeStats\(\) expects array\<int, mixed\>, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/TautulliClient.php
+
+		-
+			message: '#^Parameter \#1 \$data of static method App\\Service\\Media\\TautulliClient\:\:normalizeLibraries\(\) expects array\<int, mixed\>, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/TautulliClient.php
+
+		-
+			message: '#^Parameter \#1 \$data of static method App\\Service\\Media\\TautulliClient\:\:normalizeUserNames\(\) expects array\<int, mixed\>, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/TautulliClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 13\: int, 78\: int, 99\: bool, 181\: int, 182\: int, 10023\: array\<int, string\>\}, array\{10002\: non\-falsy\-string, 19913\: true, 13\: 15, 78\: 8, 99\: 1, 181\: 3, 182\: 3, 10023\: array\{''Accept\: application…''\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/TmdbClient.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 3
+			path: src/Service/Media/TraktClient.php
+
+		-
+			message: '#^Offset ''pageCount'' on array\{data\: array, pageCount\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Service/Media/TraktClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 42\: bool, 13\: int, 78\: int, 99\: bool, 10018\: non\-empty\-string, 181\: int, \.\.\.\}, array\{10002\: non\-falsy\-string, 19913\: true, 42\: true, 13\: 15, 78\: 8, 99\: 1, 10018\: ''Prismarr/1\.0'', 181\: 3, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/TraktClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 47\: bool, 10015\: array\|string, 19913\: bool, 13\: int, 78\: int, 99\: bool, 10018\: non\-empty\-string, \.\.\.\}, array\{10002\: non\-falsy\-string, 47\: true, 10015\: non\-empty\-string\|false, 19913\: true, 13\: 15, 78\: 8, 99\: 1, 10018\: ''Prismarr/1\.0'', \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/TraktClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 78\: int, 10102\: string, 13\: int, 99\: bool, 47\: bool, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 78\: 4, 10102\: '''', 13\: 15, 99\: 1, 47\: true, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/TransmissionClient.php
+
+		-
+			message: '#^Offset ''content'' on array\{content\: string, name\: string\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Service/Media/Usenet/NzbgetClient.php
+
+		-
+			message: '#^Offset ''name'' on array\{content\: string, name\: string\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Service/Media/Usenet/NzbgetClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 78\: int, 13\: int, 99\: bool, 47\: bool, 10015\: array\|string, \.\.\.\}, array\{19913\: true, 181\: 3, 182\: 3, 78\: 4, 13\: 20, 99\: 1, 47\: true, 10015\: non\-empty\-string\|false, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/Usenet/NzbgetClient.php
+
+		-
+			message: '#^Offset ''content'' on array\{content\: string, name\: string\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Service/Media/Usenet/SabnzbdClient.php
+
+		-
+			message: '#^Offset ''name'' on array\{content\: string, name\: string\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Service/Media/Usenet/SabnzbdClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 78\: int, 13\: int, 99\: bool, 47\: bool, 10015\: array\|string\}, array\{19913\: true, 181\: 3, 182\: 3, 78\: 4, 13\: 20, 99\: 1, 47\: true, 10015\: array\{name\: CURLFile\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/Usenet/SabnzbdClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{19913\: bool, 181\: int, 182\: int, 78\: int, 13\: int, 99\: bool\}, array\{19913\: true, 181\: 3, 182\: 3, 78\: 4, 13\: 8, 99\: 1\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Service/Media/Usenet/SabnzbdClient.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Service/Media/Usenet/UsenetStatus.php
+
+		-
+			message: '#^Method App\\Tests\\AbstractWebTestCase\:\:em\(\) should return Doctrine\\ORM\\EntityManagerInterface but returns Doctrine\\Persistence\\ObjectManager\.$#'
+			identifier: return.type
+			count: 1
+			path: tests/AbstractWebTestCase.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\JsonResponse'' and Symfony\\Component\\HttpFoundation\\JsonResponse will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/AdminSettingsControllerTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertArrayHasKey\(\) with ''display_theme'' and array\{display_home_page\: array\{label\: ''admin\.display\.home…'', type\: ''select'', default\: ''dashboard'', options\: array\{dashboard\: ''admin\.display\.home…'', discovery\: ''admin\.display\.home…'', films\: ''admin\.display\.home…'', series\: ''admin\.display\.home…'', qbittorrent\: ''admin\.display\.home…'', last\: ''admin\.display\.home…''\}, help\: ''admin\.display\.home…''\}, display_toasts\: array\{label\: ''admin\.display…'', type\: ''switch'', default\: ''1'', help\: ''admin\.display…''\}, display_timezone\: array\{label\: ''admin\.display…'', type\: ''timezone'', default\: '''', help\: ''admin\.display…''\}, display_date_format\: array\{label\: ''admin\.display\.date…'', type\: ''select'', default\: ''fr'', options\: array\{fr\: ''admin\.display\.date…'', us\: ''admin\.display\.date…'', iso\: ''admin\.display\.date…''\}\}, display_time_format\: array\{label\: ''admin\.display\.time…'', type\: ''select'', default\: ''24h'', options\: array\{''24h''\: ''admin\.display\.time…'', ''12h''\: ''admin\.display\.time…''\}\}, display_theme_color\: array\{label\: ''admin\.display\.theme…'', type\: ''color'', default\: ''theme_default'', options\: array\{theme_default\: ''auto'', indigo\: ''\#6366f1'', red\: ''\#ef4444'', green\: ''\#22c55e'', orange\: ''\#f59e0b'', pink\: ''\#ec4899'', blue\: ''\#3b82f6''\}\}, display_theme\: array\{label\: ''admin\.display\.theme…'', type\: ''select'', default\: ''classic'', options\: array\{classic\: ''admin\.display\.theme…'', midnight\: ''admin\.display\.theme…'', nord\: ''admin\.display\.theme…'', catppuccin_latte\: ''admin\.display\.theme…'', catppuccin_frappe\: ''admin\.display\.theme…'', catppuccin_macchiato\: ''admin\.display\.theme…'', catppuccin_mocha\: ''admin\.display\.theme…'', dracula\: ''admin\.display\.theme…'', \.\.\.\}, help\: ''admin\.display\.theme…''\}, display_qbit_refresh\: array\{label\: ''admin\.display\.qbit…'', type\: ''select'', default\: ''2'', options\: array\{1\: ''admin\.display\.qbit…'', 2\: ''admin\.display\.qbit…'', 5\: ''admin\.display\.qbit…'', 10\: ''admin\.display\.qbit…'', 0\: ''admin\.display\.qbit…''\}, help\: ''admin\.display\.qbit…''\}, \.\.\.\} will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/AdminSettingsThemeTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertArrayHasKey\(\) with ''theme_default'' and array\{theme_default\: ''auto'', indigo\: ''\#6366f1'', red\: ''\#ef4444'', green\: ''\#22c55e'', orange\: ''\#f59e0b'', pink\: ''\#ec4899'', blue\: ''\#3b82f6''\} will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/AdminSettingsThemeTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with ''admin\.display\.theme…'' and ''admin\.display\.theme…'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/AdminSettingsThemeTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with ''classic'' and ''classic'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/AdminSettingsThemeTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with ''select'' and ''select'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/AdminSettingsThemeTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with ''theme_default'' and ''theme_default'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/AdminSettingsThemeTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\RadarrClient\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Controller/CalendrierControllerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\SonarrClient\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Controller/CalendrierControllerTest.php
+
+		-
+			message: '#^Method App\\Tests\\Controller\\ControllersSmokeTest\:\:routesProvider\(\) should return list\<array\{string, string\}\> but returns array\{dashboard\: array\{''/tableau\-de\-bord'', ''DashboardController…''\}, ''media films''\: array\{''/medias/radarr\-1…'', ''MediaController\:…''\}, ''media series''\: array\{''/medias/sonarr\-1…'', ''MediaController\:…''\}, ''tmdb discovery''\: array\{''/decouverte'', ''TmdbController\:…''\}, calendrier\: array\{''/calendrier'', ''CalendrierControlle…''\}, ''calendrier ical''\: array\{''/calendrier\.ics'', ''CalendrierControlle…''\}, profile\: array\{''/profil'', ''ProfileController\:…''\}, ''settings export''\: array\{''/admin/settings…'', ''AdminSettingsContro…''\}, \.\.\.\}\.$#'
+			identifier: return.type
+			count: 1
+			path: tests/Controller/ControllersSmokeTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\JsonResponse'' and Symfony\\Component\\HttpFoundation\\JsonResponse will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 2
+			path: tests/Controller/HealthControllerTest.php
+
+		-
+			message: '#^Call to an undefined method Symfony\\Component\\HttpFoundation\\Response\:\:getTargetUrl\(\)\.$#'
+			identifier: method.notFound
+			count: 8
+			path: tests/Controller/HomeControllerTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\Response'' and Symfony\\Component\\HttpFoundation\\Response will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/HomeControllerTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\JsonResponse'' and Symfony\\Component\\HttpFoundation\\JsonResponse will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/MediaFilteredIdsTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\RadarrClient\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Controller/MediaLibraryCacheInvalidationTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\JsonResponse'' and Symfony\\Component\\HttpFoundation\\JsonResponse will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/MediaReleasesSearchTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\JsonResponse'' and Symfony\\Component\\HttpFoundation\\JsonResponse will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/SetupControllerTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\Response'' and Symfony\\Component\\HttpFoundation\\Response will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Controller/SetupControllerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\RadarrClient\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Controller/TmdbControllerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\SonarrClient\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Controller/TmdbControllerTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertNotSame\(\) with '''' and ''dashboard\.health…''\|''dashboard\.plex\.title''\|''dashboard\.recent…''\|''dashboard\.requests…''\|''dashboard\.trending…''\|''dashboard\.upcoming…''\|''dashboard\.watchlist…'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Dashboard/DashboardSectionsTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''upcoming'', ''requests'', ''health'', ''plex'', ''watchlist'', ''trending'', ''recent''\} and array\{''upcoming'', ''requests'', ''health'', ''plex'', ''watchlist'', ''trending'', ''recent''\} will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Dashboard/DashboardSectionsTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with arguments 16, 8 and ''After reset,…'' will always evaluate to false\.$#'
+			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/Service/DashboardLayoutServiceTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with arguments 8, 8 and ''Second resolve…'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Service/DashboardLayoutServiceTest.php
+
+		-
+			message: '#^You should use assertCount\(\$expectedCount, \$variable\) instead of assertSame\(\$expectedCount, count\(\$variable\)\)\.$#'
+			identifier: phpunit.assertCount
+			count: 1
+			path: tests/Service/DashboardLayoutServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Contracts\\\\Service\\\\ResetInterface'' and App\\Service\\DisplayPreferencesService will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Service/DisplayPreferencesServiceTest.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$config$#'
+			identifier: parameter.notFound
+			count: 1
+			path: tests/Service/Media/FlatServiceClientDisabledTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with 10 and 10 will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Service/Media/ServiceHealthCacheTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\SonarrClient\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: tests/Service/Media/SonarrClientTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\SonarrClient\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Service/Media/SonarrClientTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\RadarrClient\|App\\Service\\Media\\SonarrClient\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Service/Media/TorrentResolverServiceTest.php
+
+		-
+			message: '#^Method App\\Tests\\Service\\Media\\Usenet\\UsenetStatusTest\:\:nzbgetHistoryProvider\(\) should return array\<string, array\{string, string\}\> but returns array\{array\{''SUCCESS/ALL'', ''completed''\}, array\{''WARNING/REPAIR'', ''completed''\}, array\{''FAILURE/PAR'', ''failed''\}, array\{''DELETED/MANUAL'', ''failed''\}, array\{''NOPE'', ''unknown''\}\}\.$#'
+			identifier: return.type
+			count: 1
+			path: tests/Service/Media/Usenet/UsenetStatusTest.php
+
+		-
+			message: '#^Method App\\Tests\\Service\\Media\\Usenet\\UsenetStatusTest\:\:nzbgetQueueProvider\(\) should return array\<string, array\{string, string\}\> but returns array\{array\{''DOWNLOADING'', ''downloading''\}, array\{''FETCHING'', ''fetching''\}, array\{''QUEUED'', ''queued''\}, array\{''PP_QUEUED'', ''queued''\}, array\{''PAUSED'', ''paused''\}, array\{''VERIFYING_SOURCES'', ''verifying''\}, array\{''UNPACKING'', ''extracting''\}, array\{''RENAMING'', ''moving''\}, \.\.\.\}\.$#'
+			identifier: return.type
+			count: 1
+			path: tests/Service/Media/Usenet/UsenetStatusTest.php
+
+		-
+			message: '#^Method App\\Tests\\Service\\Media\\Usenet\\UsenetStatusTest\:\:sabnzbdProvider\(\) should return array\<string, array\{string, string\}\> but returns array\{array\{''Downloading'', ''downloading''\}, array\{''Queued'', ''queued''\}, array\{''Grabbing'', ''fetching''\}, array\{''Fetching'', ''fetching''\}, array\{''Paused'', ''paused''\}, array\{''Repairing'', ''verifying''\}, array\{''Extracting'', ''extracting''\}, array\{''Completed'', ''completed''\}, \.\.\.\}\.$#'
+			identifier: return.type
+			count: 1
+			path: tests/Service/Media/Usenet/UsenetStatusTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertArrayHasKey\(\) with ''midnight'' and array\{midnight\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{0, 0, 6\.5\}, primary\: array\{239, 84, 66\.8\}, positive\: array\{142, 71, 45\}, negative\: array\{0, 84, 60\}, contrast\: 1\.0, textSaturation\: 1\.0\}, nord\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{220, 16, 22\}, primary\: array\{213, 32, 70\}, positive\: array\{92, 28, 65\}, negative\: array\{354, 42, 56\}, contrast\: 1\.0, textSaturation\: 1\.0\}, catppuccin_latte\: array\{label_key\: ''admin\.display\.theme…'', light\: true, bg\: array\{220, 23, 95\}, primary\: array\{220, 91, 54\}, positive\: array\{109, 58, 40\}, negative\: array\{347, 87, 44\}, contrast\: 1\.0, textSaturation\: 1\.0\}, catppuccin_frappe\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{229, 19, 23\}, primary\: array\{222, 74, 74\}, positive\: array\{96, 44, 68\}, negative\: array\{359, 68, 71\}, contrast\: 1\.2, textSaturation\: 1\.0\}, catppuccin_macchiato\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{232, 23, 18\}, primary\: array\{220, 83, 75\}, positive\: array\{105, 48, 72\}, negative\: array\{351, 74, 73\}, contrast\: 1\.2, textSaturation\: 1\.0\}, catppuccin_mocha\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{240, 21, 15\}, primary\: array\{217, 92, 83\}, positive\: array\{115, 54, 76\}, negative\: array\{347, 70, 65\}, contrast\: 1\.2, textSaturation\: 1\.0\}, dracula\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{231, 15, 21\}, primary\: array\{265, 89, 79\}, positive\: array\{135, 94, 66\}, negative\: array\{0, 100, 67\}, contrast\: 1\.2, textSaturation\: 1\.0\}, gruvbox_dark\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{0, 0, 16\}, primary\: array\{43, 59, 81\}, positive\: array\{61, 66, 44\}, negative\: array\{6, 96, 59\}, contrast\: 1\.0, textSaturation\: 1\.0\}, \.\.\.\} will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Theme/ThemePresetsTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertCount\(\) with arguments 3, array\{0, 0, 6\.5\|10\|16\|95\}\|array\{0, 70\|75\|84\|100, 60\|67\}\|array\{0, 90, 50\}\|array\{1, 71, 52\}\|array\{105, 48, 72\}\|array\{109, 58, 40\}\|array\{115, 54, 76\}\|array\{12, 77, 52\}\|array\{135, 94, 66\}\|array\{142, 40\|45, 40\|55\}\|array\{142, 71, 45\}\|array\{155, 100, 20\}\|array\{157, 47, 65\}\|array\{165, 78, 51\}\|array\{186, 21, 20\}\|array\{205, 69, 49\}\|array\{209, 88, 54\}\|array\{213, 32, 70\}\|array\{217, 92, 83\}\|array\{220, 16, 22\}\|array\{220, 23, 95\}\|array\{220, 83, 75\}\|array\{220, 91, 54\}\|array\{222, 74, 74\}\|array\{225, 14, 15\}\|array\{229, 19, 23\}\|array\{231, 15, 21\}\|array\{232, 23, 18\}\|array\{239, 84, 66\.8\}\|array\{24, 97, 58\}\|array\{240, 13, 14\}\|array\{240, 21, 15\}\|array\{240, 27, 11\}\|array\{243, 33, 25\}\|array\{265, 89, 79\}\|array\{28, 40, 77\}\|array\{321\|360, 100, 71\}\|array\{347, 70, 65\}\|array\{347, 87, 44\}\|array\{351, 74, 73\}\|array\{354, 42, 56\}\|array\{358, 100, 68\}\|array\{359, 68, 71\}\|array\{43, 59, 81\}\|array\{44, 87, 94\}\|array\{50, 1, 6\}\|array\{50, 100, 49\}\|array\{51, 33, 68\}\|array\{6, 96, 59\}\|array\{61, 66, 44\}\|array\{68, 100, 30\}\|array\{92, 28, 65\}\|array\{96, 44, 68\}\|array\{97, 13, 80\}\|array\{98, 82, 71\} and ''preset camouflage…''\|''preset catppuccin…''\|''preset dracula\.bg…''\|''preset dracula…''\|''preset gruvbox_dark…''\|''preset kanagawa…''\|''preset midnight\.bg…''\|''preset midnight…''\|''preset neon_pink\.bg…''\|''preset neon_pink…''\|''preset nord\.bg must…''\|''preset nord…''\|''preset nord\.primary…''\|''preset peachy\.bg…''\|''preset peachy…''\|''preset shades_of…''\|''preset solarized…''\|''preset teal_city\.bg…''\|''preset teal_city…''\|''preset tucan\.bg…''\|''preset tucan…''\|''preset zebra\.bg…''\|''preset zebra…'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Theme/ThemePresetsTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertFalse\(\) with false will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Theme/ThemePresetsTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertIsBool\(\) with bool will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Theme/ThemePresetsTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with ''midnight'' and ''midnight'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Theme/ThemePresetsTest.php
+
+		-
+			message: '#^Call to function method_exists\(\) with ''Symfony\\\\Component\\\\Dotenv\\\\Dotenv'' and ''bootEnv'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: tests/bootstrap.php

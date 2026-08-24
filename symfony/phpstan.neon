@@ -1,0 +1,12 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+    phpVersion: 80400
+    paths: [src, tests, tools]
+    excludePaths:
+        analyseAndScan: [var, vendor]
+    reportUnmatchedIgnoredErrors: true
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
