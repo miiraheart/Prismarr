@@ -121,6 +121,34 @@ $sites = [
     'smoke'         => ['kind' => 'route',  'path' => 'tests/Controller/ControllersSmokeTest.php'],
 ];
 
+/**
+ * Every path git actually tracks, relative to $root, or null when git cannot
+ * answer.
+ *
+ * The gate exists to describe the REPOSITORY, but every predicate below used
+ * to read the filesystem, and those two disagree in both directions:
+ *
+ *   - a directory git cannot track (empty templates/<slug>/, left by a
+ *     `git mv` and then copied around by rsync) made the gate see a
+ *     registration that is not committed;
+ *   - an untracked file (a scratch src/Controller/<Class>Controller.php) makes
+ *     the gate see a registration CI will not have, so it fails locally and
+ *     passes in CI.
+ *
+ * Consulting git closes both at once. When git is unavailable, or this is not
+ * a checkout, fall back to the filesystem so the tool stays dependency-free
+ * and still runs anywhere.
+ *
+ * @var array<string, int>|null
+ */
+$tracked = (static function (string $root): ?array {
+    $out = [];
+    $rc  = 1;
+    exec('git -C ' . escapeshellarg($root) . ' ls-files 2>/dev/null', $out, $rc);
+
+    return $rc === 0 && $out !== [] ? array_flip($out) : null;
+})($root);
+
 $waiverFile = $root . '/tools/parity-waivers.php';
 $waivers = is_file($waiverFile) ? (array) require $waiverFile : [];
 
@@ -129,17 +157,45 @@ $classOf = static fn (string $slug): string => match ($slug) {
     default       => ucfirst($slug),
 };
 
-$present = static function (string $slug, array $site) use ($root, $classOf): bool {
+$present = static function (string $slug, array $site) use ($root, $classOf, $tracked): bool {
     $path = strtr($site['path'], ['{slug}' => $slug, '{Class}' => $classOf($slug)]);
     $full = $root . '/' . $path;
 
+    // A path git does not track is not a registration, whatever is on disk.
+    $isTrackedFile = static function (string $rel) use ($tracked, $root): bool {
+        return $tracked === null
+            ? is_file($root . '/' . $rel)
+            : isset($tracked[$rel]);
+    };
+
     if ($site['kind'] === 'file') {
-        return is_file($full);
+        return $isTrackedFile($path);
     }
     if ($site['kind'] === 'dir') {
-        return is_dir($full);
+        // Require an actual template, not merely the directory.
+        //
+        // git cannot track an empty directory, so is_dir() answers differently
+        // depending on what left one behind on that particular machine. A
+        // `git mv` of the last file out of templates/<module>/ leaves the
+        // directory on disk, rsync then copies it to the server, and the gate
+        // reports a registration that does not exist in the repository, while
+        // CI (a clean checkout) correctly reports the opposite.
+        //
+        // Keying on a file git can actually track makes the answer identical
+        // on the host, on the server and in CI.
+        if ($tracked === null) {
+            return (bool) glob($full . '/*.twig');
+        }
+
+        foreach ($tracked as $rel => $_) {
+            if (str_starts_with($rel, $path . '/') && str_ends_with($rel, '.twig')) {
+                return true;
+            }
+        }
+
+        return false;
     }
-    if (!is_file($full)) {
+    if (!$isTrackedFile($path) || !is_file($full)) {
         return false;
     }
 

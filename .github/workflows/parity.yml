@@ -19,6 +19,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Pinned rather than inherited. Without this the job runs whatever PHP
+      # ubuntu-latest happens to ship, which changes when GitHub bumps the
+      # runner image, so the gate could start answering differently from the
+      # host for reasons that have nothing to do with the repository.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Show the PHP the gate actually ran on
+        run: php -v
+
       - name: Every module registered in every site
         working-directory: symfony
         run: php tools/parity-check.php --matrix

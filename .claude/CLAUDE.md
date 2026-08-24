@@ -1,8 +1,34 @@
 # Prismarr
 
-Symfony 8 / PHP 8.4 / Twig app. Everything runs in a Docker container named
-`prismarr`. There is no host PHP for the app: every app command goes through
-`docker exec`. The parity tooling is the exception and runs on the host.
+Symfony 8 / PHP 8.4 / Twig app. Two kinds of command, and they do not run in
+the same place. Getting this wrong does not fail loudly, it produces a wrong
+answer, so read both.
+
+**App commands run in the container.** Anything that needs the kernel, the
+database, the vendor tree or the app config: `bin/console`, `phpunit`,
+`composer`, `lint:twig`, `lint:container`. There is no host PHP for the app, so
+these go through `docker exec` (or the `pm-test` / `pm-check` wrappers, which
+rsync to the server and run there).
+
+**`symfony/tools/parity-check.php` runs on the HOST.** It is zero-dependency
+pure PHP, it boots nothing, and host PHP 8.4.7 runs it fine:
+
+```
+make parity          # or: php symfony/tools/parity-check.php
+```
+
+Run it **from the git working tree, never on the server and never over
+rsync'd files.** rsync copies empty directories and git cannot track them, so
+running the checker on an rsync'd copy invents registrations that do not exist
+in the repository, and the gate then disagrees with CI. That is not
+hypothetical: `templates/trakt/` was left behind empty by a `git mv`, rsync
+carried it to the server, and the checker reported trakt as registered in
+`templates` against a waiver that was correctly claiming the opposite.
+
+The general form of that trap: **any predicate that reads the filesystem
+instead of git will drift from what is actually committed.** It is the one
+class of bug this gate's design is structurally exposed to, so a new site
+predicate should be judged against it before being added.
 
 ## Topology, read this before assuming anything
 
