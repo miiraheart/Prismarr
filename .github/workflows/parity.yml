@@ -89,6 +89,7 @@ jobs:
       # report phantom failures (known PHPStan wart, verified on 2.2.9).
       - name: PHPStan
         run: |
+          docker exec -e APP_ENV=dev prismarr php bin/console cache:warmup --env=dev
           docker exec prismarr vendor/bin/phpstan clear-result-cache
           docker exec prismarr vendor/bin/phpstan analyse --no-progress
 
