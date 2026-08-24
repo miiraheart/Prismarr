@@ -43,6 +43,14 @@ class TraktClientTest extends TestCase
         return $m->invoke($client, $type, $results);
     }
 
+    private function historyPayload(TraktClient $client, int $tmdbId, string $type): array
+    {
+        $m = new ReflectionMethod($client, 'historyPayload');
+        $m->setAccessible(true);
+
+        return $m->invoke($client, $tmdbId, $type);
+    }
+
     private function mapLists(TraktClient $client, array $raw): array
     {
         $m = new ReflectionMethod($client, 'mapLists');
@@ -246,5 +254,32 @@ class TraktClientTest extends TestCase
     public function testMapListsReturnsEmptyArrayForEmptyInput(): void
     {
         $this->assertSame([], $this->mapLists($this->makeClient(), []));
+    }
+
+    /**
+     * Sending watched_at=released made Trakt stamp the entry with the air date,
+     * so a successful mark sorted weeks down a history ordered by watched_at
+     * and read as a failed write. Omitting the field lets Trakt stamp now.
+     */
+    public function testHistoryPayloadSendsNoWatchedAtSoTraktStampsNow(): void
+    {
+        $body = $this->historyPayload($this->makeClient(), 12345, 'movie');
+
+        $this->assertArrayNotHasKey('watched_at', $body['movies'][0]);
+        $this->assertSame(['ids' => ['tmdb' => 12345]], $body['movies'][0]);
+    }
+
+    public function testHistoryPayloadPutsMoviesAndShowsInTheirOwnBucket(): void
+    {
+        $client = $this->makeClient();
+
+        $this->assertSame(
+            ['movies' => [['ids' => ['tmdb' => 550]]]],
+            $this->historyPayload($client, 550, 'movie')
+        );
+        $this->assertSame(
+            ['shows' => [['ids' => ['tmdb' => 1399]]]],
+            $this->historyPayload($client, 1399, 'tv')
+        );
     }
 }

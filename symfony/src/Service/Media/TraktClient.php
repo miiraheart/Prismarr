@@ -757,6 +757,27 @@ class TraktClient implements ResetInterface
     }
 
     /**
+     * The body of a /sync/history add. Split out from markWatched() only so it
+     * can be asserted without a live call.
+     *
+     * No watched_at is sent, so Trakt stamps the entry with the current time.
+     * It used to send 'released', which stamps the ORIGINAL air or release date
+     * instead. That was wrong twice over. It backdated the history, so marking
+     * a show today buried the entries weeks deep instead of recording when the
+     * mark actually happened; and because /sync/history is ordered by
+     * watched_at, a successful mark never surfaced at the top, which is what
+     * made a working write look like a broken one for an entire session.
+     *
+     * @return array<string, list<array{ids: array{tmdb: int}}>>
+     */
+    private function historyPayload(int $tmdbId, string $type): array
+    {
+        $bucket = $type === 'movie' ? 'movies' : 'shows';
+
+        return [$bucket => [['ids' => ['tmdb' => $tmdbId]]]];
+    }
+
+    /**
      * Add a title to the Trakt watch history, which is what makes it count as
      * watched everywhere. Needed because a film watched outside Infuse never
      * scrobbles and so is missing from /watched.
@@ -772,10 +793,8 @@ class TraktClient implements ResetInterface
             return false;
         }
 
+        $res = $this->postJson('/sync/history', $this->historyPayload($tmdbId, $type), $token);
         $bucket = $type === 'movie' ? 'movies' : 'shows';
-        $res = $this->postJson('/sync/history', [
-            $bucket => [['ids' => ['tmdb' => $tmdbId], 'watched_at' => 'released']],
-        ], $token);
 
         if ($res['code'] !== 201 && $res['code'] !== 200) {
             $this->logger->warning('Trakt history add failed', ['http' => $res['code'], 'tmdb_id' => $tmdbId]);
