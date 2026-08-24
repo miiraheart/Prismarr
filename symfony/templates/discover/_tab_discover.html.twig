@@ -462,52 +462,10 @@
   applyCountdowns();
 
   // ── Add button → resolve + open existing quick-add modal (base.html.twig)
-  function triggerQuickAdd(item) {
-    // Create an ephemeral element with data-quick-add to trigger the global listener
-    var trigger = document.createElement('button');
-    trigger.setAttribute('data-quick-add', JSON.stringify(item));
-    trigger.style.display = 'none';
-    document.body.appendChild(trigger);
-    trigger.click();
-    setTimeout(function() { trigger.remove(); }, 100);
-  }
-
-  function handleAddClick(btn) {
-    var type = btn.dataset.tmdbType;  // 'movie' | 'tv'
-    var id   = btn.dataset.tmdbId;
-    var orig = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-
-    fetch('/decouverte/resolve/' + type + '/' + id, { credentials: 'same-origin' })
-      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, body: d }; }); })
-      .then(function(res) {
-        btn.disabled = false;
-        btn.innerHTML = orig;
-        if (!res.ok) {
-          if (window._prismarrToast) {
-            window._prismarrToast(TMDB_I18N.impossible.replace('__REASON__', res.body.error || TMDB_I18N.generic_err), 'danger');
-          }
-          return;
-        }
-        triggerQuickAdd(res.body);
-      })
-      .catch(function() {
-        btn.disabled = false;
-        btn.innerHTML = orig;
-        if (window._prismarrToast) window._prismarrToast(TMDB_I18N.network_error, 'danger');
-      });
-  }
-
-  document.addEventListener('click', function(e) {
-    var addBtn = e.target.closest('.tmdb-add-btn');
-    if (addBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      handleAddClick(addBtn);
-      return;
-    }
-  });
+  // The .tmdb-add-btn listener used to live here. It now lives in
+  // decouverte/_detail_modal.html.twig so the Lists and Watchlists tabs get
+  // the same behaviour, and so Add creates a Seerr request rather than
+  // pushing straight to Radarr/Sonarr. Two listeners would add twice.
 
   // ── Click on card → Prismarr detail modal (Turbo-safe manual open)
   var searchInput = document.getElementById('tmdb-search');

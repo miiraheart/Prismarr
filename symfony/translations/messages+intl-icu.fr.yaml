@@ -5754,3 +5754,12 @@ watchlists:
   count: '{count} affichés'
   error:
     trakt: Votre liste Trakt n'a pas pu être chargée.
+
+request:
+  toast:
+    sent: Demandé dans Seerr
+    duplicate: Déjà demandé
+    done: Demandé
+  error:
+    invalid: Paramètres de demande invalides
+    failed: Seerr n'a pas pu créer cette demande

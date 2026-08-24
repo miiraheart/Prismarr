@@ -5756,3 +5756,12 @@ watchlists:
   count: '{count} shown'
   error:
     trakt: Your Trakt watchlist could not be loaded.
+
+request:
+  toast:
+    sent: Requested in Seerr
+    duplicate: Already requested
+    done: Requested
+  error:
+    invalid: Invalid request parameters
+    failed: Seerr could not create that request

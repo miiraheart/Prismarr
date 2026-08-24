@@ -663,6 +663,9 @@
     episode_short:{{ 'decouverte.modal.episode_short'|trans|json_encode|raw }},
     impossible:   {{ 'decouverte.modal.impossible'|trans({reason: '__REASON__'})|json_encode|raw }},
     generic_err:  {{ 'decouverte.modal.generic_error'|trans|json_encode|raw }},
+    request_sent:      {{ 'request.toast.sent'|trans|json_encode|raw }},
+    request_duplicate: {{ 'request.toast.duplicate'|trans|json_encode|raw }},
+    request_done:      {{ 'request.toast.done'|trans|json_encode|raw }},
     add_to_radarr:{{ 'decouverte.modal.add_to'|trans({service: 'Radarr'})|json_encode|raw }},
     add_to_sonarr:{{ 'decouverte.modal.add_to'|trans({service: 'Sonarr'})|json_encode|raw }},
     view_movies:  {{ 'decouverte.modal.view_in'|trans({section: 'decouverte.modal.view_movies'|trans})|json_encode|raw }},
@@ -1471,6 +1474,99 @@
     if (!card) return;
     e.preventDefault();
     loadDetail(card.dataset.tmdbType, card.dataset.tmdbId);
+  });
+
+  // ── Add goes through Seerr ───────────────────────────────────────────
+  // Lives here, in the shared partial, rather than in one tab: this file is
+  // included once by the Discover page shell, so the Discover, Lists and
+  // Watchlists tabs and the detail modal all get the same behaviour from one
+  // implementation. It used to live in the Discover tab only, which is why
+  // Add was inert on Lists.
+  //
+  // The Radarr and Sonarr pages are untouched by construction: they never
+  // render .tmdb-add-btn, so this listener never fires there and their adds
+  // stay direct, which is the whole point of the rule.
+  var REQUEST_ROUTE = {{ path('media_request_create')|json_encode|raw }};
+
+  function directQuickAdd(btn, type, id, restore) {
+    // No Seerr: fall back to the direct Radarr/Sonarr quick-add, so the
+    // button never goes dead for a setup without Seerr.
+    fetch('/decouverte/resolve/' + type + '/' + id, { credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
+      .then(function (res) {
+        restore();
+        if (!res.ok) {
+          if (window._prismarrToast) {
+            window._prismarrToast(TMDB_I18N.impossible.replace('__REASON__', res.body.error || TMDB_I18N.generic_err), 'danger');
+          }
+          return;
+        }
+        var trigger = document.createElement('button');
+        trigger.setAttribute('data-quick-add', JSON.stringify(res.body));
+        trigger.style.display = 'none';
+        document.body.appendChild(trigger);
+        trigger.click();
+        setTimeout(function () { trigger.remove(); }, 100);
+      })
+      .catch(function () {
+        restore();
+        if (window._prismarrToast) window._prismarrToast(TMDB_I18N.network_error, 'danger');
+      });
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.tmdb-add-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    var type = btn.dataset.tmdbType;
+    var id   = btn.dataset.tmdbId;
+    if (!type || !id) return;
+
+    var orig = btn.innerHTML;
+    var done = false;
+    function restore() {
+      if (done) return;
+      done = true;
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    fetch(REQUEST_ROUTE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ tmdb_id: parseInt(id, 10), type: type })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
+      .then(function (res) {
+        if (res.body && res.body.fallback) {
+          directQuickAdd(btn, type, id, restore);
+          return;
+        }
+        restore();
+        if (res.body && res.body.ok) {
+          if (window._prismarrToast) {
+            window._prismarrToast(
+              res.body.duplicate ? TMDB_I18N.request_duplicate : TMDB_I18N.request_sent,
+              res.body.duplicate ? 'info' : 'success'
+            );
+          }
+          btn.classList.add('disabled');
+          btn.innerHTML = TMDB_I18N.request_done;
+          return;
+        }
+        if (window._prismarrToast) {
+          window._prismarrToast((res.body && res.body.error) || TMDB_I18N.generic_err, 'danger');
+        }
+      })
+      .catch(function () {
+        restore();
+        if (window._prismarrToast) window._prismarrToast(TMDB_I18N.network_error, 'danger');
+      });
   });
 
 
