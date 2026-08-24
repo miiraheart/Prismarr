@@ -11,12 +11,11 @@ use App\Tests\AbstractWebTestCase;
  */
 class DiscoverControllerTest extends AbstractWebTestCase
 {
-    public function testDiscoverPageRendersWithoutMdblistConfigured(): void
+    public function testTheOldListsPageRedirectsIntoTheMergedPage(): void
     {
         $this->client->request('GET', '/lists');
 
-        $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('#dv-tabs');
+        $this->assertResponseRedirects('/decouverte?tab=lists');
     }
 
     public function testListsFeedReturnsAnEmptyPayloadWhenUnconfigured(): void

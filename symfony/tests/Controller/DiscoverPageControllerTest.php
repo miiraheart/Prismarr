@@ -76,6 +76,30 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
+    public function testTheListsTabFragmentRendersOnItsOwn(): void
+    {
+        $this->client->request('GET', '/decouverte/tab/lists');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('[data-dsc-pane="lists"]');
+    }
+
+    public function testTheListsTabCanBeRequestedAsTheActiveTab(): void
+    {
+        $this->client->request('GET', '/decouverte', ['tab' => 'lists']);
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#dsc-tabs');
+        $this->assertSelectorExists('[data-dsc-pane="lists"]');
+    }
+
+    public function testTheOldListsUrlRedirectsIntoTheListsTab(): void
+    {
+        $this->client->request('GET', '/lists');
+
+        $this->assertResponseRedirects('/decouverte?tab=lists');
+    }
+
     /**
      * The page route deliberately does NOT start with `tmdb_`.
      *

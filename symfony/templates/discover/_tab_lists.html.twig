@@ -1,10 +1,12 @@
-{% extends 'base.html.twig' %}
+{# The Lists tab. Was the standalone /lists page until the tabbed merge.
+   Its toolbar id is #dv-tabs, which predates and is unrelated to the shell's
+   #dsc-tabs tab bar.
+
+   The detail modal is NOT included here: the shell includes it once for all
+   three tabs. #}
 {% import '_icons.html.twig' as ico %}
 
-{% block title %}{{ 'discover.page.title'|trans }}{% endblock %}
-{% block page_title %}{{ 'discover.page.title'|trans }}{% endblock %}
-
-{% block body %}
+<div data-dsc-pane="lists">
 <style>
   /* Cards and badges come from decouverte/_detail_modal.html.twig
      (.media-card / .vote-badge / .lib-badge), so this page looks exactly like
@@ -79,8 +81,7 @@
     <span class="dv-cap-note{% if totalRows <= rowCap %} d-none{% endif %}" id="dv-cap-note">{% if totalRows > rowCap %}{{ 'discover.rows.capped'|trans({count: rowCap, total: totalRows}) }}{% endif %}</span>
   </div>
 
-  {% include 'decouverte/_detail_modal.html.twig' %}
-
+  
   {# Filled client-side from /trakt/playback (see loadContinueWatching()
      below). Kept outside #dv-directory so a search or "back to lists" pass,
      which rewrites that container's innerHTML, never wipes it out. Left
@@ -545,4 +546,4 @@
   loadContinueWatching();
 })();
 </script>
-{% endblock %}
+</div>

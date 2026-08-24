@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Service\ConfigService;
+use App\Service\Media\Discover\ListsTabContext;
 use App\Service\Media\LibraryIndex;
 use App\Service\Media\TmdbClient;
 use App\Service\Media\TmdbEnricher;
@@ -63,6 +64,7 @@ class DiscoverPageController extends AbstractController
         private readonly TmdbEnricher    $enricher,
         private readonly ConfigService   $config,
         private readonly LoggerInterface $logger,
+        private readonly ListsTabContext $listsContext,
     ) {}
 
     #[Route('/decouverte', name: 'discover_page', priority: 10)]
@@ -104,8 +106,19 @@ class DiscoverPageController extends AbstractController
     {
         return match ($tab) {
             'discover' => $this->renderDiscoverTab(),
+            'lists'    => $this->renderListsTab(),
             default    => new Response('', Response::HTTP_NOT_FOUND),
         };
+    }
+
+    /**
+     * The Lists tab. The row building lives in ListsTabContext, which
+     * DiscoverController also uses for its /lists/* JSON routes, so there is
+     * exactly one implementation of it.
+     */
+    private function renderListsTab(): Response
+    {
+        return $this->render('discover/_tab_lists.html.twig', $this->listsContext->build());
     }
 
     /**
