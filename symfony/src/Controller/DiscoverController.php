@@ -60,7 +60,7 @@ class DiscoverController extends AbstractController
             $initialRows[$row['url']] = $this->firstPageItems($row['url']);
         }
 
-        return $this->render('discover/index.html.twig', [
+        return $this->render('discover/_tab_lists.html.twig', [
             'pinned'      => $this->pinned(),
             'configured'  => $this->config->has('mdblist_api_key'),
             'rows'        => $shown,

@@ -5691,9 +5691,13 @@ trakt:
     list_create_failed: 'Trakt n''a pas pu créer la liste.'
 discover:
   page:
-    title: Listes
+    title: Découverte
   tab:
+    discover: Découverte
     lists: Listes
+    trakt: Trakt
+    loading: Chargement...
+    failed: Cet onglet n'a pas pu être chargé.
   search:
     placeholder: Rechercher des listes
     count: '{count} listes'

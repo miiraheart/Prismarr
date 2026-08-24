@@ -1,548 +1,114 @@
 {% extends 'base.html.twig' %}
-{% import '_icons.html.twig' as ico %}
 
 {% block title %}{{ 'discover.page.title'|trans }}{% endblock %}
-{% block page_title %}{{ 'discover.page.title'|trans }}{% endblock %}
+{% block page_title %}<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#6366f1" stroke="#6366f1" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2l2.4 7.4h7.6l-6.2 4.5l2.4 7.4l-6.2 -4.6l-6.2 4.6l2.4 -7.4l-6.2 -4.5h7.6z"/></svg> {{ 'discover.page.title'|trans }}{% endblock %}
 
 {% block body %}
 <style>
-  /* Cards and badges come from decouverte/_detail_modal.html.twig
-     (.media-card / .vote-badge / .lib-badge), so this page looks exactly like
-     Decouverte and Trakt. Only page furniture and the row layout live here. */
-  .dv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 1rem; }
-  .dv-cap-note { font-size: .75rem; color: var(--tblr-secondary); }
-  .dv-row-title { color: inherit; text-decoration: none; }
-  .dv-row-title:hover { color: var(--tblr-primary); text-decoration: underline; }
-
-  /* Copied from decouverte/index.html.twig: this page does not load that
-     page's stylesheet, so each list row needs its own copy to look identical
-     to a Decouverte carousel. */
-  .tmdb-section { margin-bottom: 1.75rem; }
-  .tmdb-section-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 0.5rem; padding: 0 0.25rem;
-  }
-  .tmdb-section-header h3 {
-    margin: 0; font-size: 1rem; font-weight: 600;
-    color: var(--tblr-body-color);
-  }
-  .tmdb-section-header h3 .count {
-    font-size: 0.75rem; color: var(--tblr-secondary); font-weight: 400;
-    margin-left: 0.4rem;
-  }
-  .tmdb-section-actions { display: flex; gap: 0.25rem; }
-  .tmdb-scroll-btn {
-    width: 28px; height: 28px; border-radius: 50%;
-    border: 1px solid var(--tblr-border-color);
-    background: var(--tblr-bg-surface); color: var(--tblr-body-color);
-    display: inline-flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .tmdb-scroll-btn:hover { background: var(--tblr-primary); color: #fff; border-color: var(--tblr-primary); }
-
-  .tmdb-row {
-    display: flex; gap: 0.75rem; overflow-x: auto; scroll-behavior: smooth;
-    padding: 0.25rem 0.25rem 0.75rem; scrollbar-width: thin;
-  }
-  .tmdb-row::-webkit-scrollbar { height: 6px; }
-  .tmdb-row::-webkit-scrollbar-thumb { background: var(--tblr-border-color); border-radius: 3px; }
-
-  /* Sized like .media-card[data-tmdb-id] in _detail_modal.html.twig so a row
-     below the fold neither shifts nor leaves a gap once its real cards land. */
-  .dv-skeleton-card {
-    flex: 0 0 150px; width: 150px; aspect-ratio: 2/3;
-    border-radius: .5rem;
-    background: var(--tblr-bg-surface-secondary);
-    animation: dv-skeleton-pulse 1.6s ease-in-out infinite;
-  }
-  @keyframes dv-skeleton-pulse {
-    0%, 100% { opacity: .55; }
-    50%      { opacity: .85; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .dv-skeleton-card { animation: none; }
-  }
+  /* The tab bar only. Everything inside a pane keeps the styles it arrived
+     with, which is why the moved templates were not restyled. */
+  .dsc-tabbar { display:flex; gap:.25rem; border-bottom:1px solid var(--tblr-border-color); margin-bottom:1rem; }
+  .dsc-tab { appearance:none; background:none; border:0; border-bottom:2px solid transparent;
+             padding:.5rem .9rem; color:var(--tblr-secondary); font-weight:500; cursor:pointer; }
+  .dsc-tab:hover { color:var(--tblr-body-color); }
+  .dsc-tab.active { color:var(--tblr-primary); border-bottom-color:var(--tblr-primary); }
+  .dsc-pane[hidden] { display:none; }
+  .dsc-loading { padding:2rem; text-align:center; color:var(--tblr-secondary); }
 </style>
 
-<div class="container-xl">
-  {% if not configured %}
-    <div class="alert alert-warning">{{ 'discover.error.not_configured'|trans }}</div>
-  {% endif %}
-
-  <div id="dv-tabs" class="dv-toolbar">
-    <div class="btn-group btn-group-sm" role="group">
-      <button type="button" class="btn btn-outline-secondary active" data-dv-tab="lists">{{ 'discover.tab.lists'|trans }}</button>
-    </div>
-    <input type="search" class="form-control form-control-sm w-auto" id="dv-search"
-           placeholder="{{ 'discover.search.placeholder'|trans }}">
-    <span class="text-secondary" id="dv-count">{% if totalRows > 0 %}{{ 'discover.search.count'|trans({count: totalRows}) }}{% endif %}</span>
-    <span class="dv-cap-note{% if totalRows <= rowCap %} d-none{% endif %}" id="dv-cap-note">{% if totalRows > rowCap %}{{ 'discover.rows.capped'|trans({count: rowCap, total: totalRows}) }}{% endif %}</span>
-  </div>
-
-  {% include 'decouverte/_detail_modal.html.twig' %}
-
-  {# Filled client-side from /trakt/playback (see loadContinueWatching()
-     below). Kept outside #dv-directory so a search or "back to lists" pass,
-     which rewrites that container's innerHTML, never wipes it out. Left
-     empty (no card markup, no styling hook) whenever there is nothing to
-     show, so no empty row is ever visible. #}
-  <div id="dv-continue-watching"></div>
-
-  {# Row shells (title, owner, counts) are rendered here so the directory
-     never needs a client fetch just to know what rows exist. The first
-     inlineRows rows also carry their cards already (see initialRows below,
-     filled in by the script at the bottom); the rest show skeleton
-     placeholders until the IntersectionObserver loads them. #}
-  <div id="dv-directory">
-    {% for row in rows %}
-      <div class="tmdb-section">
-        <div class="tmdb-section-header">
-          <h3>
-            <a href="#" class="dv-row-title" data-url="{{ row.url|e('html_attr') }}" data-label="{{ row.label|e('html_attr') }}">{% if row.pinned %}📌 {% endif %}{{ row.label }}</a>
-            <span class="count">· {% if row.pinned %}{{ row.source }}{% else %}{{ row.user }} · {{ 'discover.list.items_count'|trans({count: row.items}) }} · {{ 'discover.list.likes_count'|trans({count: row.likes}) }}{% endif %}</span>
-          </h3>
-          <div class="tmdb-section-actions">
-            <button type="button" class="tmdb-scroll-btn" data-scroll="left" aria-label="{{ 'discover.scroll.prev'|trans }}">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6"/></svg>
-            </button>
-            <button type="button" class="tmdb-scroll-btn" data-scroll="right" aria-label="{{ 'discover.scroll.next'|trans }}">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="tmdb-row" data-url="{{ row.url|e('html_attr') }}"{% if loop.index0 < inlineRows %} data-loaded="1"{% endif %}>
-          {% if loop.index0 >= inlineRows %}
-            {% for i in 1..6 %}<div class="dv-skeleton-card" aria-hidden="true"></div>{% endfor %}
-          {% endif %}
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-
-  <div id="dv-list-view" class="d-none">
-    <div class="dv-toolbar">
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="dv-back">{{ 'discover.action.back'|trans }}</button>
-      <strong id="dv-list-title"></strong>
-      <button type="button" class="btn btn-sm btn-outline-primary" id="dv-pin"></button>
-    </div>
-    <div class="tmdb-results-grid" id="dv-grid"></div>
-    <div class="text-center my-3">
-      <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="dv-more">{{ 'discover.action.more'|trans }}</button>
-    </div>
-  </div>
+{# The tab bar id is dsc-tabs, NOT dv-tabs: the Lists tab body already uses
+   #dv-tabs for its own search-and-pin toolbar. #}
+<div id="dsc-tabs" class="dsc-tabbar" role="tablist">
+  {% for t in tabs %}
+    <button type="button" class="dsc-tab{% if t == activeTab %} active{% endif %}"
+            role="tab" data-dsc-tab="{{ t }}"
+            aria-selected="{{ t == activeTab ? 'true' : 'false' }}">
+      {{ ('discover.tab.' ~ t)|trans }}
+    </button>
+  {% endfor %}
 </div>
+
+{# Only the active pane is server rendered. The others are fetched once, on
+   first click, and then kept in the DOM so every later switch is instant. #}
+<div id="dsc-panes">
+  {% for t in tabs %}
+    <div class="dsc-pane" data-dsc-host="{{ t }}"{% if t != activeTab %} hidden{% endif %}>
+      {% if t == activeTab %}{{ activeTabHtml|raw }}{% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+{# Included ONCE here rather than once per tab. Including it inside each pane
+   would re-run its bindings every time a lazy pane is injected. #}
+{% include 'decouverte/_detail_modal.html.twig' %}
 
 <script>
 (function () {
-  var ROUTES = {
-    lists: {{ path('lists_directory')|json_encode|raw }},
-    list:  {{ path('lists_items')|json_encode|raw }},
-    // One URL per type: the route requires `movie|tv`, so a placeholder such
-    // as 'TYPE' would throw InvalidParameterException when Twig renders it.
-    meta: {
-      movie: {{ path('trakt_meta', {type: 'movie', tmdbId: 0})|json_encode|raw }},
-      tv:    {{ path('trakt_meta', {type: 'tv',    tmdbId: 0})|json_encode|raw }}
-    },
-    pin:   {{ path('lists_pin')|json_encode|raw }},
-    unpin: {{ path('lists_unpin')|json_encode|raw }}
+  {# A real URL per tab. A placeholder like __TAB__ cannot be used here: the
+     route requirement rejects any value outside discover|lists|trakt at
+     generation time. #}
+  var TAB_URLS = {
+    {% for t in tabs %}{{ t|json_encode|raw }}: {{ path('discover_page_tab', {tab: t})|json_encode|raw }}{{ loop.last ? '' : ',' }}
+    {% endfor %}
   };
+  var LOADING  = {{ 'discover.tab.loading'|trans|json_encode|raw }};
+  var FAILED   = {{ 'discover.tab.failed'|trans|json_encode|raw }};
+  var bar = document.getElementById('dsc-tabs');
+  if (!bar) return;
 
-  var pinned = {{ pinned|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_QUOT'))|raw }};
-  /* Same identity rule as ListSourceResolver::idFor() on the server: trailing
-     slash and case are both ignored. Comparing case-sensitively here would show
-     "Pin" for a list that is in fact already pinned. */
-  function pinKey(url) {
-    return String(url || '').trim().replace(/\/$/, '').toLowerCase();
-  }
+  function host(tab) { return document.querySelector('[data-dsc-host="' + tab + '"]'); }
 
-  function isPinned(url) {
-    return pinned.some(function (p) { return pinKey(p.url) === pinKey(url); });
-  }
-
-  // The rows and cards DiscoverController::index() already fetched and
-  // rendered server-side, keyed by row url so wireDirectoryRows() below can
-  // find them without a fetch of its own.
-  var initialRows = {{ initialRows|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_QUOT'))|raw }};
-
-  // Rendering every list MDBList returns as its own row would mean up to 50
-  // observers and 50 potential fetch chains on one page load. MDBList's free
-  // plan allows 1000 requests/day, so the directory is capped here and each
-  // row only fetches once it is about to scroll into view (see observeRow).
-  var ROW_CAP = {{ rowCap }};
-
-  var directory  = document.getElementById('dv-directory');
-  var continueWatchingRow = document.getElementById('dv-continue-watching');
-  var listView   = document.getElementById('dv-list-view');
-  var grid       = document.getElementById('dv-grid');
-  var moreBtn    = document.getElementById('dv-more');
-  var title      = document.getElementById('dv-list-title');
-  var count      = document.getElementById('dv-count');
-  var capNote    = document.getElementById('dv-cap-note');
-  var search     = document.getElementById('dv-search');
-  var current    = { url: '', cursor: null };
-  var rowObserver = null;
-
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-  }); }
-
-  function listsCountText(n) {
-    return {{ 'discover.search.count'|trans({count: '__N__'})|json_encode|raw }}.replace('__N__', n);
-  }
-  function itemsCountText(n) {
-    return {{ 'discover.list.items_count'|trans({count: '__N__'})|json_encode|raw }}.replace('__N__', n);
-  }
-  function likesCountText(n) {
-    return {{ 'discover.list.likes_count'|trans({count: '__N__'})|json_encode|raw }}.replace('__N__', n);
-  }
-  function cappedText(shown, total) {
-    return {{ 'discover.rows.capped'|trans({count: '__N__', total: '__T__'})|json_encode|raw }}
-      .replace('__N__', shown).replace('__T__', total);
-  }
-
-  var SCROLL_PREV = {{ 'discover.scroll.prev'|trans|json_encode|raw }};
-  var SCROLL_NEXT = {{ 'discover.scroll.next'|trans|json_encode|raw }};
-  var ROW_EMPTY   = {{ 'discover.row.empty'|trans|json_encode|raw }};
-  var CONTINUE_WATCHING_LABEL = {{ 'discover.row.continue_watching'|trans|json_encode|raw }};
-  // Trakt playback entries have no title, poster or year: the caller has to
-  // resolve those itself. Bounded to a sensible number so this never turns
-  // into a burst of per-title lookups.
-  var CONTINUE_WATCHING_CAP = 12;
-
-  var SCROLL_BTNS_HTML =
-      '<div class="tmdb-section-actions">'
-    + '<button type="button" class="tmdb-scroll-btn" data-scroll="left" aria-label="' + esc(SCROLL_PREV) + '">'
-    +   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6"/></svg>'
-    + '</button>'
-    + '<button type="button" class="tmdb-scroll-btn" data-scroll="right" aria-label="' + esc(SCROLL_NEXT) + '">'
-    +   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6"/></svg>'
-    + '</button>'
-    + '</div>';
-
-  /* MEASURED 2026-08-23: MDBList returns an absolute poster URL on every
-     item, so in practice this loop does nothing. It stays as a cheap safety
-     net for the rare item with no poster, and costs one request only for
-     those. */
-  function hydrate(items, container) {
-    items.forEach(function (it) {
-      if (it.poster) return;
-      var template = ROUTES.meta[it.type];
-      if (!template) return;
-      var url = template.replace(/0$/, String(it.id));
-      fetch(url, { headers: { Accept: 'application/json' } })
-        .then(function (r) { return r.json(); })
-        .then(function (m) {
-          if (!m || !m.poster) return;
-          var card = container.querySelector('.media-card[data-tmdb-id="' + it.id + '"]');
-          if (!card) return;
-          var ph = card.querySelector('.no-poster');
-          if (ph) ph.outerHTML = '<img src="' + m.poster + '" alt="" loading="lazy">';
-        })
-        .catch(function () {});
+  function show(tab) {
+    bar.querySelectorAll('[data-dsc-tab]').forEach(function (b) {
+      var on = b.dataset.dscTab === tab;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-dsc-host]').forEach(function (p) {
+      p.hidden = p.dataset.dscHost !== tab;
     });
   }
 
-  function renderPage(d, append) {
-    var html = (d.items || []).map(window.renderCardHTML).join('');
-    if (append) { grid.insertAdjacentHTML('beforeend', html); } else { grid.innerHTML = html; }
-    current.cursor = d.next_cursor || null;
-    moreBtn.classList.toggle('d-none', !current.cursor);
-    hydrate(d.items || [], grid);
-  }
+  function activate(tab) {
+    var pane = host(tab);
+    if (!pane) return;
+    show(tab);
 
-  function openList(url, label) {
-    current.url = url;
-    current.cursor = null;
-    title.textContent = label;
-    var pinBtn = document.getElementById('dv-pin');
-    pinBtn.textContent = isPinned(url)
-      ? {{ 'discover.action.unpin'|trans|json_encode|raw }}
-      : {{ 'discover.action.pin'|trans|json_encode|raw }};
-    pinBtn.onclick = function () {
-      var unpinning = isPinned(url);
-      var target = unpinning ? ROUTES.unpin : ROUTES.pin;
-      var body   = unpinning
-        ? { id: (pinned.filter(function (p) { return pinKey(p.url) === pinKey(url); })[0] || {}).id }
-        : { url: url, label: label };
-      fetch(target, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(body)
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (!d.ok) return;
-          pinned = d.pinned || [];
-          pinBtn.textContent = isPinned(url)
-            ? {{ 'discover.action.unpin'|trans|json_encode|raw }}
-            : {{ 'discover.action.pin'|trans|json_encode|raw }};
-        });
-    };
-    directory.classList.add('d-none');
-    listView.classList.remove('d-none');
-    grid.innerHTML = '';
-    fetch(ROUTES.list + '?src=' + encodeURIComponent(url), { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { renderPage(d, false); });
-  }
+    var url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url);
 
-  // ── Row shells: rendered immediately for structure, filled on demand ──
-  // Used only by loadDirectory() below, for a search or a return from an
-  // open list: the very first paint uses the shells already in the HTML
-  // (see wireDirectoryRows()), never this.
-  function rowShellHTML(row) {
-    var pin = row.pinned ? '📌 ' : '';
-    return '<div class="tmdb-section">'
-      + '<div class="tmdb-section-header">'
-      +   '<h3>'
-      +     '<a href="#" class="dv-row-title" data-url="' + esc(row.url) + '" data-label="' + esc(row.label) + '">' + pin + esc(row.label) + '</a>'
-      +     '<span class="count">· ' + row.meta + '</span>'
-      +   '</h3>'
-      +   SCROLL_BTNS_HTML
-      + '</div>'
-      + '<div class="tmdb-row" data-url="' + esc(row.url) + '"></div>'
-      + '</div>';
-  }
-
-  function buildRows(d) {
-    var pins = (d.pinned || []).map(function (p) {
-      return { url: p.url, label: p.label, pinned: true, meta: esc(p.source) };
-    });
-    // A pinned list is usually also in the top-lists directory. Rendering both
-    // would give two identical carousels, so the pinned copy wins.
-    var seen = {};
-    pins.forEach(function (p) { seen[pinKey(p.url)] = true; });
-
-    var lists = (d.lists || []).filter(function (l) {
-      return !seen[pinKey(l.url)];
-    }).map(function (l) {
-      return {
-        url: l.url, label: l.name, pinned: false,
-        meta: esc(l.user) + ' · ' + itemsCountText(esc(l.items)) + ' · ' + likesCountText(esc(l.likes))
-      };
-    });
-    return pins.concat(lists);
-  }
-
-  // A row only calls /lists/items once it is about to scroll into view.
-  function observeRow(rowEl) {
-    if (!rowObserver) {
-      rowObserver = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (!entry.isIntersecting) return;
-          var row = entry.target;
-          rowObserver.unobserve(row);
-          if (row.dataset.loaded === '1' || row.dataset.loading === '1') return;
-          loadRowPage(row, row.dataset.url, null, false);
-        });
-      }, { rootMargin: '600px 0px' });
+    // Already loaded: nothing to fetch, which is what makes the second and
+    // every later switch instant.
+    if (pane.dataset.dscLoaded === '1' || pane.children.length) {
+      pane.dataset.dscLoaded = '1';
+      return;
     }
-    rowObserver.observe(rowEl);
-  }
 
-  // Infinite horizontal scroll: fetch the next page once a row nears its
-  // right edge, guarded so a row already loading never fires twice.
-  function onRowScroll(e) {
-    var row = e.target;
-    if (row.dataset.loading === '1' || !row.dataset.cursor) return;
-    if (row.scrollLeft + row.clientWidth < row.scrollWidth - 300) return;
-    loadRowPage(row, row.dataset.url, row.dataset.cursor, true);
-  }
-
-  function loadRowPage(rowEl, url, cursor, append) {
-    rowEl.dataset.loading = '1';
-    var qs = '?src=' + encodeURIComponent(url) + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
-    fetch(ROUTES.list + qs, { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var items = d.items || [];
-        var html = items.map(window.renderCardHTML).join('');
-        if (append) {
-          rowEl.insertAdjacentHTML('beforeend', html);
-        } else {
-          rowEl.innerHTML = html || '<div class="text-secondary py-2 px-2">' + ROW_EMPTY + '</div>';
-        }
-        rowEl.dataset.cursor = d.next_cursor || '';
-        rowEl.dataset.loaded = '1';
-        rowEl.dataset.loading = '0';
-        hydrate(items, rowEl);
+    pane.innerHTML = '<div class="dsc-loading">' + LOADING + '</div>';
+    fetch(TAB_URLS[tab], {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (html) {
+        pane.innerHTML = html;
+        pane.dataset.dscLoaded = '1';
+        // The injected markup carries its own <script> blocks, which the
+        // browser does not execute on innerHTML assignment. Re-create each
+        // one so the tab's own behaviour actually starts.
+        pane.querySelectorAll('script').forEach(function (old) {
+          var s = document.createElement('script');
+          if (old.src) { s.src = old.src; } else { s.textContent = old.textContent; }
+          old.replaceWith(s);
+        });
       })
       .catch(function () {
-        rowEl.dataset.loading = '0';
-        rowEl.dataset.loaded = '1';
+        pane.innerHTML = '<div class="dsc-loading">' + FAILED + '</div>';
       });
   }
 
-  function loadDirectory(q) {
-    if (rowObserver) { rowObserver.disconnect(); }
-    directory.innerHTML = '';
-    fetch(ROUTES.lists + (q ? '?q=' + encodeURIComponent(q) : ''), { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var rows  = buildRows(d);
-        var shown = rows.slice(0, ROW_CAP);
-
-        count.textContent = rows.length ? listsCountText(rows.length) : '';
-        if (rows.length > shown.length) {
-          capNote.textContent = cappedText(shown.length, rows.length);
-          capNote.classList.remove('d-none');
-        } else {
-          capNote.classList.add('d-none');
-        }
-
-        directory.innerHTML = shown.map(rowShellHTML).join('');
-
-        Array.prototype.forEach.call(directory.querySelectorAll('.tmdb-row'), function (rowEl) {
-          rowEl.addEventListener('scroll', onRowScroll);
-          observeRow(rowEl);
-        });
-      });
-  }
-
-  // First paint: the row shells (and the first rows' cards) are already in
-  // the HTML DiscoverController::index() rendered, so this only wires up
-  // scrolling and lazy-loading instead of fetching anything.
-  function wireDirectoryRows() {
-    Array.prototype.forEach.call(directory.querySelectorAll('.tmdb-row'), function (rowEl) {
-      var pre = initialRows[rowEl.dataset.url];
-      if (pre) {
-        var items = pre.items || [];
-        rowEl.innerHTML = items.map(window.renderCardHTML).join('') || '<div class="text-secondary py-2 px-2">' + ROW_EMPTY + '</div>';
-        rowEl.dataset.cursor = pre.next_cursor || '';
-        rowEl.dataset.loaded = '1';
-        hydrate(items, rowEl);
-      }
-      rowEl.addEventListener('scroll', onRowScroll);
-      observeRow(rowEl);
-    });
-  }
-
-  // Shared by #dv-directory and #dv-continue-watching: both are carousels
-  // of .tmdb-section rows built from the same markup. A row title is only
-  // ever a real list link inside the directory (.dv-row-title carries a
-  // data-url there); a container without any just falls through to the
-  // card-click handling below.
-  function bindRowClicks(container) {
-    if (!container) return;
-    container.addEventListener('click', function (e) {
-      var scrollBtn = e.target.closest('.tmdb-scroll-btn');
-      if (scrollBtn) {
-        var section = scrollBtn.closest('.tmdb-section');
-        var row = section && section.querySelector('.tmdb-row');
-        if (row) {
-          var dir = scrollBtn.dataset.scroll === 'right' ? 1 : -1;
-          row.scrollBy({ left: dir * row.clientWidth * 0.75, behavior: 'smooth' });
-        }
-        return;
-      }
-      var titleLink = e.target.closest('.dv-row-title');
-      if (titleLink) {
-        e.preventDefault();
-        openList(titleLink.dataset.url, titleLink.dataset.label);
-        return;
-      }
-      if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star') || e.target.closest('.dv-kebab-wrap')) return;
-      var card = e.target.closest('.media-card[data-tmdb-id]');
-      if (card && window.PrismarrDetail) {
-        window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);
-      }
-    });
-  }
-
-  bindRowClicks(directory);
-  bindRowClicks(continueWatchingRow);
-
-  // "Continue watching" row: the playback map carries title and year
-  // directly (TraktClient::getPlayback() reads them off the /sync/playback
-  // media object), but no poster or vote, so each entry still needs its own
-  // /trakt/meta lookup for those (the same one the in-library hydrate()
-  // path above uses for MDBList items missing a poster). Silent on any
-  // failure or an empty map: no row, no error.
-  function loadContinueWatching() {
-    if (!continueWatchingRow) return;
-
-    fetch('/trakt/playback', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (map) {
-        if (!map || typeof map !== 'object') return;
-
-        var entries = Object.keys(map).map(function (key) {
-          var sep  = key.indexOf(':');
-          var type = key.slice(0, sep);
-          var id   = key.slice(sep + 1);
-          return {
-            type: type, id: id,
-            paused_at: map[key].paused_at || '',
-            title: map[key].title || '',
-            year: map[key].year || null
-          };
-        });
-        if (entries.length === 0) return;
-
-        // ISO 8601 timestamps sort lexically, most recently paused first.
-        entries.sort(function (a, b) { return b.paused_at.localeCompare(a.paused_at); });
-        entries = entries.slice(0, CONTINUE_WATCHING_CAP);
-
-        return Promise.all(entries.map(function (e) {
-          var template = ROUTES.meta[e.type];
-          if (!template) return null;
-          var url = template.replace(/0$/, String(e.id));
-          return fetch(url, { headers: { Accept: 'application/json' } })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (m) {
-              return { id: e.id, type: e.type, title: e.title, year: e.year, poster: m && m.poster, vote: m && m.vote };
-            })
-            .catch(function () { return null; });
-        })).then(function (items) {
-          items = items.filter(Boolean);
-          if (items.length === 0) return;
-
-          continueWatchingRow.innerHTML = '<div class="tmdb-section">'
-            + '<div class="tmdb-section-header">'
-            +   '<h3>' + esc(CONTINUE_WATCHING_LABEL) + '</h3>'
-            +   SCROLL_BTNS_HTML
-            + '</div>'
-            + '<div class="tmdb-row">' + items.map(window.renderCardHTML).join('') + '</div>'
-            + '</div>';
-        });
-      })
-      .catch(function () { /* no row, no noise */ });
-  }
-
-  grid.addEventListener('click', function (e) {
-    if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star') || e.target.closest('.dv-kebab-wrap')) return;
-    var card = e.target.closest('.media-card[data-tmdb-id]');
-    if (card && window.PrismarrDetail) {
-      window.PrismarrDetail.load(card.dataset.tmdbType, card.dataset.tmdbId);
-    }
+  bar.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-dsc-tab]');
+    if (btn) activate(btn.dataset.dscTab);
   });
-
-  moreBtn.addEventListener('click', function () {
-    if (!current.cursor) return;
-    moreBtn.disabled = true;
-    fetch(ROUTES.list + '?src=' + encodeURIComponent(current.url) + '&cursor=' + encodeURIComponent(current.cursor),
-          { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { renderPage(d, true); moreBtn.disabled = false; });
-  });
-
-  document.getElementById('dv-back').addEventListener('click', function () {
-    listView.classList.add('d-none');
-    directory.classList.remove('d-none');
-    // Redraw so a list pinned or unpinned while it was open is reflected in the
-    // pinned strip straight away, rather than after the next search keystroke.
-    loadDirectory(search.value.trim());
-  });
-
-  var timer = null;
-  search.addEventListener('input', function () {
-    clearTimeout(timer);
-    timer = setTimeout(function () { loadDirectory(search.value.trim()); }, 300);
-  });
-
-  window.PrismarrDiscover = { routes: ROUTES, openList: openList, current: current };
-  wireDirectoryRows();
-  loadContinueWatching();
-})();
+}());
 </script>
 {% endblock %}

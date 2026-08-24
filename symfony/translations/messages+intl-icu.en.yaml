@@ -5693,9 +5693,13 @@ trakt:
     list_create_failed: Trakt could not create the list.
 discover:
   page:
-    title: Lists
+    title: Discover
   tab:
+    discover: Discover
     lists: Lists
+    trakt: Trakt
+    loading: Loading...
+    failed: This tab could not be loaded.
   search:
     placeholder: Search lists
     count: '{count} lists'
