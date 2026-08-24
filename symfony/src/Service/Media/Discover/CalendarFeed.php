@@ -110,7 +110,7 @@ class CalendarFeed
         }
 
         return [
-            'events'        => array_values($events),
+            'events'        => $events,
             'radarrFailed'  => $radarrFailed,
             'sonarrFailed'  => $sonarrFailed,
             'mdblistFailed' => $mdblistFailed,
