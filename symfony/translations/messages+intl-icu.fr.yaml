@@ -5695,7 +5695,7 @@ discover:
   tab:
     discover: Découverte
     lists: Listes
-    trakt: Trakt
+    watchlists: Listes de suivi
     loading: Chargement...
     failed: Cet onglet n'a pas pu être chargé.
   add:
@@ -5743,3 +5743,14 @@ discover:
     more: Charger plus
   error:
     not_configured: "Ajoutez une clé API MDBList dans les réglages pour parcourir les listes."
+
+watchlists:
+  row:
+    local: Liste Prismarr
+    trakt: Liste Trakt
+    empty: Rien ici pour le moment
+  search:
+    placeholder: Rechercher dans vos listes
+  count: '{count} affichés'
+  error:
+    trakt: Votre liste Trakt n'a pas pu être chargée.

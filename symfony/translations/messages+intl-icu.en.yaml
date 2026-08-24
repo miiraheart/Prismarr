@@ -5697,7 +5697,7 @@ discover:
   tab:
     discover: Discover
     lists: Lists
-    trakt: Trakt
+    watchlists: Watchlists
     loading: Loading...
     failed: This tab could not be loaded.
   add:
@@ -5745,3 +5745,14 @@ discover:
     more: Load more
   error:
     not_configured: 'Add an MDBList API key in Settings to browse lists.'
+
+watchlists:
+  row:
+    local: Prismarr watchlist
+    trakt: Trakt watchlist
+    empty: Nothing here yet
+  search:
+    placeholder: Search your watchlists
+  count: '{count} shown'
+  error:
+    trakt: Your Trakt watchlist could not be loaded.

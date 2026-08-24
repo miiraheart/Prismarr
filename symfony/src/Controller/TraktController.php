@@ -44,14 +44,26 @@ class TraktController extends AbstractController
     ) {}
 
     /**
-     * The Trakt page is now a tab on the merged Discover page. Kept as a
-     * redirect for existing bookmarks. Every /trakt/* route below, including
-     * the whole write path, is unchanged.
+     * The Trakt page is now the Watchlists tab on the merged Discover page.
+     * Kept as a redirect for existing bookmarks. Every /trakt/* route below,
+     * including the whole write path, is unchanged.
      */
     #[Route('', name: 'index')]
     public function index(): Response
     {
-        return $this->redirectToRoute('discover_page', ['tab' => 'trakt']);
+        return $this->redirectToRoute('discover_page', ['tab' => 'watchlists']);
+    }
+
+    /**
+     * The items of one custom list, for the Watchlists tab's lazy rows.
+     *
+     * `ref` is either the numeric trakt id or the list slug; both were probed
+     * and return identical payloads. Kept loose (not \d+) for that reason.
+     */
+    #[Route('/list/{ref}/items', name: 'list_items', requirements: ['ref' => '[A-Za-z0-9_-]+'], methods: ['GET'])]
+    public function listItems(string $ref): JsonResponse
+    {
+        return $this->json(['items' => $this->trakt->getListItems($ref)]);
     }
 
     /**

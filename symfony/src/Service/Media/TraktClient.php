@@ -290,6 +290,116 @@ class TraktClient implements ResetInterface
     }
 
     /**
+     * The items of one custom list, by numeric trakt id or by slug.
+     *
+     * Deliberately NOT built on collect(). That helper requests one bucket per
+     * call (/watchlist/movies, then /watchlist/shows) and stamps a single type
+     * across everything it returns. A custom list is mixed: a single page was
+     * measured on 2026-08-24 returning both movie and show entries, so the
+     * type has to be read from each entry instead. See discover-spec.md.
+     *
+     * @return list<array<string, mixed>> the same row shape collect() produces
+     */
+    public function getListItems(string $ref): array
+    {
+        if ($ref === '') {
+            return [];
+        }
+
+        try {
+            $this->ensureConfig();
+            $token = $this->accessToken();
+            if ($token === null) {
+                return [];
+            }
+
+            return $this->cachedGet('list_items_' . $ref, function () use ($ref, $token): array {
+                $slug = rawurlencode($this->username);
+                $rows = [];
+
+                for ($page = 1; $page <= self::MAX_PAGES; $page++) {
+                    $res = $this->request(
+                        '/users/' . $slug . '/lists/' . rawurlencode($ref) . '/items',
+                        ['page' => $page, 'limit' => self::PAGE_LIMIT, 'extended' => 'full'],
+                        $token,
+                    );
+
+                    if (!is_array($res['data']) || $res['data'] === []) {
+                        break;
+                    }
+
+                    foreach ($res['data'] as $entry) {
+                        $row = $this->mapListEntry($entry);
+                        if ($row !== null) {
+                            $rows[] = $row;
+                        }
+                    }
+
+                    if (count($res['data']) < self::PAGE_LIMIT) {
+                        break;
+                    }
+                }
+
+                return $rows;
+            }, self::TTL_LIST);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt list items failed', [
+                'list'      => $ref,
+                'exception' => $e::class,
+                'message'   => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * One list entry to the shared row shape, or null when it cannot be joined.
+     *
+     * @param  mixed $entry
+     * @return array<string, mixed>|null
+     */
+    private function mapListEntry($entry): ?array
+    {
+        if (!is_array($entry)) {
+            return null;
+        }
+
+        // "movie" or "show", per entry rather than per request.
+        $kind = $entry['type'] ?? null;
+        if ($kind !== 'movie' && $kind !== 'show') {
+            return null;
+        }
+
+        $media = $entry[$kind] ?? null;
+        $tmdb  = $media['ids']['tmdb'] ?? null;
+
+        // Without a TMDB id there is nothing to join against: Prismarr,
+        // Radarr and Sonarr are all keyed on tmdb_id.
+        if (!is_array($media) || !is_int($tmdb) || $tmdb <= 0) {
+            return null;
+        }
+
+        return [
+            'tmdb_id'  => $tmdb,
+            // Trakt says "show", the rest of this codebase says "tv".
+            'type'     => $kind === 'movie' ? 'movie' : 'tv',
+            'title'    => (string) ($media['title'] ?? ''),
+            'year'     => isset($media['year']) ? (int) $media['year'] : null,
+            'trakt_id' => $media['ids']['trakt'] ?? null,
+            // Arrives as a raw float here, unlike the rounded MDBList payloads.
+            'community_rating' => isset($media['rating']) ? round((float) $media['rating'], 1) : null,
+            'community_votes'  => isset($media['votes']) ? (int) $media['votes'] : null,
+            'listed_at' => $entry['listed_at'] ?? null,
+            'rank'      => isset($entry['rank']) ? (int) $entry['rank'] : null,
+            // Personal rating rides on the entry for list items, so these rows
+            // need no companion /ratings fetch.
+            'rating'    => isset($entry['my_rating']) ? (int) $entry['my_rating'] : null,
+            'notes'     => $entry['notes'] ?? null,
+        ];
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $raw
      * @return array<int, array{id:int, name:string, slug:string, item_count:int, privacy:string}>
      */

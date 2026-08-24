@@ -106,42 +106,42 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->assertResponseRedirects('/decouverte?tab=lists');
     }
 
-    public function testTheTraktTabFragmentRendersOnItsOwn(): void
+    public function testTheWatchlistsTabFragmentRendersOnItsOwn(): void
     {
-        $this->client->request('GET', '/decouverte/tab/trakt');
+        $this->client->request('GET', '/decouverte/tab/watchlists');
 
         $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('[data-dsc-pane="trakt"]');
+        $this->assertSelectorExists('[data-dsc-pane="watchlists"]');
     }
 
-    public function testTheOldTraktUrlRedirectsIntoTheTraktTab(): void
+    public function testTheOldTraktUrlRedirectsIntoTheWatchlistsTab(): void
     {
         $this->client->request('GET', '/trakt');
 
-        $this->assertResponseRedirects('/decouverte?tab=trakt');
+        $this->assertResponseRedirects('/decouverte?tab=watchlists');
     }
 
-    public function testTheTraktTabShipsTheSharedCardGridNotBespokeMarkup(): void
+    public function testTheWatchlistsTabShipsRowsNotOneFlatGrid(): void
     {
-        $this->client->request('GET', '/decouverte/tab/trakt');
+        $this->client->request('GET', '/decouverte/tab/watchlists');
 
         $this->assertResponseIsSuccessful();
-        // The shared renderer fills this grid client-side. Its presence is
-        // what distinguishes the reworked tab from the old server-rendered
-        // bespoke cards, which emitted .media-card directly in Twig.
-        $this->assertSelectorExists('#tk-grid[data-tk-shared="1"]');
+        // Rows, not one flat grid: the local Prismarr watchlist and the Trakt
+        // watchlist each get their own, and Trakt custom lists add more.
+        $this->assertSelectorExists('[data-wl-row="local"]');
+        $this->assertSelectorExists('[data-wl-row="trakt"]');
     }
 
     /**
      * The modal partial defines window.renderCardHTML, and a server-rendered
      * tab's inline script runs while the document is parsed. With the modal
-     * included AFTER the panes, the Trakt tab called renderCardHTML before it
-     * existed, threw, and rendered zero cards while its counts still showed
-     * 26 movies and 28 shows.
+     * included AFTER the panes, the Trakt tab (now Watchlists) called
+     * renderCardHTML before it existed, threw, and rendered zero cards while
+     * its counts still showed 26 movies and 28 shows.
      */
     public function testTheSharedCardRendererIsDefinedBeforeAnyTabPane(): void
     {
-        $this->client->request('GET', '/decouverte', ['tab' => 'trakt']);
+        $this->client->request('GET', '/decouverte', ['tab' => 'watchlists']);
 
         $html     = (string) $this->client->getResponse()->getContent();
         $renderer = strpos($html, 'function renderCardHTML');
@@ -161,12 +161,12 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
      * lazy-load path re-creates scripts so they run, and dropping the type or
      * id of a non-executable one leaves the tab reading an empty seed.
      */
-    public function testTheTraktTabSeedKeepsItsTypeAndId(): void
+    public function testTheWatchlistsSeedKeepsItsTypeAndId(): void
     {
-        $this->client->request('GET', '/decouverte/tab/trakt');
+        $this->client->request('GET', '/decouverte/tab/watchlists');
 
         $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('script#tk-items[type="application/json"]');
+        $this->assertSelectorExists('script#wl-seed[type="application/json"]');
     }
 
     /**

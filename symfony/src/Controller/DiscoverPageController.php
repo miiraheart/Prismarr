@@ -6,6 +6,7 @@ use App\Service\ConfigService;
 use App\Service\Media\Discover\ListsTabContext;
 use App\Service\Media\LibraryIndex;
 use App\Service\Media\TmdbClient;
+use App\Repository\Media\WatchlistItemRepository;
 use App\Service\Media\TraktClient;
 use App\Service\Media\TmdbEnricher;
 use Psr\Log\LoggerInterface;
@@ -14,6 +15,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * The merged Discover page: Discover, Lists and Trakt as three tabs.
@@ -57,7 +59,16 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class DiscoverPageController extends AbstractController
 {
     /** Tab ids, in display order. Also the allowed values of ?tab= and {tab}. */
-    public const TABS = ['discover', 'lists', 'trakt'];
+    public const TABS = ['discover', 'lists', 'watchlists'];
+
+    /**
+     * Tab ids that used to exist, mapped to their replacement.
+     *
+     * The Trakt tab became Watchlists once it grew a local-watchlist row and a
+     * row per Trakt list. Old links, the /trakt redirect and any bookmark of
+     * ?tab=trakt keep working rather than silently falling back to Discover.
+     */
+    private const TAB_ALIASES = ['trakt' => 'watchlists'];
 
     public function __construct(
         private readonly TmdbClient      $tmdb,
@@ -67,6 +78,8 @@ class DiscoverPageController extends AbstractController
         private readonly LoggerInterface $logger,
         private readonly ListsTabContext $listsContext,
         private readonly TraktClient     $trakt,
+        private readonly WatchlistItemRepository $watchlistRepo,
+        private readonly TranslatorInterface $translator,
     ) {}
 
     #[Route('/decouverte', name: 'discover_page', priority: 10)]
@@ -79,7 +92,8 @@ class DiscoverPageController extends AbstractController
             return $this->redirectToRoute('app_setup_tmdb');
         }
 
-        $active = (string) $request->query->get('tab', 'discover');
+        $active = self::TAB_ALIASES[(string) $request->query->get('tab', 'discover')]
+            ?? (string) $request->query->get('tab', 'discover');
         if (!in_array($active, self::TABS, true)) {
             $active = 'discover';
         }
@@ -98,10 +112,10 @@ class DiscoverPageController extends AbstractController
      * section, filter, genres, resolve, detail, search, explorer, collection,
      * person, watchlist and mes-recommandations. `tab` is free.
      */
-    #[Route('/decouverte/tab/{tab}', name: 'discover_page_tab', requirements: ['tab' => 'discover|lists|trakt'], priority: 10)]
+    #[Route('/decouverte/tab/{tab}', name: 'discover_page_tab', requirements: ['tab' => 'discover|lists|watchlists|trakt'], priority: 10)]
     public function tab(string $tab): Response
     {
-        return $this->renderTab($tab);
+        return $this->renderTab(self::TAB_ALIASES[$tab] ?? $tab);
     }
 
     private function renderTab(string $tab): Response
@@ -109,7 +123,7 @@ class DiscoverPageController extends AbstractController
         return match ($tab) {
             'discover' => $this->renderDiscoverTab(),
             'lists'    => $this->renderListsTab(),
-            'trakt'    => $this->renderTraktTab(),
+            'watchlists' => $this->renderWatchlistsTab(),
             default    => new Response('', Response::HTTP_NOT_FOUND),
         };
     }
@@ -125,55 +139,132 @@ class DiscoverPageController extends AbstractController
     }
 
     /**
-     * The Trakt tab.
+     * The Watchlists tab: the local Prismarr watchlist, the Trakt watchlist,
+     * and one row per Trakt custom list.
      *
-     * Enriched through LibraryIndex, which the standalone /trakt page never
-     * did: that is what gives these cards the Available badge and the
-     * watchlist star they used to lack.
+     * Only the first two rows carry their items. The custom lists ship as row
+     * shells and are filled by the template on scroll, because each one is its
+     * own Trakt round trip and a user with a dozen lists would otherwise pay
+     * for all of them on every page view. Same reasoning as the Lists tab.
      */
-    private function renderTraktTab(): Response
+    private function renderWatchlistsTab(): Response
     {
         $error = false;
-        $items = [];
-
-        try {
-            $items = $this->trakt->getWatchlist();
-        } catch (\Throwable $e) {
-            $this->logger->warning('Trakt tab watchlist failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
-            $error = true;
-        }
 
         try {
             $library = $this->libraryIndex->build();
         } catch (\Throwable $e) {
-            $this->logger->warning('Trakt tab library index failed', ['message' => $e->getMessage()]);
+            $this->logger->warning('Watchlists library index failed', ['message' => $e->getMessage()]);
             $library = ['movie' => [], 'tv' => []];
         }
 
-        $rows = [];
-        foreach ($items as $item) {
-            $info = $item['type'] === 'movie'
-                ? ($library['movie'][(int) $item['tmdb_id']] ?? null)
-                : ($library['tv']['tmdb_' . (int) $item['tmdb_id']] ?? null);
+        try {
+            $traktItems = $this->trakt->getWatchlist();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Watchlists trakt watchlist failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+            $traktItems = [];
+            $error      = true;
+        }
 
-            $rows[] = $item + [
+        try {
+            $lists = $this->trakt->getLists();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Watchlists trakt lists failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+            $lists = [];
+        }
+
+        $rows = [[
+            'key'   => 'local',
+            'label' => $this->translator->trans('watchlists.row.local'),
+            'items' => $this->enrichRows($this->localWatchlistRows(), $library),
+            'lazy'  => false,
+        ], [
+            'key'   => 'trakt',
+            'label' => $this->translator->trans('watchlists.row.trakt'),
+            'items' => $this->enrichRows($this->sortByListedAt($traktItems), $library),
+            'lazy'  => false,
+        ]];
+
+        foreach ($lists as $list) {
+            // An empty list would render as a permanently empty row.
+            if ((int) ($list['item_count'] ?? 0) === 0) {
+                continue;
+            }
+            $rows[] = [
+                'key'   => 'list-' . $list['id'],
+                'label' => $list['name'],
+                'ref'   => (string) $list['id'],
+                'count' => (int) $list['item_count'],
+                'items' => [],
+                'lazy'  => true,
+            ];
+        }
+
+        return $this->render('discover/_tab_watchlists.html.twig', [
+            'rows'      => $rows,
+            'error'     => $error,
+            'can_write' => $this->trakt->hasWriteAccess(),
+            'connected' => $this->trakt->hasWriteAccess() || $traktItems !== [],
+        ]);
+    }
+
+    /**
+     * The local Prismarr watchlist in the shared row shape.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function localWatchlistRows(): array
+    {
+        $rows = [];
+        foreach ($this->watchlistRepo->findAllOrdered() as $item) {
+            $rows[] = [
+                'tmdb_id' => $item->getTmdbId(),
+                'type'    => $item->getMediaType(),
+                'title'   => $item->getTitle(),
+                'year'    => $item->getYear(),
+                'poster'  => TmdbClient::posterUrl($item->getPosterPath(), 'w342'),
+                'vote'    => $item->getVote(),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Badge rows with Radarr/Sonarr status, so the cards carry the Available
+     * badge the standalone Trakt page never had.
+     *
+     * @param  list<array<string, mixed>> $rows
+     * @param  array{movie: array<int, mixed>, tv: array<string, mixed>} $library
+     * @return list<array<string, mixed>>
+     */
+    private function enrichRows(array $rows, array $library): array
+    {
+        foreach ($rows as $i => $row) {
+            $info = $row['type'] === 'movie'
+                ? ($library['movie'][(int) $row['tmdb_id']] ?? null)
+                : ($library['tv']['tmdb_' . (int) $row['tmdb_id']] ?? null);
+
+            $rows[$i] += [
                 'in_library' => $info !== null,
                 'lib_status' => $info['status'] ?? null,
                 'lib_id'     => $info['id'] ?? null,
             ];
         }
 
+        return $rows;
+    }
+
+    /**
+     * @param  list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function sortByListedAt(array $rows): array
+    {
         // Newest listed first, the order the Trakt site itself uses.
         usort($rows, static fn (array $a, array $b): int => ($b['listed_at'] ?? '') <=> ($a['listed_at'] ?? ''));
 
-        return $this->render('discover/_tab_trakt.html.twig', [
-            'items'       => $rows,
-            'error'       => $error,
-            'can_write'   => $this->trakt->hasWriteAccess(),
-            'can_connect' => $this->trakt->canStartDeviceAuth(),
-            'movies'      => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'movie')),
-            'shows'       => count(array_filter($rows, static fn (array $r): bool => $r['type'] === 'tv')),
-        ]);
+        return $rows;
     }
 
     /**

@@ -1,0 +1,344 @@
+{# The Watchlists tab.
+
+   Was the standalone /trakt page, then the Trakt tab. It now shows the local
+   Prismarr watchlist, the Trakt watchlist and one row per Trakt custom list,
+   in the same horizontally scrolling row style as the Lists tab.
+
+   Cards come from the shared renderCardHTML in decouverte/_detail_modal.html.twig,
+   so they carry the star, the Available badge, the watch badges and the kebab.
+   The modal itself is NOT included here: the shell includes it once.
+
+   Toolbar styles come from the shell's _toolbar_styles.html.twig. #}
+{% import '_icons.html.twig' as ico %}
+
+<div data-dsc-pane="watchlists">
+<style>
+  /* Row layout, matching the Lists tab so the two read as one design. */
+  .wl-section { margin-bottom: 1.75rem; }
+  .wl-section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: .5rem; padding: 0 .25rem;
+  }
+  .wl-section-header h3 { margin: 0; font-size: 1rem; font-weight: 600; color: var(--tblr-body-color); }
+  .wl-section-header h3 .count {
+    font-size: .75rem; color: var(--tblr-secondary); font-weight: 400; margin-left: .4rem;
+  }
+  .wl-row {
+    display: flex; gap: .75rem; overflow-x: auto; scroll-behavior: smooth;
+    padding: .25rem .25rem .75rem; scrollbar-width: thin;
+  }
+  .wl-row::-webkit-scrollbar { height: 6px; }
+  .wl-row::-webkit-scrollbar-thumb { background: var(--tblr-border-color); border-radius: 3px; }
+  .wl-skeleton-card {
+    flex: 0 0 150px; width: 150px; aspect-ratio: 2/3; border-radius: .5rem;
+    background: var(--tblr-bg-surface-secondary);
+    animation: wl-skeleton-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes wl-skeleton-pulse { 0%,100% { opacity:.55; } 50% { opacity:.85; } }
+  @media (prefers-reduced-motion: reduce) { .wl-skeleton-card { animation: none; } }
+  .wl-empty { padding: .5rem .25rem; color: var(--tblr-secondary); font-size: .85rem; }
+</style>
+
+<div class="container-xl">
+  {% if error %}
+    <div class="alert alert-warning">{{ 'watchlists.error.trakt'|trans }}</div>
+  {% endif %}
+
+  {# Same toolbar language as the Discover and Lists tabs. #}
+  <div class="tmdb-searchbar">
+    <div class="tmdb-search-wrap">
+      <svg class="tmdb-search-ico" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/>
+        <path d="M21 21l-6 -6"/>
+      </svg>
+      <input id="wl-search" type="search" class="tmdb-search-input"
+             placeholder="{{ 'watchlists.search.placeholder'|trans }}" autocomplete="off">
+      <kbd class="tmdb-search-kbd d-none d-md-inline">Trakt</kbd>
+    </div>
+    <div class="tmdb-action-btns">
+      <button type="button" class="tmdb-action-btn" id="wl-filters-toggle">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 4h18M7 12h10M11 20h2"/>
+        </svg>
+        {{ 'discover.filters.button'|trans }}
+        <span class="tmdb-filter-badge" id="wl-filter-count" style="display:none;">0</span>
+      </button>
+      {% if can_write %}
+        <button type="button" class="tmdb-action-btn" id="wl-import">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 5v14M5 12l7 7 7-7"/>
+          </svg>
+          {{ 'trakt.action.import'|trans }}
+        </button>
+      {% endif %}
+      <span class="text-secondary small" id="wl-count"></span>
+    </div>
+  </div>
+
+  {# Genre is absent for the same reason as the Lists tab: the row payloads
+     carry no genres, and fetching them would be one call per title. #}
+  <div id="wl-filters" class="card mb-3" style="display:none;">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label small mb-1">{{ 'discover.filters.type'|trans }}</label>
+          <div class="btn-group btn-group-sm" role="group">
+            <input type="radio" class="btn-check" name="wl-filter-type" id="wl-type-all" value="" checked>
+            <label class="btn btn-outline-primary btn-sm" for="wl-type-all">{{ 'discover.filters.all'|trans }}</label>
+            <input type="radio" class="btn-check" name="wl-filter-type" id="wl-type-movie" value="movie">
+            <label class="btn btn-outline-primary btn-sm" for="wl-type-movie">{{ 'discover.filters.movies'|trans }}</label>
+            <input type="radio" class="btn-check" name="wl-filter-type" id="wl-type-tv" value="tv">
+            <label class="btn btn-outline-primary btn-sm" for="wl-type-tv">{{ 'discover.filters.series'|trans }}</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-1" for="wl-year-min">{{ 'discover.filters.year_from'|trans }}</label>
+          <input type="number" class="form-control form-control-sm" id="wl-year-min" placeholder="1970" min="1900" max="2100" style="width:90px;">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-1" for="wl-year-max">{{ 'discover.filters.year_to'|trans }}</label>
+          <input type="number" class="form-control form-control-sm" id="wl-year-max" placeholder="2030" min="1900" max="2100" style="width:90px;">
+        </div>
+        <div class="col-auto" style="min-width:150px;">
+          <label class="form-label small mb-1" for="wl-vote-min">
+            {{ 'discover.filters.vote_min'|trans }} <span id="wl-vote-val" class="fw-medium">0</span>
+          </label>
+          <input type="range" class="form-range" id="wl-vote-min" min="0" max="10" step="0.5" value="0">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1" for="wl-sort">{{ 'discover.filters.sort'|trans }}</label>
+          <select class="form-select form-select-sm" id="wl-sort">
+            <option value="">{{ 'discover.filters.sort_options.default'|trans }}</option>
+            <option value="rating">{{ 'discover.filters.sort_options.rating'|trans }}</option>
+            <option value="year_desc">{{ 'discover.filters.sort_options.year_desc'|trans }}</option>
+            <option value="year_asc">{{ 'discover.filters.sort_options.year_asc'|trans }}</option>
+            <option value="title">{{ 'discover.filters.sort_options.title'|trans }}</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="button" class="btn btn-ghost-secondary btn-sm" id="wl-filter-reset">{{ 'discover.filters.reset'|trans }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="wl-rows">
+    {% for row in rows %}
+      <div class="wl-section" data-wl-row="{{ row.key }}"{% if row.lazy %} data-wl-ref="{{ row.ref }}"{% endif %}>
+        <div class="wl-section-header">
+          <h3>
+            {{ row.label }}
+            <span class="count" data-wl-count>{% if not row.lazy %}{{ row.items|length }}{% elseif row.count is defined %}{{ row.count }}{% endif %}</span>
+          </h3>
+        </div>
+        <div class="wl-row" data-wl-items{% if not row.lazy %} data-wl-loaded="1"{% endif %}>
+          {% if row.lazy %}
+            {% for i in 1..6 %}<div class="wl-skeleton-card" aria-hidden="true"></div>{% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {# Seeds for the two rows that arrive with their items. Read as data, never
+     executed: the shell's lazy loader skips non-executable script types. #}
+  <script type="application/json" id="wl-seed">{{ rows|filter(r => not r.lazy)|map(r => {key: r.key, items: r.items})|json_encode|raw }}</script>
+</div>
+
+<script>
+(function () {
+  var ITEMS_ROUTE = {{ path('trakt_list_items', {ref: '__REF__'})|json_encode|raw }};
+  var EMPTY_LABEL = {{ 'watchlists.row.empty'|trans|json_encode|raw }};
+  var COUNT_LABEL = {{ 'watchlists.count'|trans({count: '__N__'})|json_encode|raw }};
+
+  var root = document.querySelector('[data-dsc-pane="watchlists"]');
+  if (!root) return;
+
+  function render(container, items) {
+    container.innerHTML = items.length
+      ? items.map(window.renderCardHTML).join('')
+      : '<div class="wl-empty">' + EMPTY_LABEL + '</div>';
+    container.dataset.wlLoaded = '1';
+  }
+
+  // ── The two seeded rows ──────────────────────────────────────────────
+  var seedEl = document.getElementById('wl-seed');
+  var seeds  = seedEl ? JSON.parse(seedEl.textContent || '[]') : [];
+  seeds.forEach(function (seed) {
+    var section = root.querySelector('[data-wl-row="' + seed.key + '"]');
+    if (section) { render(section.querySelector('[data-wl-items]'), seed.items || []); }
+  });
+
+  // ── Lazy rows, one Trakt call each, fetched on scroll ────────────────
+  var lazy = Array.prototype.slice.call(root.querySelectorAll('[data-wl-ref]'));
+  function loadRow(section) {
+    var box = section.querySelector('[data-wl-items]');
+    if (!box || box.dataset.wlLoaded === '1' || box.dataset.wlLoading === '1') return;
+    box.dataset.wlLoading = '1';
+
+    fetch(ITEMS_ROUTE.replace('__REF__', encodeURIComponent(section.dataset.wlRef)),
+          { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        render(box, d.items || []);
+        var c = section.querySelector('[data-wl-count]');
+        if (c) { c.textContent = (d.items || []).length; }
+        applyFilters();
+        updateCount();
+      })
+      .catch(function () { render(box, []); })
+      .finally(function () { box.dataset.wlLoading = '0'; });
+  }
+
+  if (window.IntersectionObserver) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { loadRow(e.target); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '200px' });
+    lazy.forEach(function (s) { io.observe(s); });
+  } else {
+    lazy.forEach(loadRow);
+  }
+
+  // ── Search and filters ───────────────────────────────────────────────
+  var search    = document.getElementById('wl-search');
+  var filtPanel = document.getElementById('wl-filters');
+  var filtBtn   = document.getElementById('wl-filters-toggle');
+  var yearMin   = document.getElementById('wl-year-min');
+  var yearMax   = document.getElementById('wl-year-max');
+  var voteMin   = document.getElementById('wl-vote-min');
+  var voteVal   = document.getElementById('wl-vote-val');
+  var sortSel   = document.getElementById('wl-sort');
+  var filtCount = document.getElementById('wl-filter-count');
+  var countEl   = document.getElementById('wl-count');
+
+  filtBtn.addEventListener('click', function () {
+    var open = filtPanel.style.display !== 'none';
+    filtPanel.style.display = open ? 'none' : '';
+    filtBtn.classList.toggle('active', !open);
+  });
+
+  function cardYear(card) {
+    var el = card.querySelector('.card-year');
+    var y = el ? parseInt(el.textContent, 10) : NaN;
+    return isNaN(y) ? null : y;
+  }
+  function cardVote(card) {
+    var el = card.querySelector('.vote-badge');
+    if (!el) return null;
+    var v = parseFloat((el.textContent || '').replace(/[^0-9.]/g, ''));
+    return isNaN(v) ? null : v;
+  }
+
+  function currentFilters() {
+    var t = document.querySelector('input[name="wl-filter-type"]:checked');
+    return {
+      q: (search.value || '').trim().toLowerCase(),
+      type: t ? t.value : '',
+      yearMin: parseInt(yearMin.value, 10) || null,
+      yearMax: parseInt(yearMax.value, 10) || null,
+      voteMin: parseFloat(voteMin.value) || 0,
+      sort: sortSel.value
+    };
+  }
+
+  function matches(card, f) {
+    if (f.q && (card.dataset.tmdbTitle || '').toLowerCase().indexOf(f.q) === -1) return false;
+    if (f.type && card.dataset.tmdbType !== f.type) return false;
+    var y = cardYear(card);
+    if (f.yearMin && (y === null || y < f.yearMin)) return false;
+    if (f.yearMax && (y === null || y > f.yearMax)) return false;
+    if (f.voteMin > 0) {
+      var v = cardVote(card);
+      if (v === null || v < f.voteMin) return false;
+    }
+    return true;
+  }
+
+  function updateCount() {
+    var shown = root.querySelectorAll('.media-card:not([style*="display: none"])').length;
+    countEl.textContent = COUNT_LABEL.replace('__N__', shown);
+  }
+
+  function applyFilters() {
+    var f = currentFilters();
+    var n = 0;
+    if (f.type) n++;
+    if (f.yearMin) n++;
+    if (f.yearMax) n++;
+    if (f.voteMin > 0) n++;
+    if (f.sort) n++;
+    filtCount.textContent = n;
+    filtCount.style.display = n ? '' : 'none';
+
+    root.querySelectorAll('.media-card').forEach(function (card) {
+      card.style.display = matches(card, f) ? '' : 'none';
+    });
+
+    if (f.sort) {
+      root.querySelectorAll('[data-wl-items]').forEach(function (box) {
+        var cards = Array.prototype.slice.call(box.querySelectorAll('.media-card'));
+        cards.sort(function (a, b) {
+          if (f.sort === 'rating')    return (cardVote(b) || 0) - (cardVote(a) || 0);
+          if (f.sort === 'year_desc') return (cardYear(b) || 0) - (cardYear(a) || 0);
+          if (f.sort === 'year_asc')  return (cardYear(a) || 9999) - (cardYear(b) || 9999);
+          if (f.sort === 'title')     return (a.dataset.tmdbTitle || '').localeCompare(b.dataset.tmdbTitle || '');
+          return 0;
+        });
+        cards.forEach(function (c) { box.appendChild(c); });
+      });
+    }
+
+    // A row whose every card is filtered out would otherwise be a bare title.
+    root.querySelectorAll('[data-wl-row]').forEach(function (section) {
+      var any = Array.prototype.slice.call(section.querySelectorAll('.media-card'))
+        .some(function (c) { return c.style.display !== 'none'; });
+      var loaded = section.querySelector('[data-wl-items]').dataset.wlLoaded === '1';
+      section.style.display = (loaded && !any) ? 'none' : '';
+    });
+
+    updateCount();
+  }
+
+  var timer = null;
+  search.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(applyFilters, 200);
+  });
+  [yearMin, yearMax].forEach(function (el) { el.addEventListener('input', applyFilters); });
+  voteMin.addEventListener('input', function () { voteVal.textContent = voteMin.value; applyFilters(); });
+  sortSel.addEventListener('change', applyFilters);
+  document.querySelectorAll('input[name="wl-filter-type"]').forEach(function (el) {
+    el.addEventListener('change', applyFilters);
+  });
+  document.getElementById('wl-filter-reset').addEventListener('click', function () {
+    document.getElementById('wl-type-all').checked = true;
+    search.value = '';
+    yearMin.value = '';
+    yearMax.value = '';
+    voteMin.value = 0;
+    voteVal.textContent = '0';
+    sortSel.value = '';
+    applyFilters();
+  });
+
+  // ── Import the Trakt watchlist into the local one ────────────────────
+  var importBtn = document.getElementById('wl-import');
+  if (importBtn) {
+    importBtn.addEventListener('click', function () {
+      importBtn.disabled = true;
+      fetch({{ path('trakt_import')|json_encode|raw }}, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' }
+      })
+        .then(function (r) { return r.json(); })
+        .then(function () { window.location.reload(); })
+        .catch(function () { importBtn.disabled = false; });
+    });
+  }
+
+  updateCount();
+}());
+</script>
+</div>
