@@ -33,6 +33,12 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         // passes for the wrong reason: the entries are simply absent because
         // the services are unconfigured, not because they were collapsed.
         $em->persist(new Setting('trakt_client_id', 'test-client-id'));
+        // ServiceRouteGuardSubscriber's trakt_ rule requires BOTH keys. With
+        // only the client id, the guard treats Trakt as unconfigured and
+        // bounces every trakt_ route to settings before its own action runs,
+        // so testTheOldTraktUrlRedirectsIntoTheWatchlistsTab would be
+        // asserting a configured-Trakt behaviour without configuring Trakt.
+        $em->persist(new Setting('trakt_username', 'test-user'));
         $em->persist(new Setting('mdblist_api_key', 'test-key'));
         $em->flush();
     }
@@ -119,6 +125,35 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->client->request('GET', '/trakt');
 
         $this->assertResponseRedirects('/decouverte?tab=watchlists');
+    }
+
+    /**
+     * The other side of the redirect above. ServiceRouteGuardSubscriber owns
+     * trakt_ routes and bounces them to settings when Trakt is not configured,
+     * which happens BEFORE TraktController::index gets to redirect into the
+     * Watchlists tab. Both behaviours are correct; which one applies depends
+     * entirely on configuration, so pin both rather than leave the boundary
+     * implicit.
+     */
+    public function testTheOldTraktUrlGoesToSettingsWhenTraktIsUnconfigured(): void
+    {
+        $em = $this->em();
+        foreach (['trakt_client_id', 'trakt_username'] as $key) {
+            $row = $em->getRepository(Setting::class)->find($key);
+            if ($row !== null) {
+                $em->remove($row);
+            }
+        }
+        $em->flush();
+
+        $this->client->request('GET', '/trakt');
+
+        $this->assertResponseRedirects();
+        $this->assertStringNotContainsString(
+            'tab=watchlists',
+            (string) $this->client->getResponse()->headers->get('Location'),
+            'An unconfigured Trakt must be caught by the route guard, not land on the tab.',
+        );
     }
 
     public function testTheWatchlistsTabShipsRowsNotOneFlatGrid(): void
