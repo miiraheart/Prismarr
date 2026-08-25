@@ -912,6 +912,13 @@
     window.PrismarrWatchBadge.onReady(updateWatchStateChip);
   }
 
+  // Marking a title watched from the kebab updates the shared map. Redraw so
+  // the chip appears on the title already open, instead of only showing up
+  // after a reload.
+  document.addEventListener('prismarr:watch-state-changed', function () {
+    updateWatchStateChip();
+  });
+
   function renderDetail(d) {
     detailLoading.style.display = 'none';
     detailContent.style.display = '';
@@ -1830,6 +1837,22 @@
       if (mapsReady) { cb(); } else { readyCallbacks.push(cb); }
     },
     markWatched: function (type, id) {
+      // Record it in the map, not just on the cards on screen. stateFor()
+      // answers from this map and the detail modal's chip answers from
+      // stateFor(), so stamping cards alone left an open modal showing no
+      // watched state at all, and any card rendered afterwards came up
+      // unstamped too. Both stayed wrong until a full reload refetched
+      // /trakt/marks. The server side was already correct: markWatched()
+      // drops the cached watched set, so that refetch returns the new play.
+      if (watched) {
+        var key = type + ':' + id;
+        var seen = watched[key];
+        watched[key] = {
+          plays: seen && seen.plays ? seen.plays + 1 : 1,
+          last_watched_at: new Date().toISOString()
+        };
+      }
+
       document.querySelectorAll(
         '.media-card[data-tmdb-type="' + type + '"][data-tmdb-id="' + id + '"]'
       ).forEach(function (card) {
@@ -1844,6 +1867,12 @@
         badge.title = WATCHED_LABEL;
         card.appendChild(badge);
       });
+
+      // The modal lives in a separate script block, so tell it rather than
+      // reaching into it. It re-reads stateFor() and redraws its own chip.
+      document.dispatchEvent(new CustomEvent('prismarr:watch-state-changed', {
+        detail: { type: type, id: String(id) }
+      }));
     }
   };
 
