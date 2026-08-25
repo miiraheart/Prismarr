@@ -8,6 +8,8 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use ReflectionMethod;
+use ReflectionProperty;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Contracts\Cache\CacheInterface;
 
 /**
@@ -254,6 +256,82 @@ class TraktClientTest extends TestCase
     public function testMapListsReturnsEmptyArrayForEmptyInput(): void
     {
         $this->assertSame([], $this->mapLists($this->makeClient(), []));
+    }
+
+    /**
+     * A real pool rather than a mock: mergeRecentWrites() is guarded on
+     * CacheItemPoolInterface, and ArrayAdapter satisfies both that and the
+     * CacheInterface the constructor asks for.
+     */
+    private function makeClientWithPool(ArrayAdapter $pool, string $username = 'tester'): TraktClient
+    {
+        $client = new TraktClient($this->createMock(ConfigService::class), $pool, new NullLogger());
+
+        // Normally set by ensureConfig() from settings; the cache key is built
+        // from it, so it has to be present for the pool lookup to line up.
+        $p = new ReflectionProperty($client, 'username');
+        $p->setAccessible(true);
+        $p->setValue($client, $username);
+
+        return $client;
+    }
+
+    private function seedRecentWrites(ArrayAdapter $pool, array $writes, string $username = 'tester'): void
+    {
+        $item = $pool->getItem('prismarr_trakt_v2_' . sha1($username . '_recent_writes'));
+        $item->set($writes);
+        $pool->save($item);
+    }
+
+    private function mergeRecentWrites(TraktClient $client, array $map): array
+    {
+        $m = new ReflectionMethod($client, 'mergeRecentWrites');
+        $m->setAccessible(true);
+
+        return $m->invoke($client, $map);
+    }
+
+    /**
+     * Trakt's reads lag a write by minutes, so a title marked seconds ago is
+     * absent from the freshly fetched map. Without this overlay the rebuild
+     * caches that gap for a full TTL and the watched badge never appears.
+     */
+    public function testRecentWriteFillsAGapTraktHasNotCaughtUpWith(): void
+    {
+        $pool = new ArrayAdapter();
+        $this->seedRecentWrites($pool, ['movie:83533' => '2026-08-25T09:13:00.000Z']);
+
+        $merged = $this->mergeRecentWrites($this->makeClientWithPool($pool), [
+            'movie:19995' => ['plays' => 1, 'last_watched_at' => '2020-10-23T00:00:00.000Z'],
+        ]);
+
+        $this->assertArrayHasKey('movie:83533', $merged);
+        $this->assertSame(1, $merged['movie:83533']['plays']);
+        $this->assertSame('2026-08-25T09:13:00.000Z', $merged['movie:83533']['last_watched_at']);
+        $this->assertArrayHasKey('movie:19995', $merged, 'the fetched entries must survive');
+    }
+
+    /**
+     * Once Trakt has caught up it is the authority: it knows the real play
+     * count, which the optimistic overlay can only ever guess at.
+     */
+    public function testTraktEntryWinsOverARememberedWrite(): void
+    {
+        $pool = new ArrayAdapter();
+        $this->seedRecentWrites($pool, ['movie:83533' => '2026-08-25T09:13:00.000Z']);
+
+        $merged = $this->mergeRecentWrites($this->makeClientWithPool($pool), [
+            'movie:83533' => ['plays' => 4, 'last_watched_at' => '2026-08-25T09:13:00.000Z'],
+        ]);
+
+        $this->assertSame(4, $merged['movie:83533']['plays']);
+    }
+
+    public function testMergeIsAnIdentityWhenNothingWasRecentlyWritten(): void
+    {
+        $map = ['movie:19995' => ['plays' => 1, 'last_watched_at' => null]];
+
+        $this->assertSame($map, $this->mergeRecentWrites($this->makeClientWithPool(new ArrayAdapter()), $map));
     }
 
     /**

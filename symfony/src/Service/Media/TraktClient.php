@@ -26,6 +26,15 @@ class TraktClient implements ResetInterface
     private const PAGE_LIMIT  = 100;
     private const MAX_PAGES   = 50;
     private const TTL_LIST    = 900;
+    // Trakt's read endpoints lag a write by minutes, so dropping the cached
+    // watched map after a mark is not enough on its own: the next request
+    // rebuilds it from a list that does not yet contain what was just marked
+    // and pins that for a full TTL_LIST. Measured 2026-08-25, a title marked
+    // at 09:13 was still absent from the map at 09:42. Writes are remembered
+    // separately for this long and merged over the fetched map, covering the
+    // lag window without shortening TTL_LIST: a rebuild costs seven pages of
+    // movies plus the shows.
+    private const TTL_RECENT_WRITE = 1800;
     // Playback state changes while Mira is actively watching, so it gets a
     // much shorter TTL than the other reads: 15 minutes on a "currently
     // watching" badge would leave it stuck at a stale percentage.
@@ -162,7 +171,7 @@ class TraktClient implements ResetInterface
                 }
             }
 
-            return $out;
+            return $this->mergeRecentWrites($out);
         });
     }
 
@@ -822,6 +831,7 @@ class TraktClient implements ResetInterface
             $this->logger->info('Trakt history add matched nothing new', ['tmdb_id' => $tmdbId]);
         }
 
+        $this->rememberRecentWrite($type === 'movie' ? 'movie' : 'tv', $tmdbId);
         $this->forgetCached('watched');
 
         return true;
@@ -1030,6 +1040,65 @@ class TraktClient implements ResetInterface
      * CacheInterface has no delete(); the app pool also implements the PSR-6
      * pool, so downcast when it does and simply wait out the TTL when it does not.
      */
+    /**
+     * Note that a title was just marked watched, so the next rebuild of the
+     * watched map can include it even while Trakt's own reads still lag.
+     */
+    private function rememberRecentWrite(string $type, int $tmdbId): void
+    {
+        if (!$this->cache instanceof CacheItemPoolInterface || $this->username === '') {
+            return;
+        }
+
+        $item   = $this->cache->getItem($this->cacheKey('recent_writes'));
+        $recent = $item->isHit() && is_array($item->get()) ? $item->get() : [];
+
+        $recent[$type . ':' . $tmdbId] = gmdate('Y-m-d\\TH:i:s.000\\Z');
+
+        // expiresAfter is mandatory here: an item saved without one is stored
+        // with no expiry at all, which would pin these forever.
+        $item->set($recent);
+        $item->expiresAfter(self::TTL_RECENT_WRITE);
+        $this->cache->save($item);
+    }
+
+    /**
+     * Overlay remembered writes on a freshly fetched watched map. Only fills
+     * gaps: whatever Trakt returns wins, since it carries the real play count
+     * once the write has propagated.
+     *
+     * @param  array<string, array{plays:int, last_watched_at:?string}> $map
+     * @return array<string, array{plays:int, last_watched_at:?string}>
+     */
+    private function mergeRecentWrites(array $map): array
+    {
+        if (!$this->cache instanceof CacheItemPoolInterface || $this->username === '') {
+            return $map;
+        }
+
+        $item = $this->cache->getItem($this->cacheKey('recent_writes'));
+        if (!$item->isHit() || !is_array($item->get())) {
+            return $map;
+        }
+
+        foreach ($item->get() as $key => $at) {
+            if (!isset($map[$key])) {
+                $map[$key] = ['plays' => 1, 'last_watched_at' => is_string($at) ? $at : null];
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * The one place the cache key shape is defined, so a reader and a writer
+     * of the same logical entry cannot drift apart.
+     */
+    private function cacheKey(string $key): string
+    {
+        return 'prismarr_trakt_v2_' . sha1($this->username . '_' . $key);
+    }
+
     private function forgetCached(string $key): void
     {
         if ($this->cache instanceof CacheItemPoolInterface && $this->username !== '') {
