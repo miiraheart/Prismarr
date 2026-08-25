@@ -1457,6 +1457,8 @@
   </div>
 
   {% include '_quicklook.html.twig' with {} only %}
+  {# Fork owned: paints the watchlist star for Trakt membership too. #}
+  {% include 'discover/_watchlist_star_state.html.twig' %}
 
   <script src="{{ asset('static/tabler/js/tabler.min.js') }}"></script>
 

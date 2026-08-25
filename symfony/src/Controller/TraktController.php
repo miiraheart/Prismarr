@@ -190,6 +190,36 @@ class TraktController extends AbstractController
     }
 
     /**
+     * The Trakt watchlist as a {type}_{tmdbId} index, deliberately the same
+     * shape TmdbController::watchlistStatus() returns for the LOCAL watchlist,
+     * so a card script can merge the two without caring which list a title
+     * came from.
+     *
+     * It lives here rather than beside the local one because that controller
+     * is byte identical to upstream and this fork keeps it that way.
+     */
+    #[Route('/watchlist/index', name: 'watchlist_index', methods: ['GET'])]
+    public function watchlistIndex(): JsonResponse
+    {
+        try {
+            // getWatchlist() already guarantees a positive int tmdb_id and a
+            // non-null type, so no null-coalescing here: PHPStan flags those
+            // fallbacks as unreachable against the declared return shape.
+            $index = [];
+            foreach ($this->trakt->getWatchlist() as $row) {
+                $index[($row['type'] === 'movie' ? 'movie' : 'tv') . '_' . $row['tmdb_id']] = true;
+            }
+
+            return $this->json(['index' => $index]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Trakt watchlist index failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+
+            // An empty index just means no gold rings, never a broken grid.
+            return $this->json(['index' => []]);
+        }
+    }
+
+    /**
      * Titles currently mid-watch, keyed "{type}:{tmdb_id}", so a media card
      * anywhere in the app (Decouverte, Lists, this page) can stamp a
      * "watching" badge on it. Cached 5 minutes in TraktClient, shorter than

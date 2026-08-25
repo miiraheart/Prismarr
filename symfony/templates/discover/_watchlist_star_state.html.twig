@@ -1,0 +1,111 @@
+{# Watchlist star state, fork owned.
+
+   The card star is written by code this fork must not touch: the grids in
+   decouverte/explorer.html.twig are byte identical to upstream, and so is the
+   endpoint feeding them (TmdbController::watchlistStatus), which knows only
+   about the LOCAL watchlist. The Trakt half is added here instead, and this
+   partial is included once from base.html.twig so the same three states reach
+   every page that renders a card:
+
+     solid gold  in the local watchlist, clicking removes it
+     gold ring   on the Trakt watchlist only, clicking adds it locally as well
+     grey ring   on neither list
+
+   Local membership already rides in window._prismarrWatchlist, populated by
+   _quicklook.html.twig. Nothing here writes to that map, it only reads it, so
+   the upstream toggle stays the single owner of local state. #}
+<style>
+  /* These beat the inline stroke and fill presentation attributes the upstream
+     star markup carries, because a CSS declaration always outranks a
+     presentation attribute. That is what makes a third state reachable without
+     editing the code that writes the star. */
+  .wl-star svg { stroke: rgba(255,255,255,.45); fill: none; }
+  .wl-star.in-trakt-wl svg { stroke: #f59e0b; fill: none; }
+  .wl-star.in-wl svg { stroke: #f59e0b; fill: #f59e0b; }
+</style>
+<script>
+(function () {
+  var INDEX_URL = {{ path('trakt_watchlist_index')|json_encode|raw }};
+
+  var traktIndex = null;
+  var observed   = null;
+
+  function cardKey(card) {
+    var t = card.dataset.tmdbType;
+    var i = card.dataset.tmdbId;
+
+    return (t && i) ? t + '_' + i : null;
+  }
+
+  // Only ever ADDS the Trakt ring. The solid state belongs to the local
+  // toggle, which owns window._prismarrWatchlist and repaints itself, so a
+  // title on both lists has to keep reading as local.
+  function paint(card) {
+    if (!traktIndex) { return; }
+
+    var star = card.querySelector('.wl-star');
+    var key  = cardKey(card);
+    if (!star || !key) { return; }
+
+    var local = !!(window._prismarrWatchlist && window._prismarrWatchlist[key]);
+    star.classList.toggle('in-trakt-wl', !!traktIndex[key] && !local);
+  }
+
+  function paintAll(scope) {
+    (scope || document).querySelectorAll('.media-card[data-tmdb-id]').forEach(paint);
+  }
+
+  // Cards arrive late all over this app: lazy rows, search results, tab panes
+  // fetched on first click. Same approach the watch badge script uses, including
+  // the guard against attaching a second observer to the same body.
+  function watchForNewCards() {
+    if (observed === document.body) { return; }
+    observed = document.body;
+
+    new MutationObserver(function (records) {
+      if (!traktIndex) { return; }
+      records.forEach(function (record) {
+        record.addedNodes.forEach(function (node) {
+          if (node.nodeType !== 1) { return; }
+          if (node.matches && node.matches('.media-card[data-tmdb-id]')) { paint(node); }
+          if (node.querySelectorAll) { paintAll(node); }
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+
+  function init() {
+    watchForNewCards();
+
+    if (traktIndex) { paintAll(); return; }
+
+    fetch(INDEX_URL, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : { index: {} }; })
+      .then(function (d) {
+        traktIndex = d.index || {};
+        paintAll();
+
+        // The local map may still be in flight. Repaint once it settles, or a
+        // title on both lists is left wearing the Trakt ring.
+        if (window._prismarrWatchlistReady && window._prismarrWatchlistReady.then) {
+          window._prismarrWatchlistReady.then(function () { paintAll(); });
+        }
+      })
+      .catch(function () { traktIndex = {}; });
+  }
+
+  // A local toggle moves a star between states, so repaint after one. Capture
+  // phase because the upstream handler emits nothing this could listen for,
+  // and delayed because the local map is only updated once its POST answers.
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('.wl-star')) { setTimeout(paintAll, 400); }
+  }, true);
+
+  document.addEventListener('turbo:load', init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+}());
+</script>
