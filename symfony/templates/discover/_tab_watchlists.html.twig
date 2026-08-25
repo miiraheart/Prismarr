@@ -154,9 +154,34 @@
   var root = document.querySelector('[data-dsc-pane="watchlists"]');
   if (!root) return;
 
+  // Every row here, local and Trakt alike, arrives in the shared row shape,
+  // which names the TMDb id tmdb_id and the Trakt score community_rating.
+  // renderCardHTML reads item.id and item.vote, so passing a row straight
+  // through stamped data-tmdb-id="undefined" on every card in the tab.
+  //
+  // The local row hid that, because its poster and vote are filled in
+  // server-side and it never needed the id to look right. The Trakt rows had
+  // no such cover: hydrate() read the attribute back, produced NaN, and POSTed
+  // {"type":"tv","id":null} once per card, which metaBatch correctly skipped,
+  // so 54 cards sat on placeholders while the endpoint returned a healthy 200.
+  // The same broken id also reached the watchlist star, Add and the kebab.
+  function toCard(row) {
+    return {
+      id:         row.id != null ? row.id : row.tmdb_id,
+      type:       row.type,
+      title:      row.title,
+      year:       row.year,
+      poster:     row.poster || null,
+      vote:       row.vote != null ? row.vote : row.community_rating,
+      in_library: !!row.in_library,
+      lib_status: row.lib_status || null,
+      lib_id:     row.lib_id || null,
+    };
+  }
+
   function render(container, items) {
     container.innerHTML = items.length
-      ? items.map(window.renderCardHTML).join('')
+      ? items.map(toCard).map(function (c) { return window.renderCardHTML(c); }).join('')
       : '<div class="wl-empty">' + EMPTY_LABEL + '</div>';
     container.dataset.wlLoaded = '1';
     hydrate(container);
@@ -173,9 +198,17 @@
       .filter(function (c) { return !c.querySelector('img'); });
     if (!cards.length) return;
 
+    // Drop unusable ids rather than shipping them. parseInt of a missing
+    // attribute yields NaN, JSON.stringify turns that into null, and the
+    // endpoint then skips every entry and answers {} with a 200, which reads
+    // as success everywhere. Filtering here keeps a shape regression visible
+    // as a request that never fires instead of one that silently no-ops.
     var want = cards.map(function (c) {
       return { type: c.dataset.tmdbType, id: parseInt(c.dataset.tmdbId, 10) };
+    }).filter(function (w) {
+      return (w.type === 'movie' || w.type === 'tv') && Number.isFinite(w.id) && w.id > 0;
     });
+    if (!want.length) { return; }
 
     fetch(META_BATCH, {
       method: 'POST',
