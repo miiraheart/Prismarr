@@ -1,19 +1,23 @@
-{# Watchlist star state, fork owned.
+{# Watchlist star: state painting AND the click fallback. Fork owned.
 
-   The card star is written by code this fork must not touch: the grids in
-   decouverte/explorer.html.twig are byte identical to upstream, and so is the
-   endpoint feeding them (TmdbController::watchlistStatus), which knows only
-   about the LOCAL watchlist. The Trakt half is added here instead, and this
-   partial is included once from base.html.twig so the same three states reach
-   every page that renders a card:
+   Two jobs, both here because the code that renders the star cannot carry
+   either. The grids in decouverte/explorer.html.twig and the endpoint feeding
+   them (TmdbController::watchlistStatus) are byte identical to upstream, so
+   this is included once from base.html.twig instead and reaches every page.
 
-     solid gold  in the local watchlist, clicking removes it
-     gold ring   on the Trakt watchlist only, clicking adds it locally as well
-     grey ring   on neither list
+   1. THREE STATES, rather than the upstream two:
+        solid gold  in the local watchlist, clicking removes it
+        gold ring   on the Trakt watchlist only, clicking adds it locally
+        grey ring   on neither list
 
-   Local membership already rides in window._prismarrWatchlist, populated by
-   _quicklook.html.twig. Nothing here writes to that map, it only reads it, so
-   the upstream toggle stays the single owner of local state. #}
+   2. THE CLICK. The toggle handler was only ever bound inside the Discover
+      pane (_tab_discover.html.twig) and decouverte/index.html.twig. The Lists
+      and Watchlists panes render the same star with no handler at all, so it
+      had always been inert there; painting it simply made that visible. This
+      binds a fallback that runs only when nothing else handled the click.
+
+   Local membership rides in window._prismarrWatchlist, populated by
+   _quicklook.html.twig; this reads it and, on a toggle it owns, updates it. #}
 <style>
   /* These beat the inline stroke and fill presentation attributes the upstream
      star markup carries, because a CSS declaration always outranks a
@@ -25,7 +29,13 @@
 </style>
 <script>
 (function () {
-  var INDEX_URL = {{ path('trakt_watchlist_index')|json_encode|raw }};
+  var INDEX_URL  = {{ path('trakt_watchlist_index')|json_encode|raw }};
+  var TOGGLE_URL = '/decouverte/watchlist/toggle';
+  var I18N = {
+    added:   {{ 'decouverte.watchlist.added_toast'|trans|json_encode|raw }},
+    removed: {{ 'decouverte.watchlist.removed_toast'|trans|json_encode|raw }},
+    failed:  {{ 'decouverte.modal.network_error'|trans|json_encode|raw }}
+  };
 
   var traktIndex = null;
   var observed   = null;
@@ -37,8 +47,7 @@
     return (t && i) ? t + '_' + i : null;
   }
 
-  // Only ever ADDS the Trakt ring. The solid state belongs to the local
-  // toggle, which owns window._prismarrWatchlist and repaints itself, so a
+  // Only ever ADDS the Trakt ring. Solid is owned by local membership, so a
   // title on both lists has to keep reading as local.
   function paint(card) {
     if (!traktIndex) { return; }
@@ -55,9 +64,79 @@
     (scope || document).querySelectorAll('.media-card[data-tmdb-id]').forEach(paint);
   }
 
+  // Repaint every star for one title, wherever it appears: the same film can
+  // sit in several rows at once, and they must not disagree after a toggle.
+  function syncStar(type, tmdbId, inLocal) {
+    document.querySelectorAll(
+      '.wl-star[data-tmdb-type="' + type + '"][data-tmdb-id="' + tmdbId + '"]'
+    ).forEach(function (star) {
+      star.classList.toggle('in-wl', inLocal);
+      var svg = star.querySelector('svg');
+      if (svg) { svg.setAttribute('fill', inLocal ? '#f59e0b' : 'none'); }
+    });
+    paintAll();
+  }
+
+  function toast(message, level) {
+    if (window._prismarrToast) { window._prismarrToast(message, level); }
+  }
+
+  // The poster path the local watchlist stores is the TMDb path, not the full
+  // URL, so recover it from whatever the card is displaying.
+  function posterPathOf(card) {
+    var img = card ? card.querySelector('img') : null;
+    var m   = (img && img.src) ? img.src.match(/\/t\/p\/\w+(\/.+)$/) : null;
+
+    return m ? m[1] : null;
+  }
+
+  function toggleLocal(star) {
+    var card = star.closest('.media-card[data-tmdb-id]');
+    if (!card) { return; }
+
+    var type   = star.dataset.tmdbType;
+    var tmdbId = star.dataset.tmdbId;
+    var key    = type + '_' + tmdbId;
+    if (!type || !tmdbId) { return; }
+
+    window._prismarrWatchlist = window._prismarrWatchlist || {};
+    var wasIn   = !!window._prismarrWatchlist[key];
+    var willAdd = !wasIn;
+
+    // Optimistic, then reconciled against what the server actually did.
+    if (willAdd) { window._prismarrWatchlist[key] = true; } else { delete window._prismarrWatchlist[key]; }
+    syncStar(type, tmdbId, willAdd);
+
+    fetch(TOGGLE_URL, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tmdb_id: parseInt(tmdbId, 10),
+        type: type,
+        title: card.dataset.tmdbTitle || '',
+        poster_path: posterPathOf(card),
+        vote: card.dataset.tmdbVote ? parseFloat(card.dataset.tmdbVote) : null,
+        year: card.dataset.tmdbYear ? parseInt(card.dataset.tmdbYear, 10) : null
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var added = d.action === 'added';
+        if (added) { window._prismarrWatchlist[key] = true; } else { delete window._prismarrWatchlist[key]; }
+        if (added !== willAdd) { syncStar(type, tmdbId, added); }
+        toast(added ? I18N.added : I18N.removed, added ? 'success' : 'info');
+      })
+      .catch(function () {
+        if (wasIn) { window._prismarrWatchlist[key] = true; } else { delete window._prismarrWatchlist[key]; }
+        syncStar(type, tmdbId, wasIn);
+        toast(I18N.failed, 'danger');
+      });
+  }
+
   // Cards arrive late all over this app: lazy rows, search results, tab panes
-  // fetched on first click. Same approach the watch badge script uses, including
-  // the guard against attaching a second observer to the same body.
+  // fetched on first click. Same approach the watch badge script uses, guard
+  // against a second observer included.
   function watchForNewCards() {
     if (observed === document.body) { return; }
     observed = document.body;
@@ -74,9 +153,7 @@
     }).observe(document.body, { childList: true, subtree: true });
   }
 
-  function init() {
-    watchForNewCards();
-
+  function loadTraktIndex() {
     if (traktIndex) { paintAll(); return; }
 
     fetch(INDEX_URL, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
@@ -94,12 +171,30 @@
       .catch(function () { traktIndex = {}; });
   }
 
-  // A local toggle moves a star between states, so repaint after one. Capture
-  // phase because the upstream handler emits nothing this could listen for,
-  // and delayed because the local map is only updated once its POST answers.
-  document.addEventListener('click', function (e) {
-    if (e.target.closest && e.target.closest('.wl-star')) { setTimeout(paintAll, 400); }
-  }, true);
+  function init() {
+    watchForNewCards();
+    loadTraktIndex();
+  }
+
+  // Bound on load, deliberately, so this listener is registered AFTER the
+  // inline pane scripts and therefore runs after them. Both existing handlers
+  // (_tab_discover.html.twig and decouverte/index.html.twig) call
+  // preventDefault, so defaultPrevented is a reliable "somebody already did
+  // this" signal and stops the click being applied twice, which would toggle
+  // out and back and look like nothing happened.
+  window.addEventListener('load', function () {
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented) { return; }
+      if (!e.target.closest) { return; }
+
+      var star = e.target.closest('.wl-star');
+      if (!star || !star.closest('.media-card[data-tmdb-id]')) { return; }
+
+      e.stopPropagation();
+      e.preventDefault();
+      toggleLocal(star);
+    });
+  });
 
   document.addEventListener('turbo:load', init);
   if (document.readyState === 'loading') {
