@@ -32,7 +32,7 @@
         "symfony/twig-bundle": "8.0.*",
         "symfony/ux-turbo": "^2.35",
         "symfony/validator": "8.0.*",
-        "symfony/yaml": "8.0.*"
+        "symfony/yaml": "8.1.*"
     },
     "config": {
         "allow-plugins": {
