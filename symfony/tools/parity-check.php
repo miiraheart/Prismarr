@@ -41,7 +41,7 @@ $listFromMapKeys = static function (?string $body, string $regex): array {
 
 $health = $read('src/Service/HealthService.php');
 $twig   = $read('src/Twig/ConfigExtension.php');
-$admin  = $read('src/Controller/AdminSettingsController.php');
+$catalog = $read('src/Service/HealthCatalog.php');
 
 /**
  * One entry per discovery pattern, never a merge of two. A merged registry
@@ -55,8 +55,10 @@ $registries = [
         $listFromMapKeys($twig, '/SERVICE_KEYS\s*=\s*\[(?P<body>.*?)\n    \];/s'),
     'ConfigExtension::INSTANCE_TYPES' =>
         $listFromMapKeys($twig, '/INSTANCE_TYPES\s*=\s*\[(?P<body>.*?)\n    \];/s'),
-    'AdminSettingsController::$allowed' =>
-        $listFromArray($admin, '/\$allowed\s*=\s*\[(?P<body>[^\]]*)\]/'),
+    // AdminSettingsController::$allowed is built from TOGGLEABLE_SERVICES since
+    // upstream 1.3.0, so it is no longer a registry of its own.
+    'HealthCatalog::FLAT_SERVICES' =>
+        $listFromMapKeys($catalog, '/FLAT_SERVICES\s*=\s*\[(?P<body>.*?)\n    \];/s'),
     'Service/Media/*Client.php' => (static function () use ($root): array {
         // Two explicit globs rather than GLOB_BRACE, which is only defined on
         // platforms whose libc provides it and would fatal where it is not.
@@ -107,12 +109,12 @@ $sites = [
     'client'        => ['kind' => 'file',   'path' => 'src/Service/Media/{Class}Client.php'],
     'templates'     => ['kind' => 'dir',    'path' => 'templates/{slug}'],
     'health'        => ['kind' => 'needle', 'path' => 'src/Service/HealthService.php'],
-    'health_api'    => ['kind' => 'needle', 'path' => 'src/Controller/HealthController.php'],
+    // HealthController iterates HealthCatalog::FLAT_SERVICES since upstream 1.3.0.
+    'health_api'    => ['kind' => 'needle', 'path' => 'src/Service/HealthCatalog.php'],
     'health_cache'  => ['kind' => 'needle', 'path' => 'src/Service/Media/ServiceHealthCache.php'],
     'health_widget' => ['kind' => 'needle', 'path' => 'templates/dashboard/_health.html.twig'],
     'admin_ctrl'    => ['kind' => 'needle', 'path' => 'src/Controller/AdminSettingsController.php'],
     'admin_page'    => ['kind' => 'needle', 'path' => 'templates/admin/settings.html.twig'],
-    'setup'         => ['kind' => 'needle', 'path' => 'src/Controller/SetupController.php'],
     'twig_config'   => ['kind' => 'needle', 'path' => 'src/Twig/ConfigExtension.php'],
     'route_guard'   => ['kind' => 'needle', 'path' => 'src/EventSubscriber/ServiceRouteGuardSubscriber.php'],
     'sidebar'       => ['kind' => 'needle', 'path' => 'templates/base.html.twig'],

@@ -13,6 +13,7 @@ use App\Service\Media\RadarrClient;
 use App\Service\Media\SonarrClient;
 use App\Service\Media\TautulliClient;
 use App\Service\Media\TmdbClient;
+use App\Service\Media\TransmissionClient;
 use App\Service\ServiceInstanceProvider;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
@@ -54,6 +55,85 @@ class DashboardControllerTest extends TestCase
         $container->method('has')->willReturn(true);
         $container->method('get')->willReturnCallback(fn(string $id) => $id === 'router' ? $router : null);
         $c->setContainer($container);
+    }
+
+    /**
+     * Construction helper: threads radarr/sonarr, libraryCache and the
+     * enabled-instance provider through named parameters; every other
+     * argument falls back to whatever the
+     * neighbouring positional constructions above already pass. Defaults
+     * $instances to one enabled Radarr instance (radarr-1) so a test that
+     * only cares about the shared library cache doesn't have to restate the
+     * fan-out wiring every time.
+     */
+    private function makeController(
+        ?HealthService $health = null,
+        ?RadarrClient $radarr = null,
+        ?SonarrClient $sonarr = null,
+        ?JellyseerrClient $jellyseerr = null,
+        ?TmdbClient $tmdb = null,
+        ?WatchlistItemRepository $watchlistRepo = null,
+        ?ServiceInstanceProvider $instances = null,
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?TranslatorInterface $translator = null,
+        ?CacheInterface $cache = null,
+        ?TautulliClient $tautulli = null,
+        ?\App\Service\DashboardLayoutService $layout = null,
+        ?\App\Service\Media\MediaLibraryCache $libraryCache = null,
+    ): DashboardController {
+        if ($instances === null) {
+            $instances = $this->createMock(ServiceInstanceProvider::class);
+            $instances->method('getEnabled')->willReturnCallback(
+                fn(string $type): array => $type === ServiceInstance::TYPE_RADARR
+                    ? [$this->instance('radarr-1', 'Radarr')] : []
+            );
+        }
+
+        $controller = new DashboardController(
+            $health ?? $this->createMock(HealthService::class),
+            $radarr ?? $this->createMock(RadarrClient::class),
+            $sonarr ?? $this->createMock(SonarrClient::class),
+            $jellyseerr ?? $this->createMock(JellyseerrClient::class),
+            $tmdb ?? $this->createMock(TmdbClient::class),
+            $watchlistRepo ?? $this->createMock(WatchlistItemRepository::class),
+            $instances,
+            $logger ?? new NullLogger(),
+            $translator ?? $this->createMock(TranslatorInterface::class),
+            $cache ?? $this->createMock(CacheInterface::class),
+            $tautulli ?? $this->createMock(TautulliClient::class),
+            $layout ?? new \App\Service\DashboardLayoutService($this->createMock(\App\Service\ConfigService::class)),
+            libraryCache: $libraryCache,
+        );
+        $this->attachRouter($controller);
+
+        return $controller;
+    }
+
+    public function testDashboardMoviesComeFromTheSharedLibraryCacheAndStayInstanceTagged(): void
+    {
+        $pool = new \Symfony\Component\Cache\Adapter\ArrayAdapter();
+        $bus  = new class implements \Symfony\Component\Messenger\MessageBusInterface {
+            public function dispatch(object $message, array $stamps = []): \Symfony\Component\Messenger\Envelope
+            {
+                return new \Symfony\Component\Messenger\Envelope($message);
+            }
+        };
+        $swr     = new \App\Service\Cache\StaleWhileRevalidateCache($pool, $pool, $bus, new \Psr\Log\NullLogger());
+        $library = new \App\Service\Media\MediaLibraryCache($swr);
+
+        // Pre-warm the SHARED per-slug entry the Films page also reads.
+        $swr->write('media.movies.radarr-1', [['id' => 42, 'title' => 'X', 'fanart' => 'f']], \App\Service\Media\MediaLibraryCache::HARD_TTL);
+
+        $radarr = $this->createMock(\App\Service\Media\RadarrClient::class);
+        $radarr->expects($this->never())->method('getMovies'); // warm shared entry ⇒ no upstream call
+
+        $controller = $this->makeController(radarr: $radarr, libraryCache: $library);
+
+        $rows = (new \ReflectionMethod($controller, 'movies'))->invoke($controller);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(42, $rows[0]['id']);
+        $this->assertSame('radarr-1', $rows[0]['_instanceSlug'], 'dashboard rows must stay instance-tagged');
     }
 
     public function testQuickLookLibraryBuildsMovieViewModel(): void
@@ -151,6 +231,64 @@ class DashboardControllerTest extends TestCase
         // Unknown id, instance lookup returns null → null view-model.
         $instances->method('getBySlug')->willReturn(null);
         self::assertNull($m->invoke($controller, 'series', 'sonarr-1', 999));
+    }
+
+    public function testTransmissionWidgetIsEmptyWhenUnconfiguredOrClientMissing(): void
+    {
+        $health = $this->createMock(HealthService::class);
+        $health->method('isConfigured')->willReturnCallback(fn(string $s) => $s !== 'transmission');
+
+        $trs = $this->createMock(TransmissionClient::class);
+        $trs->expects(self::never())->method('getTorrents');
+
+        $build = fn(?TransmissionClient $client) => new DashboardController(
+            $health,
+            $this->createMock(RadarrClient::class),
+            $this->createMock(SonarrClient::class),
+            $this->createMock(JellyseerrClient::class),
+            $this->createMock(TmdbClient::class),
+            $this->createMock(WatchlistItemRepository::class),
+            $this->createMock(ServiceInstanceProvider::class),
+            new NullLogger(),
+            $this->createMock(TranslatorInterface::class),
+            $this->createMock(CacheInterface::class),
+            $this->createMock(TautulliClient::class), new DashboardLayoutService($this->createMock(ConfigService::class)),
+            transmission: $client,
+        );
+
+        // Empty body → the card hides itself client-side.
+        self::assertSame('', $build($trs)->widgetTransmission()->getContent());
+        self::assertSame('', $build(null)->widgetTransmission()->getContent());
+    }
+
+    /** Every HealthCatalog service gets a chip once configured — no hardcoded subset. */
+    public function testServicesHealthCoversEveryCatalogService(): void
+    {
+        $health = $this->createMock(HealthService::class);
+        $health->method('statusFor')->willReturn(['status' => 'up', 'latencyMs' => 5]);
+
+        $instances = $this->createMock(ServiceInstanceProvider::class);
+        $instances->method('getEnabled')->willReturn([]);
+
+        $controller = new DashboardController(
+            $health,
+            $this->createMock(RadarrClient::class),
+            $this->createMock(SonarrClient::class),
+            $this->createMock(JellyseerrClient::class),
+            $this->createMock(TmdbClient::class),
+            $this->createMock(WatchlistItemRepository::class),
+            $instances,
+            new NullLogger(),
+            $this->createMock(TranslatorInterface::class),
+            $this->createMock(CacheInterface::class),
+            $this->createMock(TautulliClient::class), new DashboardLayoutService($this->createMock(ConfigService::class)),
+        );
+
+        $m = new ReflectionMethod(DashboardController::class, 'servicesHealth');
+        $chips = $m->invoke($controller);
+
+        self::assertSame(array_keys(\App\Service\HealthCatalog::FLAT_SERVICES), array_column($chips, 'id'));
+        self::assertSame(array_values(\App\Service\HealthCatalog::FLAT_SERVICES), array_column($chips, 'name'));
     }
 
     public function testServicesHealthExpandsOneChipPerInstance(): void

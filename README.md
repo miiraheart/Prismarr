@@ -48,7 +48,7 @@
 
 <p align="center">
   <img src="docs/screenshots/dashboard.png" width="49%" alt="Dashboard">
-  <img src="docs/screenshots/discover.png" width="49%" alt="Discover">
+  <img src="docs/screenshots/discover.png" width="49%" alt="Search">
 </p>
 <p align="center">
   <img src="docs/screenshots/calendar.png" width="49%" alt="Calendar">
@@ -68,9 +68,9 @@
 
 ## About
 
-**Prismarr** brings qBittorrent, Radarr, Sonarr, Prowlarr, Seerr and
-TMDb together in a single modern Symfony interface. No more juggling six
-tabs to manage your library.
+**Prismarr** brings Radarr, Sonarr, Prowlarr, Seerr, your download
+clients and TMDb together in a single modern Symfony interface. No more
+juggling tabs to manage your library.
 
 It's not a replacement for Radarr or Sonarr - those run side by side and
 keep doing what they do best. Prismarr is the unified control surface:
@@ -81,9 +81,9 @@ and one settings page where every API key lives - never on disk in plain
 text and never in environment variables.
 
 The whole thing ships as a single Docker container with SQLite inside.
-First boot opens a 7-step wizard: create the admin, plug your services in,
-done. No external database, no Redis, no per-service `.env` files. Pull
-the image, mount one volume, you're up.
+First boot asks for a language and an admin account, then drops you on the
+Services settings to plug your services in. No external database, no Redis,
+no per-service `.env` files. Pull the image, mount one volume, you're up.
 
 ---
 
@@ -112,9 +112,12 @@ queued for later.
 - **Movies & Series:** Radarr and Sonarr libraries with five view modes, **multiple instances side by side** (1080p / 4K / Anime, each first-class in the UI), global `Ctrl+K` search and a quick-add modal with a per-instance target picker.
 - **Unified calendar:** movie and episode releases merged across instances, deduped by `tmdbId` / `tvdbId`, with month / week / day views and iCal export.
 - **Dashboard:** hero spotlight, upcoming releases, pending Seerr requests, live service health, watchlist, trending and latest additions. Paints instantly, each widget hydrates on its own.
-- **Downloads:** full qBittorrent dashboard (server-side pagination, sorting, filters, drag-and-drop upload) plus dedicated SABnzbd and NZBGet pages. Optional Gluetun integration.
-- **Discovery:** TMDb landing page with recommendations and trending, watchlist, an explorer with filters, and deep-links into your library.
+- **Downloads:** full qBittorrent dashboard (server-side pagination, sorting, filters, drag-and-drop upload), Deluge and Transmission pages, and dedicated SABnzbd and NZBGet pages, plus an optional Transmission dashboard widget. Optional Gluetun integration.
+- **Search:** one box for movies, series and people, typo-tolerant with a Google-style "did you mean", inline filters (type, genre, rating, sort, hide what you have), a large best-match card and each result's library status. With the box empty: trending movie and series banners, recommendations from your library, trending rows, plus the watchlist and an explorer.
 - **Plex activity (Tautulli):** optional read-only page (now playing, watch stats, graphs, history) plus a "Current Plex activity" dashboard widget. The API key stays server-side and responses are sanitised.
+- **Subtitles (Bazarr):** optional admin-only page with Wanted / Movies / Series / History views, plus a per-title subtitle badge on the Films and Series pages, in the quick-look modal and in `Ctrl+K` results — click a badge to search and download a subtitle without leaving Prismarr. Refreshes happen off the request path, so the badges cost nothing to render.
+- **Tracearr:** optional read-only page for Plex / Jellyfin / Emby activity (now playing, overview stats, graphs, history, users) via Tracearr's public API. The API key stays server-side and responses are sanitised.
+- **Emby activity:** optional "Current Emby activity" dashboard widget read straight from Emby Server's Sessions API (no Tautulli-style add-on needed). Same read-only, server-side-key, sanitised-payload rules as the Plex widget.
 - **Theming:** a full instance theme chosen in `/admin/settings → Display` from a catalogue of glance-style presets (HSL colour model resolved to CSS variables server-side, light and dark). The default reproduces the previous dark look exactly.
 - **Preferences:** accent colour, UI density, timezone, date format, English / French UI, settings export / import (credentials always stripped).
 - **Security:** Symfony auth with login rate-limiter, non-root container, dynamic CSP, SSRF protection on user-provided URLs, CSRF on every mutation.
@@ -126,9 +129,11 @@ queued for later.
 ### Requirements
 
 - Docker and Docker Compose
-- At least one of: qBittorrent, Radarr, Sonarr, Prowlarr, Seerr
+- At least one of: Radarr, Sonarr, Prowlarr, Seerr, or a download client
+  (qBittorrent, Deluge, Transmission, SABnzbd, NZBGet)
 - Optional: Gluetun if qBittorrent runs behind a VPN
-- Optional: a TMDb API key (free) to enable the Discovery page
+- Optional: Tautulli, Tracearr or Emby for playback activity, Bazarr for subtitles
+- Optional: a TMDb API key (free) to enable the Search page
 
 ### Install
 
@@ -188,12 +193,10 @@ docker compose up -d
 ```
 
 **Step 3.** Open `http://localhost:7070` in your browser. The setup wizard
-will guide you through:
-
-- admin account creation
-- TMDb API key (optional)
-- Radarr / Sonarr / Prowlarr / Seerr URLs and keys
-- qBittorrent + Gluetun (optional)
+asks for the interface language and creates the admin account, then opens
+`/admin/settings` on the Services section, where you add TMDb, Radarr,
+Sonarr, Prowlarr, Seerr, your download clients and the optional services.
+Each card has a Test button.
 
 `APP_SECRET` and `MERCURE_JWT_SECRET` are auto-generated on first boot and
 persisted in the `prismarr_data` volume. No `.env` editing required.
@@ -214,7 +217,7 @@ ports:
 
 Everything is configured from the UI:
 
-- **First boot**: the 7-step setup wizard at `/setup`
+- **First boot**: the setup wizard at `/setup` (language + admin account)
 - **Later**: the Settings page at `/admin/settings` (admin only)
 
 External service credentials (TMDb / Radarr / Sonarr / Prowlarr / Seerr
@@ -237,6 +240,8 @@ rotate or back them up manually.
 | `TZ` | `UTC` | Container time zone (e.g. `Europe/Paris`, `Pacific/Honolulu`). Drives both the OS clock and the PHP date helpers — see issue [#12](https://github.com/Shoshuo/Prismarr/issues/12) |
 | `PHP_MEMORY_LIMIT` | `1024M` | PHP memory ceiling per request. Bump (e.g. `2048M`, `-1` for unlimited) if you have a very large Radarr / Sonarr library — see issue [#13](https://github.com/Shoshuo/Prismarr/issues/13) |
 | `PHP_MAX_EXECUTION_TIME` | `120` | PHP wall-time ceiling per request, in seconds. Bump alongside `PHP_MEMORY_LIMIT` if the films / series page times out |
+| `PRISMARR_WORKER` | _(unset)_ | Enables FrankenPHP/Symfony **worker mode** — the kernel is booted once and kept resident, skipping the per-request bootstrap for faster responses. Set to `1` (or `true`) for the default worker count, or to a number (e.g. `4`) to run that many workers. Off by default / `0` / `false` = classic per-request mode; no image rebuild needed to toggle |
+| `PRISMARR_WORKER_NUM` | _(2× CPU)_ | Optional explicit worker-thread count; overrides the count when `PRISMARR_WORKER` is enabled. Leave unset to use FrankenPHP's default (2× the available CPUs) |
 
 ### Persistent data
 
@@ -352,9 +357,9 @@ Yes. The image is built for `linux/amd64` and `linux/arm64`. It runs
 on a Raspberry Pi 4/5, an Apple Silicon Mac, or any arm64 NAS.
 
 **Does Prismarr need internet access?**
-Only for TMDb (cover art, metadata, discovery) and the Servarr
+Only for TMDb (cover art, metadata, search) and the Servarr
 services you point it at. The app itself works fully on a LAN; if
-you don't configure TMDb, the Discovery page is the only feature
+you don't configure TMDb, the Search page is the only feature
 that goes dark.
 
 **Can I run it behind a reverse proxy?**
@@ -419,7 +424,7 @@ enough to keep me going. This release is for you.
 
 ## Star history
 
-[![Star history](https://api.star-history.com/svg?repos=Shoshuo/Prismarr&type=Date)](https://star-history.com/#Shoshuo/Prismarr&Date)
+[![Star history](https://star-history.dera.page/svg?repos=Shoshuo/Prismarr&type=Date)](https://star-history.dera.page/#Shoshuo/Prismarr&Date)
 
 ---
 

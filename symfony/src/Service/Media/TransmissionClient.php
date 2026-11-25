@@ -97,6 +97,12 @@ class TransmissionClient implements ResetInterface
         return $this->lastError;
     }
 
+    /** True once a call this request failed or was short-circuited by the breaker. */
+    public function isUnavailable(): bool
+    {
+        return $this->serviceUnavailable;
+    }
+
     private function recordError(string $method, int $code, string $message): void
     {
         $this->lastError = ['code' => $code, 'method' => $method, 'path' => '/transmission/rpc', 'message' => $message];
@@ -134,6 +140,10 @@ class TransmissionClient implements ResetInterface
         'pieceSize', 'pieceCount', 'comment', 'uploadedEver', 'downloadedEver', 'uploadRatio',
         'addedDate', 'doneDate', 'secondsDownloading', 'secondsSeeding', 'eta',
         'peersSendingToUs', 'peersGettingFromUs', 'files', 'fileStats', 'trackerStats', 'peers',
+        // rateDownload/rateUpload back properties.dl_speed/up_speed below — Transmission
+        // only returns fields that were asked for, so omitting these silently zeroed
+        // both speeds on the detail panel's General tab.
+        'rateDownload', 'rateUpload',
     ];
 
     // ══════════════════════════════════════════════════════════════════════════

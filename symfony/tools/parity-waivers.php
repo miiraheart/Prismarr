@@ -33,8 +33,10 @@ return [
     // mdblist: controller, templates, route_guard and smoke are EXEMPT. It is a
     // list source behind the discover page with no routes and no page of its
     // own, so there is no route prefix to guard and no route to smoke-test
-    // (DiscoverPageControllerTest covers the page it feeds). setup is BACKLOG.
-    'mdblist' => ['controller', 'templates', 'health_cache', 'setup', 'route_guard', 'smoke'],
+    // (DiscoverPageControllerTest covers the page it feeds). sidebar is EXEMPT:
+    // no sidebar entry of its own, and since upstream 1.3.0 the topbar health
+    // labels come from HealthCatalog instead of base.html.twig.
+    'mdblist' => ['controller', 'templates', 'health_cache', 'route_guard', 'sidebar', 'smoke'],
 
     // nzbget and sabnzbd: controller, client, templates and route_guard are all
     // EXEMPT. Both are served by UsenetController from templates/usenet/ and
@@ -44,17 +46,36 @@ return [
     'nzbget' => ['controller', 'client', 'templates', 'health_cache', 'route_guard'],
     'sabnzbd' => ['controller', 'client', 'templates', 'health_cache', 'route_guard'],
 
-    // tautulli: setup is BACKLOG.
-    'tautulli' => ['health_cache', 'setup'],
+    // tautulli: only the no-signal health_cache column remains.
+    'tautulli' => ['health_cache'],
 
     // tmdb: templates is EXEMPT. TMDB is a metadata source rendered inside other
     // modules' pages and owns no template directory.
     'tmdb' => ['templates', 'health_cache'],
 
     // trakt: templates is EXEMPT since the discover rework, which moved the trakt
-    // page under templates/discover/. setup is BACKLOG.
-    'trakt' => ['templates', 'health_cache', 'setup'],
+    // page under templates/discover/. sidebar is EXEMPT for the same reason as
+    // mdblist: the discover rework folded it into one sidebar entry, and the
+    // topbar health labels now come from HealthCatalog.
+    'trakt' => ['templates', 'health_cache', 'sidebar'],
 
     // transmission: only the no-signal health_cache column remains.
     'transmission' => ['health_cache'],
+
+    // radarr and sonarr: health_api is EXEMPT. They are reported per instance,
+    // and HealthCatalog (which the health API iterates) deliberately lists only
+    // the single-instance services.
+    'radarr' => ['health_api'],
+    'sonarr' => ['health_api'],
+
+    // bazarr, tracearr and emby arrived with upstream 1.3.0. health_cache is the
+    // no-signal column. smoke is EXEMPT: each has its own upstream controller
+    // test (BazarrControllerTest, TracearrControllerTest, EmbyControllerTest).
+    'bazarr' => ['health_cache', 'smoke'],
+    'tracearr' => ['health_cache', 'smoke'],
+
+    // emby: also templates, route_guard and sidebar are EXEMPT. Upstream ships it
+    // as the API behind the dashboard "now playing" widget, with no page, no
+    // sidebar entry and no guarded page route.
+    'emby' => ['templates', 'health_cache', 'route_guard', 'sidebar', 'smoke'],
 ];

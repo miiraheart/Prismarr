@@ -94,7 +94,7 @@ class DiscoverPageController extends AbstractController
         // `tmdb_`-named route. See the class docblock for why this route is
         // deliberately outside that prefix.
         if (!$this->config->has('tmdb_api_key')) {
-            return $this->redirectToRoute('app_setup_tmdb');
+            return $this->redirectToRoute('app_configure_services');
         }
 
         $active = self::TAB_ALIASES[(string) $request->query->get('tab', 'discover')]

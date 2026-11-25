@@ -134,6 +134,20 @@ class ServiceInstanceProvider implements ResetInterface
     }
 
     /**
+     * True when EXACTLY one instance of $type is enabled. Shared multi-
+     * instance safety predicate: a bare *arr id (radarrId / sonarrSeriesId /
+     * episode id) is only unambiguous when its owning service pairs with a
+     * single enabled instance — with two, "movie 42" or "series 7" means a
+     * different item per instance, so any lookup keyed on that bare id must
+     * fail closed instead of guessing. Used by BazarrSubtitleIndex's badge
+     * gate and the Bazarr subtitle-detail endpoints (movie + series) alike.
+     */
+    public function hasExactlyOneEnabled(string $type): bool
+    {
+        return count($this->getEnabled($type)) === 1;
+    }
+
+    /**
      * Persist the URL + API key for the default instance of $type. Used by
      * the setup wizard and /admin/settings to mirror the v1.0 single-config
      * UX: the user types one URL + one API key per service, the provider
@@ -219,6 +233,7 @@ class ServiceInstanceProvider implements ResetInterface
         ?string $slug = null,
         bool $enabled = true,
         ?int $position = null,
+        ?int $defaultQualityProfileId = null,
     ): ServiceInstance {
         $name = trim($name);
         $url  = trim($url);
@@ -231,7 +246,7 @@ class ServiceInstanceProvider implements ResetInterface
         // Defense in depth — even though every cURL call is already pinned to
         // CURLPROTO_HTTP|HTTPS, reject obviously invalid URLs at write time
         // so the row never lands in the DB. Same helper that guards the
-        // /setup/test/<service> SSRF path; reasons surfaced verbatim
+        // settings Test-connection probes; reasons surfaced verbatim
         // ('scheme', 'host', 'link-local', …) so the admin form can map them.
         if (($reason = HealthService::urlBlockedReason($url)) !== null) {
             throw new \InvalidArgumentException(sprintf('Invalid instance URL (%s).', $reason));
@@ -268,6 +283,7 @@ class ServiceInstanceProvider implements ResetInterface
         $instance->setEnabled($enabled);
         $instance->setIsDefault($isFirst); // first instance is automatically default
         $instance->setPosition($finalPosition);
+        $instance->setDefaultQualityProfileId($defaultQualityProfileId);
         $this->repository->save($instance);
         $this->invalidate();
         return $instance;
@@ -288,6 +304,7 @@ class ServiceInstanceProvider implements ResetInterface
         ?string $slug = null,
         ?bool $enabled = null,
         ?int $position = null,
+        int|false|null $defaultQualityProfileId = false,
     ): ServiceInstance {
         $name = trim($name);
         $url  = trim($url);
@@ -332,6 +349,12 @@ class ServiceInstanceProvider implements ResetInterface
 
         if ($position !== null) {
             $instance->setPosition($position);
+        }
+
+        // `false` = field absent, leave unchanged; null = explicit "None"
+        // (fall back to the first profile); int = the chosen default profile.
+        if ($defaultQualityProfileId !== false) {
+            $instance->setDefaultQualityProfileId($defaultQualityProfileId);
         }
 
         $this->repository->save($instance);

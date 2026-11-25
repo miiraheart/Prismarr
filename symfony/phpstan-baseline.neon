@@ -1,7 +1,7 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Offset ''type'' on array\{key\: ''deluge_password''\|''nzbget_password''\|''qbittorrent_password''\|''transmission…'', type\: ''password'', label\: ''admin\.field\.password'', clearable\: true\}\|array\{key\: ''deluge_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''gluetun_api_key'', type\: ''password'', label\: ''admin\.field\.api_key…''\}\|array\{key\: ''gluetun_url'', type\: ''text'', label\: ''admin\.field\.url''\}\|array\{key\: ''jellyseerr_api_key''\|''prowlarr_api_key''\|''radarr_api_key''\|''sabnzbd_api_key''\|''sonarr_api_key''\|''tautulli_api_key'', type\: ''password'', label\: ''admin\.field\.api_key''\}\|array\{key\: ''jellyseerr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''mdblist_api_key'', type\: ''password'', label\: ''admin\.field\.mdblist…''\}\|array\{key\: ''nzbget_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''nzbget_user''\|''qbittorrent_user''\|''transmission_user'', type\: ''text'', label\: ''admin\.field\.username'', clearable\: true\}\|array\{key\: ''prowlarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''qbittorrent_url''\|''sabnzbd_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''radarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''sonarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''tautulli_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''tmdb_api_key'', type\: ''password'', label\: ''admin\.field\.tmdb…'', placeholder\: ''7a2f4…''\}\|array\{key\: ''trakt_client_id'', type\: ''password'', label\: ''admin\.field\.trakt…''\}\|array\{key\: ''trakt_client_secret'', type\: ''password'', label\: ''admin\.field\.trakt…'', clearable\: true\}\|array\{key\: ''trakt_username'', type\: ''text'', label\: ''admin\.field\.trakt…'', placeholder\: ''your\-trakt\-slug''\}\|array\{key\: ''transmission_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\} on left side of \?\? always exists and is not nullable\.$#'
+			message: '#^Offset ''type'' on array\{key\: ''bazarr_api_key''\|''emby_api_key''\|''jellyseerr_api_key''\|''prowlarr_api_key''\|''radarr_api_key''\|''sabnzbd_api_key''\|''sonarr_api_key''\|''tautulli_api_key'', type\: ''password'', label\: ''admin\.field\.api_key''\}\|array\{key\: ''bazarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''deluge_password''\|''nzbget_password''\|''qbittorrent_password''\|''transmission…'', type\: ''password'', label\: ''admin\.field\.password'', clearable\: true\}\|array\{key\: ''deluge_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''emby_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''gluetun_api_key'', type\: ''password'', label\: ''admin\.field\.api_key…''\}\|array\{key\: ''gluetun_url'', type\: ''text'', label\: ''admin\.field\.url''\}\|array\{key\: ''jellyseerr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''mdblist_api_key'', type\: ''password'', label\: ''admin\.field\.mdblist…''\}\|array\{key\: ''nzbget_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''nzbget_user''\|''qbittorrent_user''\|''transmission_user'', type\: ''text'', label\: ''admin\.field\.username'', clearable\: true\}\|array\{key\: ''prowlarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''qbittorrent_url''\|''sabnzbd_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''radarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''sonarr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''tautulli_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''tmdb_api_key'', type\: ''password'', label\: ''admin\.field\.tmdb…'', placeholder\: ''7a2f4…''\}\|array\{key\: ''tracearr_api_key'', type\: ''password'', label\: ''admin\.field\.api_key'', placeholder\: ''trr_pub_…''\}\|array\{key\: ''tracearr_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\}\|array\{key\: ''trakt_client_id'', type\: ''password'', label\: ''admin\.field\.trakt…''\}\|array\{key\: ''trakt_client_secret'', type\: ''password'', label\: ''admin\.field\.trakt…'', clearable\: true\}\|array\{key\: ''trakt_username'', type\: ''text'', label\: ''admin\.field\.trakt…'', placeholder\: ''your\-trakt\-slug''\}\|array\{key\: ''transmission_url'', type\: ''text'', label\: ''admin\.field\.url'', placeholder\: ''http\://host\.docker…''\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
 			path: src/Controller/AdminSettingsController.php
@@ -11,6 +11,42 @@ parameters:
 			identifier: classConstant.phpDocType
 			count: 1
 			path: src/Controller/AdminSettingsController.php
+
+		-
+			message: '#^Offset ''code'' on \*NEVER\* on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/BazarrController.php
+
+		-
+			message: '#^Offset ''code'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/BazarrController.php
+
+		-
+			message: '#^Offset ''message'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/BazarrController.php
+
+		-
+			message: '#^Offset ''method'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/BazarrController.php
+
+		-
+			message: '#^Offset ''ok'' on array\{ok\: bool, error\?\: mixed, code\?\: int, data\?\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/BazarrController.php
+
+		-
+			message: '#^Offset ''path'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Controller/BazarrController.php
 
 		-
 			message: '#^Offset ''sortDate'' on array\{type\: ''episode'', seriesTitle\: mixed, title\: mixed, overview\: mixed, season\: mixed, episode\: mixed, date\: null, poster\: mixed, \.\.\.\}\|array\{type\: ''film'', title\: mixed, year\: mixed, poster\: mixed, fanart\: mixed, overview\: mixed, status\: mixed, hasFile\: bool, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
@@ -33,42 +69,6 @@ parameters:
 		-
 			message: '#^Left side of && is always true\.$#'
 			identifier: booleanAnd.leftAlwaysTrue
-			count: 2
-			path: src/Controller/DelugeController.php
-
-		-
-			message: '#^Offset ''code'' on \*NEVER\* on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Controller/DelugeController.php
-
-		-
-			message: '#^Offset ''code'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: src/Controller/DelugeController.php
-
-		-
-			message: '#^Offset ''message'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: src/Controller/DelugeController.php
-
-		-
-			message: '#^Offset ''method'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: src/Controller/DelugeController.php
-
-		-
-			message: '#^Offset ''ok'' on array\{ok\: bool, error\?\: mixed, code\?\: int, data\?\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Controller/DelugeController.php
-
-		-
-			message: '#^Offset ''path'' on array\{code\: int, method\: string, path\: string, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
 			count: 2
 			path: src/Controller/DelugeController.php
 
@@ -115,30 +115,6 @@ parameters:
 			path: src/Controller/JellyseerrController.php
 
 		-
-			message: '#^Offset ''sortTitle'' on array\{id\: mixed, title\: mixed, originalTitle\: mixed, sortTitle\: mixed, year\: mixed, hasFile\: bool, poster\: string\|null, instance\: array\{slug\: string, name\: string\}\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: src/Controller/MediaController.php
-
-		-
-			message: '#^Offset ''title'' on array\{id\: mixed, title\: mixed, originalTitle\: mixed, sortTitle\: mixed, year\: mixed, hasFile\: bool, poster\: string\|null, instance\: array\{slug\: string, name\: string\}, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: src/Controller/MediaController.php
-
-		-
-			message: '#^Offset ''title'' on array\{id\: mixed, title\: mixed, originalTitle\: mixed, sortTitle\: mixed, year\: mixed, hasFile\: bool, poster\: string\|null, instance\: array\{slug\: string, name\: string\}\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: src/Controller/MediaController.php
-
-		-
-			message: '#^Parameter \#1 \$array of function array_column expects array, Symfony\\Contracts\\Cache\\ItemInterface given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Controller/MediaController.php
-
-		-
 			message: '#^Property App\\Controller\\MediaController\:\:\$config is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -157,12 +133,6 @@ parameters:
 			path: src/Controller/MediaController.php
 
 		-
-			message: '#^Ternary operator condition is always true\.$#'
-			identifier: ternary.alwaysTrue
-			count: 2
-			path: src/Controller/MediaController.php
-
-		-
 			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -177,6 +147,18 @@ parameters:
 		-
 			message: '#^Match expression does not handle remaining value\: string$#'
 			identifier: match.unhandled
+			count: 1
+			path: src/Controller/TmdbController.php
+
+		-
+			message: '#^Offset ''best_person'' does not exist on array\{terms\: string, best\: array\|null, results\: list\<array\>, people\: list\<array\>, total\: int, candidates\: list\<array\{label\: string, popularity\: float\}\>\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: src/Controller/TmdbController.php
+
+		-
+			message: '#^Offset ''best_person'' does not exist on array\{terms\: string, best\: array\|null, results\: list\<array\>, people\: list\<array\>, total\: int\<min, \-1\>\|int\<1, max\>, candidates\: list\<array\{label\: string, popularity\: float\}\>\}\.$#'
+			identifier: offsetAccess.notFound
 			count: 1
 			path: src/Controller/TmdbController.php
 
@@ -245,6 +227,48 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: src/Service/AppVersion.php
+
+		-
+			message: '#^If condition is always false\.$#'
+			identifier: if.alwaysFalse
+			count: 1
+			path: src/Service/Cache/BazarrIndexRefresher.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: src/Service/Cache/BazarrIndexRefresher.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 1
+			path: src/Service/Cache/BazarrIndexRefresher.php
+
+		-
+			message: '#^Call to function array_key_exists\(\) with ''value'' and array\{fetchedAt\: int, value\: mixed\} will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Service/Cache/StaleWhileRevalidateCache.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\{fetchedAt\: int, value\: mixed\} will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Service/Cache/StaleWhileRevalidateCache.php
+
+		-
+			message: '#^Offset ''fetchedAt'' on array\{fetchedAt\: int, value\: mixed\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Service/Cache/StaleWhileRevalidateCache.php
+
+		-
+			message: '#^Result of \|\| is always false\.$#'
+			identifier: booleanOr.alwaysFalse
+			count: 2
+			path: src/Service/Cache/StaleWhileRevalidateCache.php
 
 		-
 			message: '#^Offset ''err'' on array\{http\: int\|null, body\: string\|null, err\: string\} on left side of \?\? always exists and is not nullable\.$#'
@@ -333,7 +357,13 @@ parameters:
 		-
 			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: string, 19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
 			identifier: argument.type
-			count: 2
+			count: 1
+			path: src/Service/Media/RadarrClient.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: string, 19913\: true, 181\: 3, 182\: 3, 13\: int, 78\: 4, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
+			identifier: argument.type
+			count: 1
 			path: src/Service/Media/RadarrClient.php
 
 		-
@@ -359,6 +389,30 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Service/Media/RadarrClient.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Service/Media/SearchRanker.php
+
+		-
+			message: '#^Offset ''label'' on array\{label\: string, popularity\?\: float\|int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Service/Media/SearchRanker.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: src/Service/Media/SearchRanker.php
+
+		-
+			message: '#^Variable \$data on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: src/Service/Media/SearchVocabulary.php
 
 		-
 			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 19913\: bool, 181\: int, 182\: int, 13\: int, 78\: int, 99\: bool, 10023\: array\<int, string\>\}, array\{10002\: string, 19913\: true, 181\: 3, 182\: 3, 13\: 8, 78\: 4, 99\: 1, 10023\: array\{non\-falsy\-string, ''Accept\: application…''\}\} given\.$#'
@@ -419,6 +473,12 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Service/Media/TmdbClient.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Service/Media/TracearrClient.php
 
 		-
 			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
@@ -547,6 +607,24 @@ parameters:
 			path: tests/Controller/AdminSettingsThemeTest.php
 
 		-
+			message: '#^Parameter \#1 \$classes of method Doctrine\\ORM\\Tools\\SchemaTool\:\:createSchema\(\) expects list\<Doctrine\\ORM\\Mapping\\ClassMetadata\>, list\<Doctrine\\Persistence\\Mapping\\ClassMetadata\<object\>\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Controller/BazarrFrameRenderTest.php
+
+		-
+			message: '#^Parameter \#1 \$classes of method Doctrine\\ORM\\Tools\\SchemaTool\:\:dropSchema\(\) expects list\<Doctrine\\ORM\\Mapping\\ClassMetadata\>, list\<Doctrine\\Persistence\\Mapping\\ClassMetadata\<object\>\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Controller/BazarrFrameRenderTest.php
+
+		-
+			message: '#^Parameter \#1 \$em of class Doctrine\\ORM\\Tools\\SchemaTool constructor expects Doctrine\\ORM\\EntityManagerInterface, Doctrine\\Persistence\\ObjectManager given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Controller/BazarrFrameRenderTest.php
+
+		-
 			message: '#^Call to an undefined method App\\Service\\Media\\RadarrClient\:\:method\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -604,11 +682,17 @@ parameters:
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\JsonResponse'' and Symfony\\Component\\HttpFoundation\\JsonResponse will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
+			path: tests/Controller/ProwlarrGrabTest.php
+
+		-
+			message: '#^Call to an undefined method Symfony\\Component\\HttpFoundation\\Response\:\:getTargetUrl\(\)\.$#'
+			identifier: method.notFound
+			count: 5
 			path: tests/Controller/SetupControllerTest.php
 
 		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''Symfony\\\\Component\\\\HttpFoundation\\\\Response'' and Symfony\\Component\\HttpFoundation\\Response will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
+			message: '#^Call to an undefined method Symfony\\Component\\HttpFoundation\\Session\\SessionInterface\:\:getFlashBag\(\)\.$#'
+			identifier: method.notFound
 			count: 1
 			path: tests/Controller/SetupControllerTest.php
 
@@ -625,26 +709,62 @@ parameters:
 			path: tests/Controller/TmdbControllerTest.php
 
 		-
-			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertNotSame\(\) with '''' and ''dashboard\.health…''\|''dashboard\.plex\.title''\|''dashboard\.recent…''\|''dashboard\.requests…''\|''dashboard\.trending…''\|''dashboard\.upcoming…''\|''dashboard\.watchlist…'' will always evaluate to true\.$#'
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertNotSame\(\) with '''' and ''dashboard\.emby\.title''\|''dashboard\.health…''\|''dashboard\.plex\.title''\|''dashboard\.recent…''\|''dashboard\.requests…''\|''dashboard…''\|''dashboard\.trending…''\|''dashboard\.upcoming…''\|''dashboard\.watchlist…'' will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/Dashboard/DashboardSectionsTest.php
 
 		-
-			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''upcoming'', ''requests'', ''health'', ''plex'', ''watchlist'', ''trending'', ''recent''\} and array\{''upcoming'', ''requests'', ''health'', ''plex'', ''watchlist'', ''trending'', ''recent''\} will always evaluate to true\.$#'
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''upcoming'', ''requests'', ''health'', ''plex'', ''emby'', ''transmission'', ''watchlist'', ''trending'', \.\.\.\} and array\{''upcoming'', ''requests'', ''health'', ''plex'', ''emby'', ''transmission'', ''watchlist'', ''trending'', \.\.\.\} will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/Dashboard/DashboardSectionsTest.php
 
 		-
-			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with arguments 16, 8 and ''After reset,…'' will always evaluate to false\.$#'
-			identifier: staticMethod.impossibleType
+			message: '#^Property App\\Service\\Cache\\CacheRefresherInterface@anonymous/tests/MessageHandler/RefreshCacheKeyHandlerTest\.php\:17\:\:\$seen is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/MessageHandler/RefreshCacheKeyHandlerTest.php
+
+		-
+			message: '#^Property Psr\\Log\\AbstractLogger@anonymous/tests/MessageHandler/RefreshCacheKeyHandlerTest\.php\:27\:\:\$records is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/MessageHandler/RefreshCacheKeyHandlerTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Cache\\Adapter\\ArrayAdapter@anonymous/tests/Service/Cache/BazarrIndexRefresherTest\.php\:361\:\:\$order is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Cache/BazarrIndexRefresherTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertCount\(\) with arguments 2, array\{object\} and ''the mutation\-driven…'' will always evaluate to false\.$#'
+			identifier: method.impossibleType
+			count: 1
+			path: tests/Service/Cache/StaleWhileRevalidateCacheTest.php
+
+		-
+			message: '#^Property Psr\\Log\\AbstractLogger@anonymous/tests/Service/Cache/StaleWhileRevalidateCacheTest\.php\:45\:\:\$records is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Cache/StaleWhileRevalidateCacheTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Messenger\\MessageBusInterface@anonymous/tests/Service/Cache/StaleWhileRevalidateCacheTest\.php\:23\:\:\$sink is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Cache/StaleWhileRevalidateCacheTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with arguments 10, 10 and ''Second resolve…'' will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/Service/DashboardLayoutServiceTest.php
 
 		-
-			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with arguments 8, 8 and ''Second resolve…'' will always evaluate to true\.$#'
-			identifier: staticMethod.alreadyNarrowedType
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with arguments 20, 10 and ''After reset,…'' will always evaluate to false\.$#'
+			identifier: staticMethod.impossibleType
 			count: 1
 			path: tests/Service/DashboardLayoutServiceTest.php
 
@@ -661,10 +781,106 @@ parameters:
 			path: tests/Service/DisplayPreferencesServiceTest.php
 
 		-
+			message: '#^Parameter \#1 \$radarrIds of method App\\Service\\Media\\BazarrClient\:\:getMovies\(\) expects list\<int\>, array\{''7abc'', 9\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Service/Media/BazarrClientTest.php
+
+		-
+			message: '#^Property App\\Service\\Media\\BazarrClient@anonymous/tests/Service/Media/BazarrClientTest\.php\:258\:\:\$urls is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrClientTest.php
+
+		-
+			message: '#^Property App\\Service\\Media\\BazarrClient@anonymous/tests/Service/Media/BazarrClientTest\.php\:353\:\:\$calls is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrClientTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Messenger\\MessageBusInterface@anonymous/tests/Service/Media/BazarrSubtitleIndexDatasetsTest\.php\:32\:\:\$sink is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexDatasetsTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Messenger\\MessageBusInterface@anonymous/tests/Service/Media/BazarrSubtitleIndexLanguagesTest\.php\:152\:\:\$sink is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexLanguagesTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''bazarr_subtitle…''\} and array\{\} will always evaluate to false\.$#'
+			identifier: method.impossibleType
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexPatchTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Messenger\\MessageBusInterface@anonymous/tests/Service/Media/BazarrSubtitleIndexPatchTest\.php\:269\:\:\$sink is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexPatchTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Messenger\\MessageBusInterface@anonymous/tests/Service/Media/BazarrSubtitleIndexPatchTest\.php\:31\:\:\$sink is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexPatchTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertCount\(\) with 1 and array\{\} will always evaluate to false\.$#'
+			identifier: method.impossibleType
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexSwrTest.php
+
+		-
+			message: '#^Property Psr\\Log\\AbstractLogger@anonymous/tests/Service/Media/BazarrSubtitleIndexSwrTest\.php\:61\:\:\$records is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexSwrTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Messenger\\MessageBusInterface@anonymous/tests/Service/Media/BazarrSubtitleIndexSwrTest\.php\:30\:\:\$sink is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexSwrTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''state'', ''count''\} and array\{''state'', ''count''\} will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 2
+			path: tests/Service/Media/BazarrSubtitleIndexTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Messenger\\MessageBusInterface@anonymous/tests/Service/Media/BazarrSubtitleIndexTest\.php\:51\:\:\$sink is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/BazarrSubtitleIndexTest.php
+
+		-
 			message: '#^PHPDoc tag @param references unknown parameter\: \$config$#'
 			identifier: parameter.notFound
 			count: 1
 			path: tests/Service/Media/FlatServiceClientDisabledTest.php
+
+		-
+			message: '#^Property Psr\\Log\\AbstractLogger@anonymous/tests/Service/Media/MediaLibraryCacheTest\.php\:158\:\:\$records is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/MediaLibraryCacheTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Media\\TmdbClient\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Service/Media/SearchVocabularyTest.php
+
+		-
+			message: '#^Property Symfony\\Component\\Messenger\\MessageBusInterface@anonymous/tests/Service/Media/SearchVocabularyTest\.php\:25\:\:\$sink is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Service/Media/SearchVocabularyTest.php
 
 		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with 10 and 10 will always evaluate to true\.$#'
@@ -685,10 +901,22 @@ parameters:
 			path: tests/Service/Media/SonarrClientTest.php
 
 		-
+			message: '#^Offset ''results'' does not exist on array\{\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 2
+			path: tests/Service/Media/TmdbClientFailureCacheTest.php
+
+		-
 			message: '#^Call to an undefined method App\\Service\\Media\\RadarrClient\|App\\Service\\Media\\SonarrClient\:\:method\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: tests/Service/Media/TorrentResolverServiceTest.php
+
+		-
+			message: '#^Anonymous function never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 2
+			path: tests/Service/Media/TracearrClientTest.php
 
 		-
 			message: '#^Method App\\Tests\\Service\\Media\\Usenet\\UsenetStatusTest\:\:nzbgetHistoryProvider\(\) should return array\<string, array\{string, string\}\> but returns array\{array\{''SUCCESS/ALL'', ''completed''\}, array\{''WARNING/REPAIR'', ''completed''\}, array\{''FAILURE/PAR'', ''failed''\}, array\{''DELETED/MANUAL'', ''failed''\}, array\{''NOPE'', ''unknown''\}\}\.$#'
@@ -707,6 +935,18 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: tests/Service/Media/Usenet/UsenetStatusTest.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: tests/Service/ServiceListsCoherenceTest.php
+
+		-
+			message: '#^You should use assertCount\(\$expectedCount, \$variable\) instead of assertSame\(\$expectedCount, count\(\$variable\)\)\.$#'
+			identifier: phpunit.assertCount
+			count: 1
+			path: tests/Service/ServiceListsCoherenceTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertArrayHasKey\(\) with ''midnight'' and array\{midnight\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{0, 0, 6\.5\}, primary\: array\{239, 84, 66\.8\}, positive\: array\{142, 71, 45\}, negative\: array\{0, 84, 60\}, contrast\: 1\.0, textSaturation\: 1\.0\}, nord\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{220, 16, 22\}, primary\: array\{213, 32, 70\}, positive\: array\{92, 28, 65\}, negative\: array\{354, 42, 56\}, contrast\: 1\.0, textSaturation\: 1\.0\}, catppuccin_latte\: array\{label_key\: ''admin\.display\.theme…'', light\: true, bg\: array\{220, 23, 95\}, primary\: array\{220, 91, 54\}, positive\: array\{109, 58, 40\}, negative\: array\{347, 87, 44\}, contrast\: 1\.0, textSaturation\: 1\.0\}, catppuccin_frappe\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{229, 19, 23\}, primary\: array\{222, 74, 74\}, positive\: array\{96, 44, 68\}, negative\: array\{359, 68, 71\}, contrast\: 1\.2, textSaturation\: 1\.0\}, catppuccin_macchiato\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{232, 23, 18\}, primary\: array\{220, 83, 75\}, positive\: array\{105, 48, 72\}, negative\: array\{351, 74, 73\}, contrast\: 1\.2, textSaturation\: 1\.0\}, catppuccin_mocha\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{240, 21, 15\}, primary\: array\{217, 92, 83\}, positive\: array\{115, 54, 76\}, negative\: array\{347, 70, 65\}, contrast\: 1\.2, textSaturation\: 1\.0\}, dracula\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{231, 15, 21\}, primary\: array\{265, 89, 79\}, positive\: array\{135, 94, 66\}, negative\: array\{0, 100, 67\}, contrast\: 1\.2, textSaturation\: 1\.0\}, gruvbox_dark\: array\{label_key\: ''admin\.display\.theme…'', light\: false, bg\: array\{0, 0, 16\}, primary\: array\{43, 59, 81\}, positive\: array\{61, 66, 44\}, negative\: array\{6, 96, 59\}, contrast\: 1\.0, textSaturation\: 1\.0\}, \.\.\.\} will always evaluate to true\.$#'
@@ -737,6 +977,12 @@ parameters:
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/Theme/ThemePresetsTest.php
+
+		-
+			message: '#^You should use assertCount\(\$expectedCount, \$variable\) instead of assertSame\(\$expectedCount, count\(\$variable\)\)\.$#'
+			identifier: phpunit.assertCount
+			count: 1
+			path: tests/Twig/SearchPageListenersTest.php
 
 		-
 			message: '#^Call to function method_exists\(\) with ''Symfony\\\\Component\\\\Dotenv\\\\Dotenv'' and ''bootEnv'' will always evaluate to true\.$#'

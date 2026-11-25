@@ -40,7 +40,6 @@
 {% if error %}
   {% include 'error/_service_banner.html.twig' with {
     service: 'Prowlarr',
-    wizard_route: 'app_setup_indexers',
     configured_url: service_url,
     reason: 'unreachable'
   } %}
@@ -220,7 +219,7 @@
                                     <span class="d-flex align-items-center gap-1 text-success small"><span class="status-dot status-dot-animated bg-success"></span> {{ 'prowlarr.index.status_ok'|trans }}</span>
                                 {% endif %}
                             </td>
-                            <td class="text-secondary small text-nowrap">{{ idx.added ? idx.added|date('d/m/Y') : '—' }}</td>
+                            <td class="text-secondary small text-nowrap">{{ idx.added ? idx.added|prismarr_date : '—' }}</td>
                             <td class="text-end">
                                 <div class="d-flex gap-1 justify-content-end">
                                     <button class="btn btn-sm btn-ghost-secondary p-1" data-edit-id="{{ idx.id }}" title="{{ 'prowlarr.common.edit'|trans }}">
@@ -408,6 +407,7 @@
 {% block javascripts %}
 <script>
 (function () {
+    var BASE = window.BASE_PATH;
     var _I18N = {
         name: {{ 'prowlarr.common.name'|trans|json_encode|raw }},
         appProfile: {{ 'prowlarr.index.field_app_profile'|trans|json_encode|raw }},
@@ -501,11 +501,19 @@
         infoPrivacyPrivate: {{ 'prowlarr.index.privacy_private'|trans|json_encode|raw }},
         infoPrivacySemi: {{ 'prowlarr.index.privacy_semiprivate'|trans|json_encode|raw }},
         infoPrivacyPublic: {{ 'prowlarr.index.privacy_public'|trans|json_encode|raw }},
-        listPrivacySemi: {{ 'prowlarr.index.privacy_semi'|trans|json_encode|raw }}
+        listPrivacySemi: {{ 'prowlarr.index.privacy_semi'|trans|json_encode|raw }},
+        searchColActions: {{ 'prowlarr.common.actions'|trans|json_encode|raw }},
+        searchGrabBtn: {{ 'prowlarr.search.grab'|trans|json_encode|raw }},
+        searchGrabSent: {{ 'prowlarr.search.grab_sent'|trans|json_encode|raw }},
+        searchGrabFailedTpl: {{ 'prowlarr.search.grab_failed_tpl'|trans|json_encode|raw }}
     };
 
     // ── Helpers ──
-    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    // Issue #71 fix-round-1 — textContent→innerHTML only escapes & < > ;
+    // this page also interpolates esc() output into attribute contexts
+    // (href, data-guid, data-indexer-id), so " must be escaped too or a
+    // quote in indexer-supplied data breaks out of the attribute.
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/"/g, '&quot;'); }
     function showAlert(el, cls, msg) { el.className = 'mt-2 alert ' + cls; el.textContent = msg; el.style.display = ''; }
     // Clean the payload before sending to the Prowlarr API (remove empty selectOptions that cause type errors)
     function cleanPayload(data) {
@@ -540,7 +548,7 @@
             h += '</div>';
             // Charger app profiles
             if (!appProfilesCache) {
-                fetch('/prowlarr/app-profiles').then(function(r){return r.json();}).then(function(profiles) {
+                fetch(BASE + '/prowlarr/app-profiles').then(function(r){return r.json();}).then(function(profiles) {
                     appProfilesCache = profiles;
                     fillAppProfileSelect(topLevel.appProfileId);
                 });
@@ -599,7 +607,7 @@
     function loadAndRenderTags(currentTags) {
         selectedTags = currentTags || [];
         if (!tagsCache) {
-            fetch('/prowlarr/tags').then(function(r) { return r.json(); }).then(function(tags) {
+            fetch(BASE + '/prowlarr/tags').then(function(r) { return r.json(); }).then(function(tags) {
                 tagsCache = tags;
                 renderTagsUI();
             });
@@ -653,7 +661,7 @@
         var label = (input.value || '').trim();
         if (!label) return;
         input.disabled = true;
-        fetch('/prowlarr/tag/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: label }) })
+        fetch(BASE + '/prowlarr/tag/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: label }) })
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 input.disabled = false;
@@ -706,7 +714,7 @@
     document.querySelectorAll('[data-toggle-id]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             btn.disabled = true; btn.textContent = '…';
-            fetch('/prowlarr/indexer/' + btn.dataset.toggleId + '/toggle', { method: 'POST' })
+            fetch(BASE + '/prowlarr/indexer/' + btn.dataset.toggleId + '/toggle', { method: 'POST' })
                 .then(function (r) { return r.json(); })
                 .then(function (d) { btn.disabled = false; if (d.ok) { btn.classList.toggle('is-on', d.enabled); btn.classList.toggle('is-off', !d.enabled); btn.textContent = d.enabled ? 'ON' : 'OFF'; } });
         });
@@ -716,7 +724,7 @@
     document.querySelectorAll('[data-delete-id]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             if (!confirm(_I18N.confirmDeleteIndexerTpl.replace('__NAME__', btn.dataset.deleteName))) return;
-            fetch('/prowlarr/indexer/' + btn.dataset.deleteId + '/delete', { method: 'POST' })
+            fetch(BASE + '/prowlarr/indexer/' + btn.dataset.deleteId + '/delete', { method: 'POST' })
                 .then(function (r) { return r.json(); })
                 .then(function (d) { if (d.ok) { var row = btn.closest('tr'); if (row) row.remove(); } });
         });
@@ -729,10 +737,10 @@
             var orig = btn.innerHTML;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:.7rem;height:.7rem;"></span>';
             btn.disabled = true;
-            fetch('/prowlarr/indexer/' + id, { method: 'GET' })
+            fetch(BASE + '/prowlarr/indexer/' + id, { method: 'GET' })
                 .then(function (r) { return r.json(); })
                 .then(function (raw) {
-                    return fetch('/prowlarr/indexer/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(raw)) });
+                    return fetch(BASE + '/prowlarr/indexer/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(raw)) });
                 })
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
@@ -749,7 +757,7 @@
         var btn = this;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:.7rem;height:.7rem;"></span> ' + _I18N.testAllInProgress;
-        fetch('/prowlarr/indexer/testall', { method: 'POST' })
+        fetch(BASE + '/prowlarr/indexer/testall', { method: 'POST' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 btn.disabled = false;
@@ -782,7 +790,7 @@
     document.getElementById('btn-sync-indexers').addEventListener('click', function () {
         var btn = this; btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:.7rem;height:.7rem;"></span> ' + _I18N.syncInProgress;
-        fetch('/prowlarr/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'ApplicationIndexerSync' }) })
+        fetch(BASE + '/prowlarr/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'ApplicationIndexerSync' }) })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d.ok) { btn.disabled = false; btn.innerHTML = syncOrigHtml; return; }
@@ -790,7 +798,7 @@
                 if (!cmdId) { btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" class="me-1"><path d="M5 12l5 5l10-10"/></svg> ' + _I18N.syncDone; setTimeout(function(){btn.innerHTML=syncOrigHtml;},2000); return; }
                 // Poll command status
                 var poll = setInterval(function () {
-                    fetch('/prowlarr/command/' + cmdId)
+                    fetch(BASE + '/prowlarr/command/' + cmdId)
                         .then(function(r){return r.json();})
                         .then(function(s) {
                             if (!s || s.status === 'completed') {
@@ -821,7 +829,7 @@
         var q = searchInput.value.trim();
         if (q.length < 2) return;
         searchLoading.style.display = ''; searchResults.innerHTML = ''; searchBtn.disabled = true;
-        fetch('/prowlarr/search?q=' + encodeURIComponent(q))
+        fetch(BASE + '/prowlarr/search?q=' + encodeURIComponent(q))
             .then(function (r) { return r.json(); })
             .then(function (items) {
                 searchLoading.style.display = 'none'; searchBtn.disabled = false;
@@ -831,11 +839,17 @@
                 countLabel = countLabel.replace('#', items.length);
                 var h = '<div class="small text-secondary mb-2">' + esc(countLabel) + '</div>';
                 h += '<div class="table-responsive pw-search-results"><table class="table table-vcenter table-sm">';
-                h += '<thead><tr><th>' + esc(_I18N.searchColTitle) + '</th><th>' + esc(_I18N.searchColIndexer) + '</th><th>' + esc(_I18N.searchColSize) + '</th><th>' + esc(_I18N.searchColSeeds) + '</th><th>' + esc(_I18N.searchColAge) + '</th></tr></thead><tbody>';
+                h += '<thead><tr><th>' + esc(_I18N.searchColTitle) + '</th><th>' + esc(_I18N.searchColIndexer) + '</th><th>' + esc(_I18N.searchColSize) + '</th><th>' + esc(_I18N.searchColSeeds) + '</th><th>' + esc(_I18N.searchColAge) + '</th><th>' + esc(_I18N.searchColActions) + '</th></tr></thead><tbody>';
                 items.forEach(function (r) {
                     var size = r.size > 0 ? (r.size / 1073741824).toFixed(2) + ' ' + _I18N.sizeUnits : '—';
                     var seeds = r.seeders !== null ? '<span class="text-success">' + r.seeders + '</span>' : '—';
-                    h += '<tr class="pw-result-row"><td class="text-truncate" style="max-width:300px;" title="' + esc(r.title||'') + '">' + esc(r.title||'—') + '</td><td><span class="badge bg-secondary-lt" style="font-size:.55rem;">' + esc(r.indexer||'—') + '</span></td><td class="text-secondary">' + size + '</td><td>' + seeds + '</td><td class="text-secondary">' + _I18N.ageDaysTpl.replace('__D__', r.age||0) + '</td></tr>';
+                    // Issue #71 — tracker title links to Prowlarr's manual-search
+                    // detail page when the indexer provided one.
+                    var titleHtml = r.infoUrl
+                        ? '<a href="' + esc(r.infoUrl) + '" target="_blank" rel="noopener">' + esc(r.title||'—') + '</a>'
+                        : esc(r.title||'—');
+                    var grabBtn = '<button type="button" class="btn btn-sm btn-outline-primary pw-grab-btn" data-guid="' + esc(r.guid||'') + '" data-indexer-id="' + esc(String(r.indexerId||0)) + '">' + esc(_I18N.searchGrabBtn) + '</button>';
+                    h += '<tr class="pw-result-row"><td class="text-truncate" style="max-width:300px;" title="' + esc(r.title||'') + '">' + titleHtml + '</td><td><span class="badge bg-secondary-lt" style="font-size:.55rem;">' + esc(r.indexer||'—') + '</span></td><td class="text-secondary">' + size + '</td><td>' + seeds + '</td><td class="text-secondary">' + _I18N.ageDaysTpl.replace('__D__', r.age||0) + '</td><td>' + grabBtn + '</td></tr>';
                 });
                 h += '</tbody></table></div>';
                 searchResults.innerHTML = h;
@@ -844,6 +858,37 @@
     }
     searchBtn.addEventListener('click', doSearch);
     searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
+
+    // Delegated on the results container — rows are rebuilt on every search,
+    // so a per-row listener would be silently dropped each time.
+    searchResults.addEventListener('click', function (e) {
+        var btn = e.target.closest ? e.target.closest('.pw-grab-btn') : null;
+        if (!btn) return;
+        var guid = btn.dataset.guid || '';
+        var indexerId = parseInt(btn.dataset.indexerId, 10) || 0;
+        if (!guid || !indexerId) return;
+        btn.disabled = true;
+        fetch((window.BASE_PATH || '') + '/prowlarr/grab', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ guid: guid, indexerId: indexerId }),
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var ok = d && d.ok !== false;
+                if (ok) {
+                    btn.textContent = '✓';
+                    if (window._prismarrToast) window._prismarrToast(_I18N.searchGrabSent, 'success');
+                } else {
+                    btn.disabled = false;
+                    if (window._prismarrToast) window._prismarrToast(_I18N.searchGrabFailedTpl.replace('__ERROR__', (d && d.error) || _I18N.commonError), 'danger');
+                }
+            })
+            .catch(function () {
+                btn.disabled = false;
+                if (window._prismarrToast) window._prismarrToast(_I18N.searchGrabFailedTpl.replace('__ERROR__', _I18N.commonError), 'danger');
+            });
+    });
 
     // ══ Modal Ajouter ══
     var schemaCache = null;
@@ -863,7 +908,7 @@
         openModal('modal-add-indexer');
         if (!schemaCache) {
             document.getElementById('add-idx-list').innerHTML = '<div class="col-12 text-center py-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
-            fetch('/prowlarr/indexer/schema').then(function (r) { return r.json(); }).then(function (data) { schemaCache = data; populateFilterDropdowns(); renderSchemaList(getAddFilters()); });
+            fetch(BASE + '/prowlarr/indexer/schema').then(function (r) { return r.json(); }).then(function (data) { schemaCache = data; populateFilterDropdowns(); renderSchemaList(getAddFilters()); });
         } else { renderSchemaList(getAddFilters()); }
     });
 
@@ -987,7 +1032,7 @@
         var payload = collectTopLevel(document.getElementById('add-idx-fields'), selectedSchema);
         payload.fields = collectFields(document.getElementById('add-idx-fields'), selectedSchema.fields || []);
         btn.disabled = true; btn.textContent = _I18N.testing;
-        fetch('/prowlarr/indexer/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(payload)) })
+        fetch(BASE + '/prowlarr/indexer/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(payload)) })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 btn.disabled = false; btn.textContent = _I18N.test;
@@ -1001,7 +1046,7 @@
         var payload = collectTopLevel(document.getElementById('add-idx-fields'), selectedSchema);
         payload.fields = collectFields(document.getElementById('add-idx-fields'), selectedSchema.fields || []);
         btn.disabled = true; btn.textContent = _I18N.adding;
-        fetch('/prowlarr/indexer/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(payload)) })
+        fetch(BASE + '/prowlarr/indexer/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(payload)) })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 btn.disabled = false; btn.textContent = _I18N.add;
@@ -1043,7 +1088,7 @@
             document.getElementById('edit-idx-fields').innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
             document.getElementById('edit-idx-result').className = 'mt-2 alert d-none';
             openModal('modal-edit-indexer');
-            fetch('/prowlarr/indexer/' + id)
+            fetch(BASE + '/prowlarr/indexer/' + id)
                 .then(function (r) { return r.json(); })
                 .then(function (raw) {
                     editRaw = raw;
@@ -1065,7 +1110,7 @@
         var payload = collectTopLevel(document.getElementById('edit-idx-fields'), editRaw);
         payload.fields = collectFields(document.getElementById('edit-idx-fields'), editRaw.fields || []);
         btn.disabled = true; btn.textContent = _I18N.testing;
-        fetch('/prowlarr/indexer/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(payload)) })
+        fetch(BASE + '/prowlarr/indexer/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(payload)) })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 btn.disabled = false; btn.textContent = _I18N.test;
@@ -1079,7 +1124,7 @@
         var payload = collectTopLevel(document.getElementById('edit-idx-fields'), editRaw);
         payload.fields = collectFields(document.getElementById('edit-idx-fields'), editRaw.fields || []);
         btn.disabled = true; btn.textContent = _I18N.saving;
-        fetch('/prowlarr/indexer/' + editRaw.id + '/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(payload)) })
+        fetch(BASE + '/prowlarr/indexer/' + editRaw.id + '/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleanPayload(payload)) })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 btn.disabled = false; btn.textContent = _I18N.save;
@@ -1118,7 +1163,7 @@
             document.getElementById('info-tab-history').innerHTML = '';
             openModal('modal-info-indexer');
 
-            fetch('/prowlarr/indexer/' + id)
+            fetch(BASE + '/prowlarr/indexer/' + id)
                 .then(function(r) { return r.json(); })
                 .then(function(raw) {
                     infoRaw = raw;
@@ -1133,7 +1178,7 @@
                         if (histLoaded) return;
                         histLoaded = true;
                         document.getElementById('info-tab-history').innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
-                        fetch('/prowlarr/indexer/' + idxId + '/history')
+                        fetch(BASE + '/prowlarr/indexer/' + idxId + '/history')
                             .then(function(r) { return r.json(); })
                             .then(function(records) { renderInfoHistory(records); });
                     });
@@ -1154,7 +1199,7 @@
 
         var torznabUrl = '';
         if (raw.indexerUrls && raw.indexerUrls.length) {
-            torznabUrl = window.location.origin + '/prowlarr/indexer/' + raw.id;
+            torznabUrl = window.location.origin + BASE + '/prowlarr/indexer/' + raw.id;
         }
 
         var h = '<h6 class="mb-3" style="color:#E88D1A;">' + esc(_I18N.infoDetailsHeading) + '</h6>';
@@ -1233,8 +1278,7 @@
             var typeBadge = r.eventType === 'indexerRss' ? '<span class="badge bg-cyan-lt" style="font-size:.55rem;">' + esc(_I18N.infoEventRss) + '</span>'
                 : r.eventType === 'indexerQuery' ? '<span class="badge bg-indigo-lt" style="font-size:.55rem;">' + esc(_I18N.infoEventQuery) + '</span>'
                 : '<span class="badge bg-secondary-lt" style="font-size:.55rem;">' + esc(r.eventType || '—') + '</span>';
-            var locale = (document.documentElement.lang || 'fr-FR');
-            h += '<tr class="small"><td class="text-secondary text-nowrap">' + (r.date ? new Date(r.date).toLocaleString(locale, {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—') + '</td>';
+            h += '<tr class="small"><td class="text-secondary text-nowrap">' + (r.date ? window._prismarrFmtDateTime(new Date(r.date)) : '—') + '</td>';
             h += '<td>' + typeBadge + '</td>';
             h += '<td class="text-truncate" style="max-width:200px;">' + esc(r.data && r.data.query ? r.data.query : '—') + '</td>';
             h += '<td class="text-secondary">' + esc(r.data && r.data.source ? r.data.source : '—') + '</td></tr>';
@@ -1254,7 +1298,7 @@
     document.getElementById('info-idx-delete').addEventListener('click', function() {
         if (!infoRaw) return;
         if (!confirm(_I18N.confirmDeleteIndexerTpl.replace('__NAME__', infoRaw.name || ''))) return;
-        fetch('/prowlarr/indexer/' + infoRaw.id + '/delete', { method: 'POST' })
+        fetch(BASE + '/prowlarr/indexer/' + infoRaw.id + '/delete', { method: 'POST' })
             .then(function(r) { return r.json(); })
             .then(function(d) { if (d.ok) { closeModal('modal-info-indexer'); window.location.reload(); } });
     });

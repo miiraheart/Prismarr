@@ -30,7 +30,7 @@
 <script>
 (function () {
   var INDEX_URL  = {{ path('trakt_watchlist_index')|json_encode|raw }};
-  var TOGGLE_URL = '/decouverte/watchlist/toggle';
+  var TOGGLE_URL = {{ path('tmdb_watchlist_toggle')|json_encode|raw }};
   var I18N = {
     added:   {{ 'decouverte.watchlist.added_toast'|trans|json_encode|raw }},
     removed: {{ 'decouverte.watchlist.removed_toast'|trans|json_encode|raw }},

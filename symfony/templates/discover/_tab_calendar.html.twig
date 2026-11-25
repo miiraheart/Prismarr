@@ -964,10 +964,10 @@
         // cached JSON or edge case with empty libraries).
         if (ev.type === 'film' && ev.id) {
             var radarrSlug = ev._instanceSlug || DEFAULT_RADARR_SLUG;
-            target = '/medias/' + radarrSlug + '/films?open=' + ev.id;
+            target = window.BASE_PATH + '/medias/' + radarrSlug + '/films?open=' + ev.id;
         } else if (ev.type === 'episode' && ev.seriesId) {
             var sonarrSlug = ev._instanceSlug || DEFAULT_SONARR_SLUG;
-            target = '/medias/' + sonarrSlug + '/series?open=' + ev.seriesId;
+            target = window.BASE_PATH + '/medias/' + sonarrSlug + '/series?open=' + ev.seriesId;
         }
         if (target) {
             e.preventDefault();

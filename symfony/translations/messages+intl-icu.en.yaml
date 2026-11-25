@@ -67,7 +67,7 @@ sidebar:
     qbittorrent: qBittorrent
     deluge: Deluge
     transmission: Transmission
-    discovery: Discover
+    discovery: 'Search'
     calendar: Calendar
     radarr: Radarr
     sonarr: Sonarr
@@ -77,6 +77,7 @@ sidebar:
     lists: Lists
     films: Movies
     series: TV Shows
+    bazarr: Bazarr
   footer:
     collapse: Collapse sidebar
     expand: Expand sidebar
@@ -215,18 +216,12 @@ setup:
     email_invalid: Invalid email.
     password_too_short: Password must be at least 8 characters.
     password_mismatch: The two passwords do not match.
-  flash:
-    welcome: 'Prismarr is ready. Welcome!'
-  nav:
-    step: 'Step {current}/{total}'
   stepper:
     welcome: Welcome
     admin: Account
-    tmdb: TMDb
-    managers: Media
-    indexers: Indexers
-    downloads: Downloads
-    finish: Finish
+    services: Services
+  flash:
+    connect_services: Your admin account is ready. Connect your services below to get started.
   step:
     welcome:
       title: Welcome to Prismarr
@@ -242,7 +237,7 @@ setup:
         en: English
         fr: Français
     admin:
-      eyebrow: 'Step 2 of 7'
+      eyebrow: 'Step 2 of 3'
       title: Create your admin account
       subtitle: 'This account will have access to every Prismarr configuration option. You can create more users later from the admin area.'
       email: Email
@@ -254,101 +249,15 @@ setup:
       toggle_visibility: Show/hide
       back: '← Back'
       cta: 'Create account →'
-    tmdb:
-      eyebrow: 'Step 3 of 7 · Optional'
-      title: The Movie Database (TMDb)
-      subtitle: 'Required for the <strong>Discover</strong> page (trending movies & TV shows, recommendations, watchlist). Create a free key on <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org</a>. If you skip this step, Discover will be disabled.'
-      api_key: API v3 key
-      api_key_hint: 'v3 only — v4 (Bearer token) is not supported yet.'
-    managers:
-      eyebrow: 'Step 4 of 7 · Optional'
-      title: Media managers
-      subtitle: 'Radarr manages your movie library, Sonarr manages TV shows. You can configure both, only one, or skip this step.'
-      default_instance_hint: 'This becomes your default Radarr / Sonarr instance. You can add more instances later from /admin/settings — useful when you run a separate 1080p + 4K Radarr, or a regular + anime Sonarr.'
-      radarr:
-        section: '🎬 Radarr — Movies'
-        subtitle: Automated movie management service.
-      sonarr:
-        section: '📺 Sonarr — TV Shows'
-        subtitle: Automated TV show management service.
-      fields:
-        url: URL
-        api_key: API key
-    indexers:
-      eyebrow: 'Step 5 of 7 · Optional'
-      title: Indexers & requests
-      subtitle: 'Prowlarr centralises your tracker indexers. Seerr lets users request movies and TV shows, which are then sent to Radarr/Sonarr.'
-      prowlarr:
-        section: '🔎 Prowlarr — Indexers'
-        subtitle: Indexer aggregator compatible with Radarr/Sonarr.
-      jellyseerr:
-        section: '🙋 Seerr — User requests'
-        subtitle: Request interface for end users.
-    downloads:
-      eyebrow: 'Step 6 of 7 · Optional'
-      title: Download client
-      subtitle: 'qBittorrent is your BitTorrent client. Gluetun is an optional VPN router that sits in front of qBittorrent to mask your IP.'
-      qbittorrent:
-        section: '⬇️ qBittorrent'
-        subtitle: Authentication through the qBittorrent Web UI.
-        user: Username
-        password: Password
-        reverse_proxy_hint: 'Leave the username and password empty if qBittorrent sits behind a reverse proxy that injects authentication itself (qui, traefik forward auth, …).'
-      deluge:
-        section: Deluge
-        subtitle: 'Torrent client (Web UI) — used for the Deluge tab.'
-        password: Web UI password
-        reverse_proxy_hint: 'Leave the password empty if Deluge sits behind an authenticating reverse proxy that injects the session for you.'
-      transmission:
-        section: '⬇️ Transmission'
-        subtitle: Authentication through the Transmission RPC interface.
-        user: Username
-        password: Password
-        reverse_proxy_hint: 'Leave the username and password empty if Transmission sits behind a reverse proxy that injects authentication itself, or if RPC authentication is disabled.'
-      usenet_optional: 'Usenet — optional'
-      sabnzbd:
-        section: 'SABnzbd'
-        subtitle: 'Usenet download client. Needs the URL and the API key.'
-        api_key: 'API key'
-      nzbget:
-        section: 'NZBGet'
-        subtitle: 'Usenet download client. Username and password are optional (reverse proxy / auth disabled on the LAN).'
-      gluetun:
-        section: 'Gluetun'
-        section_suffix: 'VPN — optional'
-        subtitle: 'Leave blank if qBittorrent does not route through a VPN.'
-        url: URL (Control Server)
-        api_key: API key
-        api_key_optional: (optional)
-        api_key_placeholder: 'X-API-Key value if the Control Server is protected'
-    finish:
-      eyebrow: 'Step 7 of 7'
-      title: "You're all set!"
-      subtitle: "Here is a summary of your configuration. You can edit or add services at any time from the admin area."
-      badge_configured: Configured
-      badge_skipped: Skipped
-      cta: 'Launch Prismarr →'
-    common:
-      back: '← Back'
-      skip: Skip this step
-      save_next: 'Save and continue →'
   test:
-    button: Test connection
-    testing: Testing…
-    ok: Connected
     category:
       network: Cannot reach service
       auth: Wrong API key or password
-      host_whitelist: 'Host blocked by SABnzbd (add it to host_whitelist)'
       forbidden: Access forbidden (403)
       not_found: Endpoint not found (404)
       server_error: Service error (5xx)
       unconfigured: Fill in the URL and credentials first
       unknown: Unexpected response
-    error:
-      csrf: 'Session expired, please refresh the page'
-      forbidden: Setup is already completed
-      rate_limited: Too many test requests, wait a moment
 
 home:
   welcome:
@@ -356,7 +265,7 @@ home:
     subtitle: No service is configured yet. Pick a section to get started.
     cards:
       discovery:
-        title: Discover (TMDb)
+        title: 'Search (TMDb)'
         subtitle: Trending movies & TV shows, watchlist.
       managers:
         title: Radarr & Sonarr
@@ -422,11 +331,22 @@ dashboard:
     view_all: 'View all →'
   trending:
     title: Trending this week
-    discover_cta: 'Discover →'
+    discover_cta: 'Search →'
   recent:
     title: Recently added to your library
+  transmission:
+    title: Transmission transfers
+    open_cta: 'Open →'
+    downloading: Downloading
+    seeding: Seeding
+    paused: Paused
+    dl_speed: Download speed
+    up_speed: Upload speed
+    empty: Nothing downloading right now
+    unreachable: Unable to reach Transmission
   plex:
     title: Current Plex activity
+    title_tracearr: Current media activity
     settings_cta: 'Settings →'
     streams: Streams
     mbps: Mbps
@@ -456,6 +376,10 @@ dashboard:
       unconfigured: Tautulli is not configured
       unreachable: Unable to reach Tautulli
       auth: Invalid Tautulli API key or unauthorized
+    error_tracearr:
+      unconfigured: Tracearr is not configured
+      unreachable: Unable to reach Tracearr
+      auth: Invalid Tracearr API key or unauthorized
     tab:
       now: Now playing
       recent: Recently watched
@@ -469,6 +393,14 @@ dashboard:
       cast: 'Cast:'
       studio: 'Studio:'
       tech: Stream
+  emby:
+    title: Current Emby activity
+    settings_cta: 'Settings →'
+    empty: No active Emby streams
+    error:
+      unconfigured: Emby is not configured
+      unreachable: Unable to reach Emby
+      auth: Invalid Emby API key or unauthorized
   type:
     film: Movie
     series: TV Show
@@ -486,7 +418,7 @@ dashboard:
     cta_discover: '▶ Discover'
   quicklook:
     manage: 'Manage'
-    discover: 'View in Discover'
+    discover: 'View in Search'
     close: 'Close'
     runtime: '{min} min'
     seasons: '{count} seasons'
@@ -574,6 +506,44 @@ tautulli:
     items: '{count, plural, one {# item} other {# items}}'
     episodes: '{count, plural, one {# episode} other {# episodes}}'
 
+tracearr:
+  title: Tracearr Activity
+  period:
+    week: 7 days
+    month: 30 days
+    year: 1 year
+  section:
+    now_playing: Now playing
+    plays: Plays over time
+    activity_hour: Plays by hour of day
+    activity_dow: Plays by day of week
+    platforms: Plays by platform
+    quality: Stream quality
+    concurrent: Concurrent streams
+    history: History
+    users: Users
+  now_playing:
+    empty: Nothing is playing right now.
+  stats:
+    today_plays: Plays today
+    watch_time_today: Hours watched today
+    active_users_today: Active users today
+    plays_30d: Plays (30 days)
+    total_users: Users
+    violations_7d: Violations (7 days)
+  charts:
+    empty: No play data for this period
+  history:
+    load_more: Load more
+    empty: No watch history yet.
+  users:
+    empty: No user activity yet.
+    col:
+      user: User
+      server: Server
+      last_seen: Last seen
+      plays: Plays
+      trust: Trust score
 profile:
   title: My profile
   identity:
@@ -675,13 +645,12 @@ admin:
     title: External services
     description: 'URLs and API keys for the services Prismarr drives. Use <em>Test</em> to validate connectivity after changes.'
     group:
-      discovery: Discovery
-      managers: Managers
       indexers: Indexers & requests
       downloads: Downloads
       monitoring: Monitoring
+      media: 'Media'
     subtitle:
-      tmdb: Movie & TV discovery, watchlist
+      tmdb: 'Movie & TV search, watchlist'
       radarr: Movie manager
       sonarr: TV show manager
       prowlarr: Indexer aggregator
@@ -695,6 +664,9 @@ admin:
       tautulli: 'Plex activity (via Tautulli)'
       trakt: Watchlist & ratings
       mdblist: 'Curated lists & ratings'
+      bazarr: 'Subtitle manager (via Bazarr)'
+      tracearr: 'Plex / Jellyfin / Emby activity (via Tracearr)'
+      emby: 'Emby now playing'
     sidebar_toggle: Menu
     sidebar_toggle_title: Show in sidebar
     status:
@@ -706,6 +678,19 @@ admin:
     test: Test
     enabled: Enabled
     enabled_title: 'When off, Prismarr stops polling this service and treats it as not configured. URL and API key are kept.'
+    search_placeholder: 'Search services'
+    none_connected: 'No service connected yet. Open one below to set it up.'
+    no_match: 'No service matches your search.'
+    instances_count: '{count, plural, one {# instance} other {# instances}}'
+    state:
+      checking: 'Checking…'
+      up: 'Operational'
+      down: 'Unreachable'
+      unknown: 'Not checked'
+      disabled: 'Disabled'
+      new: 'Not configured'
+    remove: 'Remove'
+    remove_undo: 'Undo remove'
   instances:
     add: '+ Add a {service} instance'
     empty:
@@ -740,6 +725,9 @@ admin:
       slug_auto: Auto-generated from the name
       slug_hint: 'Used in URLs (e.g. /radarr/{slug}/films). Lowercase letters, digits and dashes only.'
       slug_warning: 'Editing the slug will break any external bookmark or link pointing to the old URL.'
+      default_quality_profile: Default quality profile
+      default_quality_profile_none: 'None (use the first available)'
+      default_quality_profile_hint: 'Preselected in the quick-add and library add forms for this instance. Leave on None to keep the previous behaviour.'
     flash:
       created: Instance created.
       updated: Instance updated.
@@ -755,7 +743,7 @@ admin:
     prismarr_ui_label: Interface language
     prismarr_ui_help: 'Language displayed in Prismarr. Users cannot change their own language (admin-only setting).'
     prismarr_metadata_label: TMDb metadata language
-    prismarr_metadata_help: 'Language for titles, overviews and metadata fetched from TMDb (for the Discover page and enriched cards).'
+    prismarr_metadata_help: 'Language for titles, overviews and metadata fetched from TMDb (for the Search page and enriched cards).'
     services_section: Connected services
     col_instance: Instance
     radarr_ui_label: UI language
@@ -793,7 +781,7 @@ admin:
       help: Page shown right after sign-in.
       options:
         dashboard: Dashboard
-        discovery: Discover (TMDb)
+        discovery: 'Search (TMDb)'
         films: Movies
         series: TV shows
         qbittorrent: Downloads
@@ -865,6 +853,13 @@ admin:
       options:
         comfortable: Comfortable (default)
         compact: Compact
+    activity_source:
+      label: Live activity source
+      help: 'Service feeding the dashboard "current activity" widget and the sidebar streaming pill when both Tautulli and Tracearr are configured. Falls back to the other one if the chosen service is not set up.'
+      options:
+        auto: Automatic (Tautulli first)
+        tautulli: Tautulli
+        tracearr: Tracearr
     page_size:
       label: Items per page
       help: 'Number of films or series listed per page on the library views. Larger pages render slower but show more at once.'
@@ -1002,14 +997,17 @@ admin:
     no_releases: 'No release information available right now (GitHub API unreachable).'
     installed: Installed
 
+  dirty_one: '1 unsaved change'
+  dirty_other: '__N__ unsaved changes'
 decouverte:
-  title: Discover
+  title: 'Search'
   search_placeholder: 'Search a movie or TV show on TMDb…'
   actions:
     filters: Filters
     watchlist: Watchlist
     explorer: Explorer
   filters:
+    drawer_title: Filters
     type: Type
     movies: Movies
     series: TV shows
@@ -1019,12 +1017,6 @@ decouverte:
     year_to: to
     vote_min: 'Min rating: {value}/10'
     sort: Sort
-    sort_options:
-      popularity: 'Popularity ↓'
-      vote_avg: 'Rating ↓'
-      vote_count: 'Reviews ↓'
-      release: 'Release date ↓'
-      revenue: 'Revenue ↓'
     apply: Apply
     reset: Reset
   search:
@@ -1198,7 +1190,7 @@ decouverte:
     type_film: Movie
     type_tv: TV Show
     empty_title: Watchlist empty
-    empty_message: 'Add movies and TV shows from the <a href="{path}">Discover page</a>.'
+    empty_message: 'Add movies and TV shows from the <a href="{path}">Search page</a>.'
     remove_confirm: 'Remove "{title}" from the watchlist?'
     removed_toast: Removed from watchlist
     added_toast: Added to watchlist
@@ -1218,7 +1210,7 @@ decouverte:
     title: Explorer
     subtitle: 'Filter TMDb by genre, year, rating, language, popularity.'
     no_results: No results for these filters.
-    back_to_discover: Discover
+    back_to_discover: 'Search'
     section:
       type: Type
       genre: Genre
@@ -1259,6 +1251,31 @@ decouverte:
       unmonitored: Unmonitored
     page: 'Page {current} / {total}'
 
+  srch:
+    placeholder: 'Search a movie, a series, an actor or a director'
+    shortcut: 'Press / to search'
+    all_genres: 'All genres'
+    rating: 'Rating'
+    any_rating: 'Any rating'
+    sort:
+      relevance: 'Most relevant'
+      popularity: 'Most popular'
+      vote: 'Top rated'
+      newest: 'Newest'
+    hide_owned: 'Hide what I have'
+    people: 'People'
+    more: 'Load more'
+    count: '__N__ results'
+    browse: 'Browsing with your filters'
+    best: 'Best match'
+    others: 'Other results'
+    filmography: 'Filmography'
+    back: 'Back to results'
+    did_you_mean: 'Did you mean __S__?'
+    showing_for: 'Showing results for __S__.'
+    search_instead: 'Search instead for "__Q__"'
+    person_kicker: 'Person'
+    see_filmography: 'See filmography'
 media:
   api:
     tag_still_used: 'This tag is still in use. Remove it from all movies before deleting it.'
@@ -1346,6 +1363,8 @@ media:
     filters:
       search_placeholder: "Search…"
       apply: Apply
+      open: Filters
+      drawer_title: Filters
       status:
         all: All
         monitored: Monitored
@@ -1874,6 +1893,8 @@ media:
     filters:
       search_placeholder: "Search…"
       apply: Apply
+      open: Filters
+      drawer_title: Filters
       status:
         all: All
         monitored: Monitored
@@ -2063,6 +2084,8 @@ media:
       col_age: Age
       col_episode: Episode
       col_action: Action
+      ep_quality_label: Downloaded quality
+      ep_cf_score_label: Custom format score
       col_source: Source
       col_date: Date
       age_suffix: 'd'
@@ -4331,6 +4354,8 @@ usenet:
     prev: Previous
     next: Next
     page_of: 'Page {current} / {total}'
+    recent_title: 'Recent history'
+    view_all: 'View all ({count})'
   empty: 'The queue is empty.'
   toolbar:
     pause_all: Pause all
@@ -4579,6 +4604,10 @@ prowlarr:
     indexer_added: Indexer added!
     error_add_failed: Unable to add
     error_save_failed: Unable to save
+  search:
+    grab: Grab
+    grab_sent: Sent to download client
+    grab_failed_tpl: 'Grab failed: __ERROR__'
   apps:
     title: Applications
     page_title_full: 'Applications — Prowlarr'
@@ -5508,12 +5537,124 @@ jellyseerr:
       available: Available
       partially_available: Partially available
 
+bazarr:
+  title: Bazarr
+  subtitle: Subtitle management — wanted movies and episodes
+  nav:
+    wanted: Wanted
+    movies: Movies
+    series: Series
+    history: History
+  stat:
+    movies_wanted: Movies wanted
+    episodes_wanted: Episodes wanted
+    providers: Providers enabled
+  wanted:
+    movies_title: Movies missing subtitles
+    episodes_title: Episodes missing subtitles
+    empty: Nothing wanted
+    column_title: Title
+  landing:
+    most_missing_title: Most missing subtitles
+    empty: Nothing missing
+    view_movies: All movies
+    view_series: All series
+  movies:
+    title: Movies
+    empty: No movies found
+    column_title: Title
+    column_year: Year
+    column_language: Audio language
+    column_missing: Missing subtitles
+    none_missing: Complete
+    not_tracked: Not tracked
+  series:
+    title: Series
+    empty: No series found
+    column_title: Title
+    column_year: Year
+    column_episodes: Episode files
+    column_missing: Missing episodes
+    none_missing: Complete
+    not_tracked: Not tracked
+  filter:
+    search_placeholder: Search by title…
+    status_all: All
+    status_complete: Complete
+    status_missing: Missing
+    status_not_tracked: Not tracked
+    all_languages: All languages
+    sort_title_asc: Title A→Z
+    sort_missing_desc: Most missing first
+  grid:
+    complete: Complete
+    not_tracked: Not tracked
+    empty_filtered: No items match your filters
+  warming:
+    title: Loading subtitle data from Bazarr…
+    subtitle: This takes a few seconds the first time after a restart.
+    retry: Retry now
+  history:
+    movies_title: Movie subtitle history
+    episodes_title: Episode subtitle history
+    empty: No history yet
+    column_title: Title
+    column_action: Action
+    column_provider: Provider
+    column_language: Language
+    column_date: Date
+  series_detail:
+    title: Episodes
+    back: Back to series
+    empty: No episodes found
+    column_season: Season
+    column_episode: Episode
+    column_title: Title
+    column_language: Audio language
+    column_status: Subtitles
+    search: Search
+    complete: Complete
+  badge:
+    missing: Missing
+    missing_count: '{count, plural, one {# subtitle missing} other {# subtitles missing}}'
+    missing_episodes: '{count, plural, one {# episode missing subtitles} other {# episodes missing subtitles}}'
+    complete: Subtitles complete
+    subs: Subs
+    pending: Subtitle status is still loading from Bazarr
+  chips:
+    hi_title: Hearing-impaired subtitles
+    forced_title: Forced subtitles
+  detail:
+    subtitles: Subtitles
+    search: Search
+    episode_missing: Missing subtitles
+  auto:
+    started: Automatic search started
+    button: Auto search
+  modal:
+    title: Subtitle search
+    download: Download
+    no_results: No subtitles found
+    searching: Searching…
+    downloading: Downloading…
+    success: Subtitle downloaded
+    error: Could not complete the request
+    columns:
+      provider: Provider
+      language: Language
+      hi: HI
+      forced: Forced
+      score: Score
+      release: Release
+      uploader: Uploader
+      actions: Action
+
 user:
   email:
     already_exists: An account with this email already exists.
 
 watchlist_page:
-  back_to_discover: Discover
+  back_to_discover: 'Search'
   count_titles: '{count, plural, one {# title} other {# titles}}'
   films_suffix: movies
   series_suffix: TV shows

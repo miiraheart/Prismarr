@@ -15,7 +15,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Two guard levels for service sections:
- *   1. If the service is NOT configured (key missing in DB) → redirect to wizard.
+ *   1. If the service is NOT configured (key missing in DB) → redirect to the Services settings.
  *   2. If the service is configured but UNREACHABLE → redirect to the section
  *      index (which displays the banner) — avoids landing on a broken sub-page.
  *
@@ -30,26 +30,35 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 class ServiceRouteGuardSubscriber implements EventSubscriberInterface
 {
     /**
-     * @var array<string, array{service: string, service_id: string, keys?: list<string>, instance_type?: string, wizard: string, index: string}>
+     * `exclude_prefix` (optional) carves a sub-tree out of the rule's own
+     * route prefix: matching routes are left completely alone by this guard.
+     * Used for JSON API endpoints, which must answer with their controller's
+     * JSON error shape — a 302 to an HTML page turns a background fetch into
+     * an unparseable response, silently drops POST bodies, and leaks a flash
+     * message into the next page the user happens to load.
+     *
+     * @var array<string, array{service: string, service_id: string, keys?: list<string>, instance_type?: string, exclude_prefix?: string, index: string}>
      */
     private const RULES = [
-        'radarr_'           => ['service' => 'Radarr',      'service_id' => 'radarr',      'instance_type' => ServiceInstance::TYPE_RADARR,    'wizard' => 'app_setup_managers',  'index' => 'app_media_films'],
-        'app_media_films'   => ['service' => 'Radarr',      'service_id' => 'radarr',      'instance_type' => ServiceInstance::TYPE_RADARR,    'wizard' => 'app_setup_managers',  'index' => 'app_media_films'],
-        'app_media_radarr'  => ['service' => 'Radarr',      'service_id' => 'radarr',      'instance_type' => ServiceInstance::TYPE_RADARR,    'wizard' => 'app_setup_managers',  'index' => 'app_media_films'],
-        'sonarr_'           => ['service' => 'Sonarr',      'service_id' => 'sonarr',      'instance_type' => ServiceInstance::TYPE_SONARR,    'wizard' => 'app_setup_managers',  'index' => 'app_media_series'],
-        'app_media_series'  => ['service' => 'Sonarr',      'service_id' => 'sonarr',      'instance_type' => ServiceInstance::TYPE_SONARR,    'wizard' => 'app_setup_managers',  'index' => 'app_media_series'],
-        'app_media_sonarr'  => ['service' => 'Sonarr',      'service_id' => 'sonarr',      'instance_type' => ServiceInstance::TYPE_SONARR,    'wizard' => 'app_setup_managers',  'index' => 'app_media_series'],
-        'prowlarr_'         => ['service' => 'Prowlarr',    'service_id' => 'prowlarr',    'keys' => ['prowlarr_api_key', 'prowlarr_url'],     'wizard' => 'app_setup_indexers',  'index' => 'prowlarr_index'],
-        'jellyseerr_'       => ['service' => 'Jellyseerr',  'service_id' => 'jellyseerr',  'keys' => ['jellyseerr_api_key', 'jellyseerr_url'], 'wizard' => 'app_setup_indexers',  'index' => 'jellyseerr_index'],
-        'qbittorrent_'      => ['service' => 'qBittorrent', 'service_id' => 'qbittorrent', 'keys' => ['qbittorrent_url', 'qbittorrent_user'],  'wizard' => 'app_setup_downloads', 'index' => 'app_qbittorrent_index'],
-        'app_qbittorrent'   => ['service' => 'qBittorrent', 'service_id' => 'qbittorrent', 'keys' => ['qbittorrent_url', 'qbittorrent_user'],  'wizard' => 'app_setup_downloads', 'index' => 'app_qbittorrent_index'],
-        'deluge_'           => ['service' => 'Deluge',      'service_id' => 'deluge',      'keys' => ['deluge_url'],                            'wizard' => 'app_setup_downloads', 'index' => 'app_deluge_index'],
-        'app_deluge'        => ['service' => 'Deluge',      'service_id' => 'deluge',      'keys' => ['deluge_url'],                            'wizard' => 'app_setup_downloads', 'index' => 'app_deluge_index'],
-        'transmission_'     => ['service' => 'Transmission', 'service_id' => 'transmission', 'keys' => ['transmission_url'],                   'wizard' => 'app_setup_downloads', 'index' => 'app_transmission_index'],
-        'app_transmission'  => ['service' => 'Transmission', 'service_id' => 'transmission', 'keys' => ['transmission_url'],                   'wizard' => 'app_setup_downloads', 'index' => 'app_transmission_index'],
-        'tmdb_'             => ['service' => 'TMDb',        'service_id' => 'tmdb',        'keys' => ['tmdb_api_key'],                         'wizard' => 'app_setup_tmdb',      'index' => 'tmdb_index'],
-        'app_tautulli_index' => ['service' => 'Tautulli',   'service_id' => 'tautulli',    'keys' => ['tautulli_url', 'tautulli_api_key'],      'wizard' => 'admin_settings_index', 'index' => 'app_tautulli_index'],
-        'trakt_'            => ['service' => 'Trakt',       'service_id' => 'trakt',       'keys' => ['trakt_client_id', 'trakt_username'],     'wizard' => 'admin_settings_index', 'index' => 'trakt_index'],
+        'radarr_'           => ['service' => 'Radarr',      'service_id' => 'radarr',      'instance_type' => ServiceInstance::TYPE_RADARR,    'index' => 'app_media_films'],
+        'app_media_films'   => ['service' => 'Radarr',      'service_id' => 'radarr',      'instance_type' => ServiceInstance::TYPE_RADARR,    'index' => 'app_media_films'],
+        'app_media_radarr'  => ['service' => 'Radarr',      'service_id' => 'radarr',      'instance_type' => ServiceInstance::TYPE_RADARR,    'index' => 'app_media_films'],
+        'sonarr_'           => ['service' => 'Sonarr',      'service_id' => 'sonarr',      'instance_type' => ServiceInstance::TYPE_SONARR,    'index' => 'app_media_series'],
+        'app_media_series'  => ['service' => 'Sonarr',      'service_id' => 'sonarr',      'instance_type' => ServiceInstance::TYPE_SONARR,    'index' => 'app_media_series'],
+        'app_media_sonarr'  => ['service' => 'Sonarr',      'service_id' => 'sonarr',      'instance_type' => ServiceInstance::TYPE_SONARR,    'index' => 'app_media_series'],
+        'prowlarr_'         => ['service' => 'Prowlarr',    'service_id' => 'prowlarr',    'keys' => ['prowlarr_api_key', 'prowlarr_url'],     'index' => 'prowlarr_index'],
+        'jellyseerr_'       => ['service' => 'Jellyseerr',  'service_id' => 'jellyseerr',  'keys' => ['jellyseerr_api_key', 'jellyseerr_url'], 'index' => 'jellyseerr_index'],
+        'qbittorrent_'      => ['service' => 'qBittorrent', 'service_id' => 'qbittorrent', 'keys' => ['qbittorrent_url', 'qbittorrent_user'],  'index' => 'app_qbittorrent_index'],
+        'app_qbittorrent'   => ['service' => 'qBittorrent', 'service_id' => 'qbittorrent', 'keys' => ['qbittorrent_url', 'qbittorrent_user'],  'index' => 'app_qbittorrent_index'],
+        'deluge_'           => ['service' => 'Deluge',      'service_id' => 'deluge',      'keys' => ['deluge_url'],                            'index' => 'app_deluge_index'],
+        'app_deluge'        => ['service' => 'Deluge',      'service_id' => 'deluge',      'keys' => ['deluge_url'],                            'index' => 'app_deluge_index'],
+        'transmission_'     => ['service' => 'Transmission', 'service_id' => 'transmission', 'keys' => ['transmission_url'],                   'index' => 'app_transmission_index'],
+        'app_transmission'  => ['service' => 'Transmission', 'service_id' => 'transmission', 'keys' => ['transmission_url'],                   'index' => 'app_transmission_index'],
+        'tmdb_'             => ['service' => 'TMDb',        'service_id' => 'tmdb',        'keys' => ['tmdb_api_key'],                         'index' => 'tmdb_index'],
+        'app_tautulli_index' => ['service' => 'Tautulli',   'service_id' => 'tautulli',    'keys' => ['tautulli_url', 'tautulli_api_key'],      'index' => 'app_tautulli_index'],
+        'app_bazarr_'       => ['service' => 'Bazarr',      'service_id' => 'bazarr',      'keys' => ['bazarr_url', 'bazarr_api_key'],          'exclude_prefix' => 'app_bazarr_api_', 'index' => 'app_bazarr_index'],
+        'app_tracearr_index' => ['service' => 'Tracearr',   'service_id' => 'tracearr',    'keys' => ['tracearr_url', 'tracearr_api_key'],      'index' => 'app_tracearr_index'],
+        'trakt_'            => ['service' => 'Trakt',       'service_id' => 'trakt',       'keys' => ['trakt_client_id', 'trakt_username'],     'index' => 'trakt_index'],
     ];
 
     public function __construct(
@@ -108,10 +117,13 @@ class ServiceRouteGuardSubscriber implements EventSubscriberInterface
             }
         }
 
-        // 1. Service not configured → wizard
+        // 1. Service not configured → Services section of the settings page
         if (!$this->isConfigured($rule)) {
             $this->flash($event, $this->translator->trans('error.service_not_configured.service_unavailable_flash', ['service' => $rule['service']]));
-            $event->setResponse(new RedirectResponse($this->urls->generate($rule['wizard'])));
+            // app_configure_services sends admins to the Services settings and
+            // everyone else home: this guard runs before the firewall and cannot
+            // check roles itself.
+            $event->setResponse(new RedirectResponse($this->urls->generate('app_configure_services')));
             return;
         }
 
@@ -119,7 +131,7 @@ class ServiceRouteGuardSubscriber implements EventSubscriberInterface
         //    (skip if we ARE already on the index, which has its own banner).
         //    Strict comparison: isHealthy() now also returns null for
         //    unconfigured services, but step 1 above already redirects those
-        //    to the wizard, so only "true down" should trigger this redirect.
+        //    to the settings page, so only "true down" should trigger this redirect.
         //    v1.1.0 — pass the slug so the health probe targets THIS instance,
         //    not the default. Without it, breaking Radarr 4K would also flag
         //    Radarr 1 as down (shared cache key). The redirect target also
@@ -134,14 +146,20 @@ class ServiceRouteGuardSubscriber implements EventSubscriberInterface
     }
 
     /**
-     * @return array{service: string, service_id: string, keys?: list<string>, instance_type?: string, wizard: string, index: string}|null
+     * @return array{service: string, service_id: string, keys?: list<string>, instance_type?: string, exclude_prefix?: string, index: string}|null
      */
     private function matchRule(string $route): ?array
     {
         foreach (self::RULES as $prefix => $rule) {
-            if (str_starts_with($route, $prefix)) {
-                return $rule;
+            if (!str_starts_with($route, $prefix)) {
+                continue;
             }
+            // Carve-out wins over the rule it belongs to: the route is exempt
+            // from the guard entirely (see RULES' doc block).
+            if (isset($rule['exclude_prefix']) && str_starts_with($route, $rule['exclude_prefix'])) {
+                return null;
+            }
+            return $rule;
         }
         return null;
     }

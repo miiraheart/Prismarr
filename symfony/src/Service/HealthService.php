@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\ServiceInstance;
+use App\Service\Media\BazarrClient;
 use App\Service\Media\DelugeClient;
 use App\Service\Media\GluetunClient;
 use App\Service\Media\JellyseerrClient;
@@ -13,6 +14,8 @@ use App\Service\Media\RadarrClient;
 use App\Service\Media\ServiceHealthCache;
 use App\Service\Media\SonarrClient;
 use App\Service\Media\TautulliClient;
+use App\Service\Media\TracearrClient;
+use App\Service\Media\EmbyClient;
 use App\Service\Media\TmdbClient;
 use App\Service\Media\TraktClient;
 use App\Service\Media\TransmissionClient;
@@ -20,6 +23,7 @@ use App\Service\Media\Usenet\NzbgetClient;
 use App\Service\Media\Usenet\SabnzbdClient;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Tests third-party service availability.
@@ -33,7 +37,7 @@ use Symfony\Contracts\Cache\ItemInterface;
  *    the admin "Test connection" button can return an actionable hint
  *    without leaking internal stack traces.
  */
-class HealthService
+class HealthService implements ResetInterface
 {
     private const CACHE_TTL = 10;
 
@@ -80,6 +84,13 @@ class HealthService
         // Transmission — nullable + last for the same legacy-test-constructor
         // reason as the clients above.
         private readonly ?TransmissionClient $transmission = null,
+        // Bazarr (subtitle management) — nullable + last, same
+        // legacy-test-constructor reason as the clients above.
+        private readonly ?BazarrClient      $bazarr = null,
+        // Tracearr — nullable + last, same legacy-test-constructor reason.
+        private readonly ?TracearrClient $tracearr = null,
+        // Emby (current playback activity) — same nullable + last convention.
+        private readonly ?EmbyClient       $emby = null,
         // Trakt: nullable + last for the same legacy-test-constructor
         // reason as the clients above.
         private readonly ?TraktClient      $trakt = null,
@@ -257,7 +268,10 @@ class HealthService
             'sabnzbd'     => $this->sabnzbd?->ping() ?? false,
             'nzbget'      => $this->nzbget?->ping() ?? false,
             'tautulli'    => $this->tautulli?->ping() ?? false,
+            'tracearr'    => $this->tracearr?->ping() ?? false,
+            'emby'        => $this->emby?->ping() ?? false,
             'transmission' => $this->transmission?->ping() ?? false,
+            'bazarr'      => $this->bazarr?->ping() ?? false,
             'trakt'       => $this->trakt?->ping() ?? false,
             'mdblist'     => $this->mdblist?->ping() ?? false,
             'gluetun'     => $this->gluetun?->ping() ?? false,
@@ -277,7 +291,7 @@ class HealthService
      * (issue #15). Radarr/Sonarr are absent on purpose — they enable/disable
      * per instance via the `enabled` flag on `service_instance`.
      */
-    public const TOGGLEABLE_SERVICES = ['prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt', 'mdblist'];
+    public const TOGGLEABLE_SERVICES = ['prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'bazarr', 'tracearr', 'emby', 'trakt', 'mdblist'];
 
     public function isConfigured(string $service): bool
     {
@@ -331,6 +345,17 @@ class HealthService
             // including get_activity, is apikey-authenticated).
             'tautulli' =>
                 $this->config->has('tautulli_url') && $this->config->has('tautulli_api_key'),
+            // Bazarr needs both the URL and the API key (every /api call is
+            // X-API-KEY-authenticated, including /system/status).
+            'bazarr' =>
+                $this->config->has('bazarr_url') && $this->config->has('bazarr_api_key'),
+            // Tracearr's public API is Bearer-token only — URL + key both required.
+            'tracearr' =>
+                $this->config->has('tracearr_url') && $this->config->has('tracearr_api_key'),
+            // Emby needs both the URL and an API key (every endpoint the
+            // widget uses, /Sessions included, is token-authenticated).
+            'emby' =>
+                $this->config->has('emby_url') && $this->config->has('emby_api_key'),
             // Trakt reads a *public* profile: the client id (API key) plus the
             // username slug are all it needs. No OAuth, no secret, no URL,
             // the endpoint is always api.trakt.tv.
@@ -367,7 +392,7 @@ class HealthService
         if ($service === null) {
             $this->statusCache = [];
             if ($this->serviceHealthCache !== null) {
-                foreach (['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'trakt', 'mdblist'] as $svc) {
+                foreach (['radarr', 'sonarr', 'prowlarr', 'jellyseerr', 'qbittorrent', 'deluge', 'transmission', 'tmdb', 'sabnzbd', 'nzbget', 'tautulli', 'bazarr', 'tracearr', 'emby', 'trakt', 'mdblist'] as $svc) {
                     $this->serviceHealthCache->clear($svc);
                 }
             }
@@ -375,6 +400,20 @@ class HealthService
             unset($this->statusCache[$service]);
             $this->serviceHealthCache?->clear($service);
         }
+    }
+
+    /**
+     * FrankenPHP worker mode — Symfony's services_resetter calls reset()
+     * between requests (this service is auto-tagged kernel.reset via the
+     * ResetInterface autoconfiguration). Drop the per-request in-process
+     * isHealthy() memo AND the memoized shared-pool generation token so one
+     * request's health verdicts can't bleed into the next; this also removes
+     * a latent staleness edge in classic mode.
+     */
+    public function reset(): void
+    {
+        $this->statusCache = [];
+        $this->generation = null;
     }
 
     /**
@@ -708,6 +747,45 @@ class HealthService
                 return [
                     'url'     => rtrim($url, '/') . '/api/v2?' . http_build_query(['apikey' => $key, 'cmd' => 'get_activity']),
                     'headers' => ['Accept: application/json'],
+                ];
+            }
+            case 'bazarr': {
+                $url = $get('bazarr_url');
+                $key = $get('bazarr_api_key');
+                if ($url === '' || $key === '') return null;
+                // Same read-only endpoint the client's ping() uses; a bad or
+                // revoked key answers 401 → diagnosed as `auth`.
+                return [
+                    'url'     => rtrim($url, '/') . '/api/system/status',
+                    'headers' => ['X-API-KEY: ' . $key, 'Accept: application/json'],
+                ];
+            }
+            case 'tracearr': {
+                $url = $get('tracearr_url');
+                $key = $get('tracearr_api_key');
+                if ($url === '' || $key === '') return null;
+                // /health is the cheapest key-authenticated public endpoint:
+                // a bad or revoked token answers 401 → `auth`.
+                return [
+                    'url'     => rtrim($url, '/') . TracearrClient::API_BASE . '/health',
+                    'headers' => ['Authorization: Bearer ' . $key, 'Accept: application/json'],
+                ];
+            }
+            case 'emby': {
+                $url = $get('emby_url');
+                $key = $get('emby_api_key');
+                if ($url === '' || $key === '') return null;
+                // /System/Info validates the key: Emby answers 401 on a bad
+                // X-Emby-Token, which diagnoseFromResponse() maps to `auth`.
+                // (/System/Info/Public would answer 200 for any key.) The key
+                // travels in a header so it never lands in an access log.
+                $base = rtrim($url, '/');
+                if (!str_ends_with(strtolower($base), '/emby')) {
+                    $base .= '/emby';
+                }
+                return [
+                    'url'     => $base . '/System/Info',
+                    'headers' => ['Accept: application/json', 'X-Emby-Token: ' . $key],
                 ];
             }
             case 'nzbget': {

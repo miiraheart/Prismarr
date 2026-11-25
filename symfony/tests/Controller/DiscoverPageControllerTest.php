@@ -398,7 +398,7 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         );
     }
 
-    public function testItBouncesToTheWizardWhenTmdbIsNotConfigured(): void
+    public function testItBouncesToConfigureServicesWhenTmdbIsNotConfigured(): void
     {
         $em  = $this->em();
         $row = $em->getRepository(Setting::class)->find('tmdb_api_key');
@@ -410,8 +410,10 @@ class DiscoverPageControllerTest extends AbstractWebTestCase
         $this->client->request('GET', '/decouverte');
 
         $this->assertResponseRedirects();
+        // Upstream 1.3.0 dropped the per-service setup steps; unconfigured
+        // services now go through app_configure_services.
         $this->assertStringContainsString(
-            'setup',
+            '/services/configurer',
             (string) $this->client->getResponse()->headers->get('Location'),
         );
     }

@@ -4,12 +4,19 @@ namespace App\Controller;
 
 use App\Entity\ServiceInstance;
 use App\Repository\Media\WatchlistItemRepository;
+use App\Service\ActivitySource;
+use App\Service\ConfigService;
+use App\Service\HealthCatalog;
 use App\Service\HealthService;
 use App\Service\Media\JellyseerrClient;
+use App\Service\Media\MediaLibraryCache;
 use App\Service\Media\RadarrClient;
 use App\Service\Media\SonarrClient;
 use App\Service\Media\TautulliClient;
+use App\Service\Media\TracearrClient;
+use App\Service\Media\EmbyClient;
 use App\Service\Media\TmdbClient;
+use App\Service\Media\TransmissionClient;
 use App\Service\ServiceInstanceProvider;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -17,6 +24,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -27,13 +35,14 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * whole page. Session 9c will wire the UI preferences (timezone, date
  * format, density…) into this template.
  */
-class DashboardController extends AbstractController
+class DashboardController extends AbstractController implements ResetInterface
 {
     private const UPCOMING_DAYS       = 7;
     private const MAX_REQUESTS        = 5;
     private const MAX_RECOMMENDATIONS = 16;
     private const MAX_RECENT          = 16;
     private const MAX_WATCHLIST       = 16;
+    private const MAX_TRANSMISSION    = 5;
     // #30 — short server-side cache for the heavy per-widget upstream calls.
     // Radarr/Sonarr aren't client-cached (unlike TMDb), so the async widget
     // fragments would each hit them live; this dedupes the calls shared across
@@ -64,7 +73,57 @@ class DashboardController extends AbstractController
         private readonly CacheInterface $cache,
         private readonly TautulliClient $tautulli,
         private readonly \App\Service\DashboardLayoutService $layout,
+        // Shared per-instance library cache: replaces this controller's
+        // private dash.movies/dash.series copies so the dashboard shares one
+        // entry with the Films/Series pages — and so MediaController's
+        // invalidation sites finally reach the dashboard. Nullable + last so
+        // legacy positional test constructors keep working.
+        private readonly ?MediaLibraryCache $libraryCache = null,
+        // Transmission — optional torrent widget. Nullable + last so existing
+        // positional constructions (tests) keep working.
+        private readonly ?TransmissionClient $transmission = null,
+        // Tracearr — fallback source for the activity widget. Nullable + last
+        // so the positional constructor calls in DashboardControllerTest hold.
+        private readonly ?TracearrClient $tracearr = null,
+        // Reads the activity-source preference; nullable + last for the same
+        // positional-constructor reason (null → auto).
+        private readonly ?ConfigService $config = null,
+        // Nullable + last: DashboardControllerTest builds this controller
+        // positionally, so a new dependency must not shift the signature.
+        private readonly ?EmbyClient $emby = null,
     ) {}
+
+    /**
+     * FrankenPHP worker mode — controllers autowired as services are shared
+     * singletons that survive across requests in a worker. Without this, the
+     * per-request `$moviesCache` / `$seriesCache` memo (primed by the first
+     * dashboard paint) would be served to every later request in the same
+     * worker, showing stale library data until the worker recycled. Symfony's
+     * services_resetter calls reset() between requests (auto-tagged
+     * kernel.reset via the ResetInterface autoconfiguration).
+     */
+    public function reset(): void
+    {
+        $this->moviesCache = null;
+        $this->seriesCache = null;
+    }
+
+    /**
+     * Which service feeds the "current activity" widget — the admin
+     * preference via ActivitySource (auto = Tautulli first, unchanged
+     * behaviour), falling back to whichever one is configured.
+     */
+    private function activitySource(): ?string
+    {
+        return ActivitySource::resolve(
+            $this->config?->get(ActivitySource::SETTING),
+            fn(string $service) => match ($service) {
+                'tautulli' => $this->health->isConfigured('tautulli'),
+                'tracearr' => $this->tracearr !== null && $this->health->isConfigured('tracearr'),
+                default    => false,
+            },
+        );
+    }
 
     /**
      * #30 — wrap an expensive upstream aggregate in a short shared cache.
@@ -107,40 +166,59 @@ class DashboardController extends AbstractController
      */
     private function movies(): array
     {
-        return $this->moviesCache ??= $this->cached('movies', function () {
-            $out = [];
-            foreach ($this->instances->getEnabled(ServiceInstance::TYPE_RADARR) as $inst) {
-                $rows = $this->safeFetch(
-                    'library.movies.' . $inst->getSlug(),
-                    fn() => $this->radarr->withInstance($inst)->getMovies(),
-                ) ?? [];
-                foreach ($rows as $row) {
-                    $row['_instanceSlug'] = $inst->getSlug();
-                    $row['_instanceName'] = $inst->getName();
-                    $out[] = $row;
-                }
-            }
-            return $out;
-        });
+        return $this->moviesCache ??= $this->collectLibrary(ServiceInstance::TYPE_RADARR);
     }
 
     private function series(): array
     {
-        return $this->seriesCache ??= $this->cached('series', function () {
-            $out = [];
-            foreach ($this->instances->getEnabled(ServiceInstance::TYPE_SONARR) as $inst) {
-                $rows = $this->safeFetch(
-                    'library.series.' . $inst->getSlug(),
-                    fn() => $this->sonarr->withInstance($inst)->getSeries(),
-                ) ?? [];
-                foreach ($rows as $row) {
-                    $row['_instanceSlug'] = $inst->getSlug();
-                    $row['_instanceName'] = $inst->getName();
-                    $out[] = $row;
-                }
+        return $this->seriesCache ??= $this->collectLibrary(ServiceInstance::TYPE_SONARR);
+    }
+
+    /**
+     * Fan out over every enabled instance, reading each one's list through the
+     * SHARED MediaLibraryCache entry (`media.movies.<slug>` /
+     * `media.series.<slug>`) rather than this controller's own
+     * `dash.movies` / `dash.series` copy, then tag the rows with the instance
+     * they came from. The tag is applied HERE, never stored in the cache —
+     * MediaController's library pages read the same entry and must not see
+     * dashboard-private keys.
+     *
+     * `dash.movies` / `dash.series` were a second, uncoordinated 45 s copy of
+     * the same payload with no invalidation hook, so a mutation on the Films
+     * page could stay invisible on the dashboard for the rest of the window.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectLibrary(string $type): array
+    {
+        $isMovies = $type === ServiceInstance::TYPE_RADARR;
+        $out      = [];
+
+        foreach ($this->instances->getEnabled($type) as $inst) {
+            $slug = $inst->getSlug();
+            $rows = $this->safeFetch(
+                'library.' . ($isMovies ? 'movies.' : 'series.') . $slug,
+                function () use ($isMovies, $inst, $slug) {
+                    if ($this->libraryCache === null) {
+                        return $isMovies
+                            ? $this->radarr->withInstance($inst)->getMovies()
+                            : $this->sonarr->withInstance($inst)->getSeries();
+                    }
+
+                    return $isMovies
+                        ? $this->libraryCache->movies($slug, fn() => $this->radarr->withInstance($inst)->getMovies())
+                        : $this->libraryCache->series($slug, fn() => $this->sonarr->withInstance($inst)->getSeries());
+                },
+            ) ?? [];
+
+            foreach ($rows as $row) {
+                $row['_instanceSlug'] = $slug;
+                $row['_instanceName'] = $inst->getName();
+                $out[] = $row;
             }
-            return $out;
-        });
+        }
+
+        return $out;
     }
 
     #[Route('/tableau-de-bord', name: 'app_dashboard')]
@@ -157,6 +235,9 @@ class DashboardController extends AbstractController
             'jellyseerr' => $this->health->isConfigured('jellyseerr'),
             'tmdb'       => $this->health->isConfigured('tmdb'),
             'tautulli'   => $this->health->isConfigured('tautulli'),
+            'transmission' => $this->transmission !== null && $this->health->isConfigured('transmission'),
+            'tracearr'   => $this->health->isConfigured('tracearr'),
+            'emby'       => $this->health->isConfigured('emby'),
         ];
 
         return $this->render('dashboard/index.html.twig', [
@@ -257,26 +338,32 @@ class DashboardController extends AbstractController
     }
 
     /**
-     * Async fragment — current Plex activity from Tautulli. Skipped entirely
-     * (empty body → hidden client-side) when Tautulli isn't configured /
-     * enabled. Otherwise renders the widget body; the fragment re-fetches on a
-     * 10 s interval (see index.html.twig) and fails open to an error state, so
-     * a down/misconfigured Tautulli never breaks the dashboard.
+     * Async fragment — current media activity from Tautulli, or from Tracearr
+     * when Tautulli isn't set up (see activitySource()). Skipped entirely
+     * (empty body → hidden client-side) when neither is configured / enabled.
+     * Otherwise renders the widget body; the fragment re-fetches on a 10 s
+     * interval (see index.html.twig) and fails open to an error state, so a
+     * down/misconfigured source never breaks the dashboard.
      */
     #[Route('/tableau-de-bord/widget/plex', name: 'app_dashboard_widget_plex')]
     public function widgetPlex(): Response
     {
-        if (!$this->health->isConfigured('tautulli')) {
+        $source = $this->activitySource();
+        if ($source === null) {
             return new Response('');
         }
         set_time_limit(60);
 
-        $activity = $this->tautulli->getActivity();
-
         // History changes slowly; cache it ~60s so the 10s now-playing poll
-        // doesn't hit get_history every time. The relative time label is now
-        // formatted in the template via the relative_date Twig filter.
-        $history = $this->cached('plex_history', fn() => $this->tautulli->getHistory(8));
+        // doesn't hit the history endpoint every time. The relative time label
+        // is formatted in the template via the relative_date Twig filter.
+        if ($source === 'tracearr') {
+            $activity = $this->tracearr->getActivity();
+            $history  = $this->cached('tracearr_history', fn() => $this->tracearr->getHistory(null, 8)['rows']);
+        } else {
+            $activity = $this->tautulli->getActivity();
+            $history  = $this->cached('plex_history', fn() => $this->tautulli->getHistory(8));
+        }
 
         $streaming = ($activity['streamCount'] ?? 0) > 0;
 
@@ -284,6 +371,54 @@ class DashboardController extends AbstractController
             'plex'        => $activity,
             'plex_history'=> $history,
             'plex_tab'    => $streaming ? 'now' : 'recent',
+            'plex_source' => $source,
+        ]);
+    }
+
+    /**
+     * Async fragment — Transmission transfer summary: global speeds, state
+     * counts and the torrents currently downloading. Skipped (empty body →
+     * hidden client-side) when Transmission isn't configured / enabled.
+     * Re-fetched on a 10 s interval (see index.html.twig); a failed RPC
+     * renders the unreachable state instead of breaking the dashboard.
+     */
+    #[Route('/tableau-de-bord/widget/transmission', name: 'app_dashboard_widget_transmission')]
+    public function widgetTransmission(): Response
+    {
+        if ($this->transmission === null || !$this->health->isConfigured('transmission')) {
+            return new Response('');
+        }
+        set_time_limit(60);
+
+        $torrents = $this->safeFetch('transmission.torrents', fn() => $this->transmission->getTorrents());
+        $error    = $torrents === null || $this->transmission->isUnavailable() || $this->transmission->getLastError() !== null;
+        $torrents ??= [];
+        $active   = array_values(array_filter($torrents, fn($t) => $t['state'] === 'downloading'));
+        usort($active, fn($a, $b) => $b['dlspeed'] <=> $a['dlspeed']);
+
+        return $this->render('dashboard/_transmission.html.twig', [
+            'trs_error'  => $error,
+            'trs_stats'  => $error ? null : $this->transmission->getStats($torrents),
+            'trs_active' => array_slice($active, 0, self::MAX_TRANSMISSION),
+        ]);
+    }
+
+    /**
+     * Async fragment — current Emby playback, straight from the Emby
+     * Sessions API (no Tautulli-style middleman exists for Emby). Empty body
+     * when Emby isn't configured / enabled; otherwise the widget body, polled
+     * every 10 s (see index.html.twig). Fails open like the Plex widget.
+     */
+    #[Route('/tableau-de-bord/widget/emby', name: 'app_dashboard_widget_emby')]
+    public function widgetEmby(): Response
+    {
+        if ($this->emby === null || !$this->health->isConfigured('emby')) {
+            return new Response('');
+        }
+        set_time_limit(60);
+
+        return $this->render('dashboard/_emby_activity.html.twig', [
+            'emby' => $this->emby->getActivity(),
         ]);
     }
 
@@ -547,10 +682,9 @@ class DashboardController extends AbstractController
                 $byCountry[$cc][(int) ($rd['type'] ?? 0)] = $rd['release_date'] ?? null;
             }
         }
-        $order = ['FR', 'US'];
-        foreach (array_keys($byCountry) as $cc) {
-            if (!in_array($cc, $order, true)) $order[] = $cc;
-        }
+        // Locale-led country priority (was hardcoded FR→US), then any other
+        // countries the payload contains, so an English user gets US/GB dates.
+        $order = TmdbClient::regionPriority($this->translator->getLocale(), array_keys($byCountry));
         $pick = function (array $types) use ($byCountry, $order): ?\DateTimeImmutable {
             foreach ($order as $cc) {
                 foreach ($types as $t) {
@@ -689,7 +823,7 @@ class DashboardController extends AbstractController
             }
         }
 
-        $labels = ['prowlarr' => 'Prowlarr', 'jellyseerr' => 'Seerr', 'qbittorrent' => 'qBittorrent', 'deluge' => 'Deluge', 'transmission' => 'Transmission', 'sabnzbd' => 'SABnzbd', 'nzbget' => 'NZBGet', 'tmdb' => 'TMDb', 'tautulli' => 'Tautulli', 'trakt' => 'Trakt', 'mdblist' => 'MDBList'];
+        $labels = HealthCatalog::FLAT_SERVICES;
         foreach ($labels as $service => $label) {
             try {
                 $s = $this->health->statusFor($service);
@@ -852,6 +986,9 @@ class DashboardController extends AbstractController
             'actionUrl'    => $actionUrl,
             'actionLabel'  => $this->translator->trans('dashboard.quicklook.manage'),
             'inLibrary'    => true,
+            // Bare *arr ids, for the quick-look's subtitle badge.
+            'radarrId'     => $type === 'movie' ? $id : null,
+            'sonarrId'     => $type === 'series' ? $id : null,
             'airStatus'    => $airStatus,
             'releaseDates' => $type === 'series'
                 ? $this->seriesReleaseChips(
@@ -949,6 +1086,10 @@ class DashboardController extends AbstractController
             'actionUrl'    => $actionUrl,
             'actionLabel'  => $actionLabel,
             'inLibrary'    => $match !== null,
+            // Bare *arr ids of the matched library row, for the quick-look's
+            // subtitle badge. Null when the title is not in the library.
+            'radarrId'     => (!$isTv && $match !== null) ? $match['id'] : null,
+            'sonarrId'     => ($isTv && $match !== null) ? $match['id'] : null,
             'airStatus'    => $airStatus,
             'cast'         => $extras['cast'],
             'providers'    => $extras['providers'],
@@ -1041,10 +1182,10 @@ class DashboardController extends AbstractController
             ];
         }
 
-        // Streaming (flatrate) providers, FR-first then common fallbacks —
+        // Streaming (flatrate) providers, locale-led then common fallbacks —
         // mirrors TmdbController::pickProviders' country priority.
         $providers = [];
-        foreach (['FR', 'BE', 'LU', 'US', 'GB'] as $cc) {
+        foreach (TmdbClient::regionPriority($this->translator->getLocale()) as $cc) {
             $flat = $data['watch/providers']['results'][$cc]['flatrate'] ?? [];
             if ($flat === []) {
                 continue;

@@ -651,6 +651,16 @@
 <script>
 (function () {
   function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  // Turbo re-runs this script on every visit. A listener bound on `document`
+  // would pile up (one more copy per visit) and keep pointing at the previous
+  // visit's DOM. bindDoc() swaps the previous copy for the new one.
+  function bindDoc(type, name, fn) {
+    var slot = '_prismarrModalDoc_' + name;
+    if (window[slot]) document.removeEventListener(type, window[slot]);
+    window[slot] = fn;
+    document.addEventListener(type, fn);
+  }
+  var BASE = window.BASE_PATH;
 
   // Localized strings used by the detail modal + toasts. Built server-side
   // so every label stays in sync with the current request locale.
@@ -838,7 +848,7 @@
       closeDetailModal();
     }
   });
-  document.addEventListener('keydown', function(e) {
+  bindDoc('keydown', 'keydown1', function(e) {
     if (e.key === 'Escape' && detailModal.classList.contains('show')) {
       closeDetailModal();
     }
@@ -915,7 +925,7 @@
   // Marking a title watched from the kebab updates the shared map. Redraw so
   // the chip appears on the title already open, instead of only showing up
   // after a reload.
-  document.addEventListener('prismarr:watch-state-changed', function () {
+  bindDoc('prismarr:watch-state-changed', 'watchState', function () {
     updateWatchStateChip();
   });
 
@@ -1024,7 +1034,7 @@
       actions.push('<button class="btn btn-primary tmdb-add-btn" data-tmdb-id="' + d.id + '" data-tmdb-type="' + d.type + '" data-tmdb-title="' + safeTitle + '">'
         + '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M12 5v14"/><path d="M5 12h14"/></svg>' + (d.type === 'movie' ? TMDB_I18N.add_to_radarr : TMDB_I18N.add_to_sonarr) + '</button>');
     } else {
-      var libUrl = d.type === 'movie' ? '/medias/' + DEFAULT_RADARR_SLUG + '/films' : '/medias/' + DEFAULT_SONARR_SLUG + '/series';
+      var libUrl = d.type === 'movie' ? BASE + '/medias/' + DEFAULT_RADARR_SLUG + '/films' : BASE + '/medias/' + DEFAULT_SONARR_SLUG + '/series';
       if (d.lib_id) libUrl += '?open=' + d.lib_id;
       var btnClass = d.lib_status === 'downloaded' ? 'btn-success' : (d.lib_status === 'missing' || d.lib_status === 'partial' ? 'btn-warning' : 'btn-outline-primary');
       actions.push('<a href="' + libUrl + '" class="btn ' + btnClass + '">'
@@ -1360,7 +1370,7 @@
   }
 
   // Switch video in the gallery
-  document.addEventListener('click', function(e) {
+  bindDoc('click', 'click1', function(e) {
     var vbtn = e.target.closest('.td-video-btn');
     if (!vbtn) return;
     var key = vbtn.dataset.ytKey;
@@ -1377,7 +1387,7 @@
   });
 
   // Scroll arrows for similar + seasons + backdrops (in the modal)
-  document.addEventListener('click', function(e) {
+  bindDoc('click', 'click2', function(e) {
     var btn = e.target.closest('[data-td-scroll], [data-seasons-scroll], [data-backdrops-scroll]');
     if (!btn) return;
     var rowId, dirAttr;
@@ -1393,7 +1403,7 @@
   // Lightbox backdrops
   var lb = document.getElementById('td-lightbox');
   var lbImg = document.getElementById('td-lightbox-img');
-  document.addEventListener('click', function(e) {
+  bindDoc('click', 'click3', function(e) {
     var open = e.target.closest('[data-td-lb-open]');
     if (open) {
       lbImg.src = open.dataset.tdLbOpen;
@@ -1405,7 +1415,7 @@
       lbImg.src = '';
     }
   });
-  document.addEventListener('keydown', function(e) {
+  bindDoc('keydown', 'keydown2', function(e) {
     if (!document.getElementById('td-lightbox')) return;
     if (e.key === 'Escape' && lb.classList.contains('show')) {
       lb.classList.remove('show');
@@ -1435,7 +1445,7 @@
     var libBadge = item.in_library ? '<span class="lib-badge" style="background:' + (statusColors[item.lib_status] || '#22c55e') + ';">' + (cardShort[item.lib_status] || cardShort._default) + '</span>' : '';
     var voteBadge = item.vote ? '<span class="vote-badge ' + vc + '">' + {{ ico.icon('star-filled', '', 12)|json_encode|raw }} + ' ' + item.vote + '</span>' : '';
     var hoverBtn  = item.in_library
-      ? '<a href="' + (item.type === 'movie' ? '/medias/' + DEFAULT_RADARR_SLUG + '/films' : '/medias/' + DEFAULT_SONARR_SLUG + '/series') + '?open=' + (item.lib_id||'') + '" class="btn btn-sm" style="background:' + ({downloaded:'#22c55e',missing:'#f59e0b',announced:'#6366f1',inCinemas:'#6366f1',partial:'#3b82f6',unmonitored:'#6b7280'}[item.lib_status]||'#22c55e') + ';color:#fff;">' + (cardShort[item.lib_status] || inLibraryShort) + '</a>'
+      ? '<a href="' + (item.type === 'movie' ? BASE + '/medias/' + DEFAULT_RADARR_SLUG + '/films' : BASE + '/medias/' + DEFAULT_SONARR_SLUG + '/series') + '?open=' + (item.lib_id||'') + '" class="btn btn-sm" style="background:' + ({downloaded:'#22c55e',missing:'#f59e0b',announced:'#6366f1',inCinemas:'#6366f1',partial:'#3b82f6',unmonitored:'#6b7280'}[item.lib_status]||'#22c55e') + ';color:#fff;">' + (cardShort[item.lib_status] || inLibraryShort) + '</a>'
       : '<button type="button" class="btn btn-primary btn-sm tmdb-add-btn" data-tmdb-id="' + item.id + '" data-tmdb-type="' + item.type + '" data-tmdb-title="' + safeTitle + '">' + {{ 'decouverte.action.add'|trans|json_encode|raw }} + '</button>';
 
     var wlClass = (window._prismarrWatchlist && window._prismarrWatchlist[item.type + '_' + item.id]) ? ' in-wl' : '';
@@ -1468,7 +1478,7 @@
   function loadDetail(type, id) {
     openDetailModal();
     var seq = ++detailSeq;
-    fetch('/decouverte/detail/' + type + '/' + id, { credentials: 'same-origin' })
+    fetch(BASE + '/decouverte/detail/' + type + '/' + id, { credentials: 'same-origin' })
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (seq !== detailSeq) return; // a newer title was opened meanwhile
@@ -1484,7 +1494,7 @@
       });
   }
 
-  document.addEventListener('click', function(e) {
+  bindDoc('click', 'click4', function(e) {
     if (e.target.closest('.tmdb-add-btn') || e.target.closest('.h-actions') || e.target.closest('a') || e.target.closest('.wl-star') || e.target.closest('.dv-kebab-wrap')) return;
     var card = e.target.closest('.media-card[data-tmdb-id]');
     if (!card) return;
@@ -1507,7 +1517,7 @@
   function directQuickAdd(btn, type, id, restore) {
     // No Seerr: fall back to the direct Radarr/Sonarr quick-add, so the
     // button never goes dead for a setup without Seerr.
-    fetch('/decouverte/resolve/' + type + '/' + id, { credentials: 'same-origin' })
+    fetch(BASE + '/decouverte/resolve/' + type + '/' + id, { credentials: 'same-origin' })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
       .then(function (res) {
         restore();
@@ -1530,7 +1540,7 @@
       });
   }
 
-  document.addEventListener('click', function (e) {
+  bindDoc('click', 'quickAdd', function (e) {
     var btn = e.target.closest('.tmdb-add-btn');
     if (!btn) return;
     e.preventDefault();
@@ -1593,6 +1603,7 @@
   window.seasonsEpisodes = seasonsEpisodes;
   window.renderCardHTML  = renderCardHTML;
   window.voteClass       = voteClass;
+  window.loadDetail      = loadDetail;
 
   window.PrismarrDetail = window.PrismarrDetail || {};
   window.PrismarrDetail.load  = loadDetail;
